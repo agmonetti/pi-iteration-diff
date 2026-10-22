@@ -293,3 +293,28 @@ y sesión Herdr nombrada, con integración oficial explícita, están en M0.md.
 Resultado automatizado de esta continuación: `npm run check` PASS 10/10. Sin PTY
 nueva, sin pruebas humanas; compatibilidad Herdr no certificada. M0 permanece abierto.
 
+### Evidencia humana Pi + Herdr y foco (reporte recibido 2026-10-22)
+
+El operador informa Arch Linux, Pi 1.4.0 y Herdr 0.9.5; probó Pi directo y un pane
+real Herdr con el spike y la integración oficial cargados. H1/H2/H4/H6 PASS en ambos:
+dock derecho, selección mouse, alternancia de foco y anexado explícito sin autosend
+son viables en ese entorno. H3 funcional PASS pero indicador visual ausente (FAIL);
+H8 PASS limitado a cierre/resize/restauración reportados. No hay certificación
+individual de detach/reattach, zoom, split, reload o cambios/restauración de sesión.
+La captura mencionada no fue adjuntada para inspección; fuente: informe humano.
+Terminal cliente, dimensiones y hora de ejecución no informados (detalle en M0.md).
+
+Se adopta la API pública Focusable (`focused`) para el indicador H3. TUI actualiza
+esa propiedad tanto por teclado como por foco solicitado con mouse. Encabezado
+existente en accent del tema activo sólo al enfocar, sin editor custom ni internals
+nuevos. Test automatizado de transiciones pasa; contraste físico pendiente de repetir.
+ADR-002/004/005 tienen ahora evidencia humana positiva **acotada al spike y acciones
+reportadas**. No convertirla en aprobación global FR-12/14 ni compatibilidad universal.
+
+Drag literal observado sin transferencia (copia al portapapeles en Pi): puede ser
+selección nativa/semántica de captura, no evidencia de imposibilidad del protocolo.
+El spike sólo registra release cruzado, no hit-test del editor ni payload de drop.
+Por ahora FR-16 NOT IMPLEMENTED y sin excepción aprobada. La alternativa seleccionar
+→ a queda validada por humano; evaluar captura/hit-test y conservación de rango
+antes de decidir implementación literal, no extrapolar desde selección terminal.
+

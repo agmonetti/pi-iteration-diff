@@ -55,6 +55,7 @@ export default function feasibilitySpike(pi: ExtensionAPI): void {
             render: () => tui.requestRender(),
             append: (start, end) => ctx.ui.setEditorText(appendExcerpt(ctx.ui.getEditorText(), start, end)),
             editor: () => dock?.focusEditor(),
+            highlight: (text) => ctx.ui.theme.fg("accent", text),
           });
           dock = mountDock(tui, panel);
           unsubscribe = ctx.ui.onTerminalInput((data) => {

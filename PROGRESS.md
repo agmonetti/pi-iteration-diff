@@ -9,10 +9,10 @@
 ## 1. Resumen del estado
 
 - **Completado en este bloque:** investigación local de APIs; scaffold mínimo; dock sintético manual `/m0-diff`, selección teclado/mouse normalizado, append al editor y cleanup.
-- **Tests ejecutados:** `npm run check` PASS (10 tests: 5 UI + 5 lifecycle SDK). Smoke PTY histórico PASS, no repetido en esta continuación; no sustituye interacción humana. Arquitecto revisó plan y diff.
-- **No comprobado:** mouse físico y matriz humana Pi/Herdr; drag/drop al editor; lifecycle HTTP/proveedor, aborto de herramienta y resume. Lifecycle SDK local con herramientas, colas/retry/aborto de stream PASS (entrada nueva al final); snapshots no implementados.
-- **Siguiente acción:** completar matriz humana H1–H8 de `M0.md` y trazas lifecycle L1–L6 en fixture autorizado. M0 no está cerrado.
-- **Continuación:** comandos humanos A/B y evidencia SDK al final de `M0.md`; mouse físico, HTTP retry, aborto de herramienta y resume siguen pendientes.
+- **Tests ejecutados:** `npm run check` PASS (11 tests: 6 UI + 5 lifecycle SDK). Sin PTY nueva; pruebas humanas recibidas por informe del operador, no simuladas.
+- **Validado por humano:** Pi directo y pane Herdr con integración oficial: dock, mouse/rangos, foco funcional, anexado sin autosend; H8 cierre/resize/restauración sólo reportados parcialmente.
+- **Corregido:** indicador visual de foco en encabezado con accent del tema, sin modificar editor. Automatizado PASS; nueva validación humana del indicador pendiente.
+- **Pendiente:** HTTP retry, aborto de herramienta, restauración de sesiones, contrato de entradas agrupadas y drag literal. M0 abierto; no snapshots/M1.
 
 ## 2. Entregables documentales (2026-10-22)
 
@@ -27,7 +27,7 @@
 
 | Milestone | Estado | Evidencia/criterio pendiente |
 |---|---|---|
-| M0 Factibilidad | **IN PROGRESS / PARTIAL** | Suite + PTY PASS; matriz humana Herdr/Pi y trazas lifecycle pendientes |
+| M0 Factibilidad | **IN PROGRESS / PARTIAL** | H1/H2/H4/H6 humanos PASS reportados; foco visual corregido; matriz restante y lifecycle extendido pendientes |
 | M1 Snapshots | **NOT STARTED** | Delta neto por petición y separación de cambios antiguos |
 | M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
 | M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
@@ -284,4 +284,41 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
   sólo cuatro rutas propias previstas. Commit lógico único para suite M0 y su
   protocolo/evidencia: `test(lifecycle): verify turns queues retry and abort`.
   Sin push, tags ni cambios de configuración.
+
+### 2026-10-22 — M0 / evidencia humana e indicador de foco
+
+**Cambió**
+- `src/ui/feasibility-panel.ts`: Focusable público; encabezado resaltado sólo con
+  foco, solicita render en cada cambio real. `src/index.ts`: inyecta accent del tema
+  actual, sin editor custom ni estado duplicado en el adaptador.
+- `tests/feasibility.test.ts`: transición de foco por F6/Esc, mouse al panel/editor,
+  resize y cierre; borrador/selección intactos. Sin nuevos elementos decorativos.
+- `M0.md`, `RESEARCH.md`: registro humano como reporte del operador y límites de H8;
+  no se inventa captura inspeccionada, fecha de ejecución ni terminal cliente.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| H1/H2/H4/H6 | Humano, Arch Linux, Pi 1.4.0 y Herdr 0.9.5 | PASS reportado | Dock, mouse/rangos, anexado sin reemplazo/envío en ambos |
+| H3 | Mismo entorno humano, versión previa | PASS funcional / FAIL visual | F6/Esc/click funcionan, falta indicador |
+| H8 | Mismo entorno humano | PASS parcial reportado | Cierre/resize/restauración realizados; no inferir otros subcasos |
+| H5 | Pi/Herdr humano | NOT IMPLEMENTED | Drop no transfiere; copia observada no demuestra imposibilidad |
+| npm run check | Node 26.12.0, Pi/TUI 1.4.0 | PASS | tsc; 11/11, 0 fallos, suite 1406 ms |
+
+**Fallos / límites / decisiones**
+- Resaltar sólo encabezado con token accent cumple el alcance solicitado; normal
+  cuando editor tiene foco. El tema se consulta en render, no se cachean colores.
+- Informe humano recibido hoy, sin hora/terminal/dimensiones ni captura adjunta.
+  No certificar Herdr universalmente. Sin cambios a integración/estados oficiales.
+- Arquitecto aprobó plan y revisión final de este bloque sin bloqueantes.
+- LSP activo en tres rutas: 0 errores, 1 clean confirmado y 2 inconclusos por
+  servidor silencioso; tsc PASS es el gate de tipos. Revisión status/diff/cached
+  antes de commit por seis rutas explícitas; sin push.
+
+**Falta probar**
+- Nuevo indicador con el tema/terminal humano, subcasos H7/H8 específicos.
+- Retry HTTP local real, abort bash, persistencia/restauración y contrato de colas.
+
+**Próximo paso**
+- Completar fixtures técnicos M0 aislados, sin avanzar a M1.
 

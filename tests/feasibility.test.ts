@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Container, ScrollView, TuiAltScreen, TuiMainScreen, VStack, visibleWidth,
+import { Container, ScrollView, TuiAltScreen, TuiMainScreen, VStack, visibleWidth, matchesKey,
   type Terminal, type Component } from "@earendil-works/pi-tui";
 import { mountDock } from "../src/ui/layout-adapter.js";
 import { appendExcerpt, FeasibilityPanel } from "../src/ui/feasibility-panel.js";
@@ -33,6 +33,7 @@ function fixture() {
   let draft = "existing draft";
   const editor: Component = {
     invalidate() {}, render: () => [draft], handleInput(data) { draft += data; },
+    handleMouse: () => ({ handled: true, focus: true }),
   };
   const components = Array.from({ length: 7 }, () => new Container());
   components[0].addChild({ invalidate() {}, render: () => ["native conversation"] });
@@ -48,6 +49,7 @@ function fixture() {
     render: () => tui.requestRender(),
     append: (start, end) => { draft = appendExcerpt(draft, start, end); },
     editor: () => tui.setFocus(editor),
+    highlight: (text) => `\x1b[36m${text}\x1b[39m`,
   });
   return { terminal, tui, native, panel, editor, draft: () => draft };
 }
@@ -116,6 +118,49 @@ test("resize: hide panel at narrow width, restore editor focus, respect ANSI/Uni
     f.terminal.resize(); f.tui.renderNow(true);
     assert.ok(f.tui.getScreenLines().some((line) => line.includes("M0 SYNTHETIC")));
   } finally { dock.close(); f.tui.stop(); }
+});
+
+test("focus heading follows F6, Esc, mouse and resize without changing selection or draft", () => {
+  const f = fixture();
+  const dock = mountDock(f.tui, f.panel);
+  // Same public input hook used by /m0-diff; no native editor modifications.
+  const unsubscribe = f.tui.addInputListener(data => {
+    if (!matchesKey(data, "f6")) return;
+    dock.focusPanel();
+    return { consume: true };
+  });
+  const highlighted = (): boolean => {
+    f.tui.renderNow(true);
+    assert.equal(f.panel.focused, f.tui.getFocusedComponent() === f.panel);
+    return f.tui.getScreenLines().some(line => line.includes("\x1b[36m│ M0 SYNTHETIC"));
+  };
+  f.tui.start();
+  try {
+    assert.equal(highlighted(), false);
+    f.terminal.input("\x1b[17~"); // F6
+    assert.equal(highlighted(), true);
+    f.terminal.input("\x1b");
+    assert.equal(highlighted(), false);
+    f.terminal.input("\x1b[<0;90;4M");
+    f.terminal.input("\x1b[<0;90;4m");
+    assert.equal(highlighted(), true);
+    // Editor is on the final row of the native viewport.
+    f.terminal.input("\x1b[<0;3;24M");
+    f.terminal.input("\x1b[<0;3;24m");
+    assert.equal(highlighted(), false);
+    f.terminal.input("\x1b[17~");
+    assert.equal(highlighted(), true);
+    f.terminal.columns = 80;
+    f.terminal.resize();
+    assert.equal(highlighted(), false);
+    f.terminal.columns = 120;
+    f.terminal.resize();
+    assert.equal(highlighted(), false);
+    assert.deepEqual(f.panel.range(), [0, 0]);
+    assert.equal(f.draft(), "existing draft");
+    dock.close();
+    assert.equal(f.panel.focused, false);
+  } finally { unsubscribe(); dock.close(); f.tui.stop(); }
 });
 
 test("unknown ownership and regular mode are rejected; cleanup never clobbers a later owner", () => {

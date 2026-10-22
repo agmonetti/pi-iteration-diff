@@ -1,5 +1,5 @@
 import { matchesKey, truncateToWidth, type Component, type TuiMouseEvent,
-  type TuiMouseEventResult } from "@earendil-works/pi-tui";
+  type TuiMouseEventResult, type Focusable } from "@earendil-works/pi-tui";
 
 const lines = ["const café = '🙂 e\u0301';", "\treturn café;", "// synthetic M0 fixture"];
 
@@ -8,7 +8,14 @@ export function appendExcerpt(draft: string, start: number, end: number): string
 }
 
 /** Synthetic probe only: not a diff parser or a product review model. */
-export class FeasibilityPanel implements Component {
+export class FeasibilityPanel implements Component, Focusable {
+  private hasFocus = false;
+  get focused(): boolean { return this.hasFocus; }
+  set focused(value: boolean) {
+    if (this.hasFocus === value) return;
+    this.hasFocus = value;
+    this.actions.render();
+  }
   anchor = 0;
   cursor = 0;
   private dragging = false;
@@ -17,11 +24,13 @@ export class FeasibilityPanel implements Component {
     render(): void;
     append(start: number, end: number): void;
     editor(): void;
+    highlight(text: string): string;
   }) {}
   invalidate(): void {}
   render(width: number): string[] {
     const [start, end] = this.range();
-    return ["│ M0 SYNTHETIC (not workspace)",
+    const heading = "│ M0 SYNTHETIC (not workspace)";
+    return [this.focused ? this.actions.highlight(heading) : heading,
       "│ ↑/↓ move; Shift+↓ range",
       "│ a append; Esc editor",
       ...lines.map((line, i) => `│ ${i >= start && i <= end ? ">" : " "} ${i + 1} ${line.replaceAll("\t", "    ")}`),
