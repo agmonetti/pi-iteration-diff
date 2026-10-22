@@ -263,3 +263,33 @@ pasos reproducibles en `M0.md`. M0 permanece abierto y no habilita M1.
   M0 abierto; ninguna implementación de snapshots/M1. Próximo trabajo: ejecución
   humana H1–H8 y fixture/trazas L1–L6, antes de fijar fronteras de iteración.
 
+### Evidencia SDK adicional (2026-10-22)
+
+`tests/lifecycle.test.ts` ejecutado contra AgentSession/Agent reales de Pi 1.4.0,
+con `agent.streamFunction` público sustituido por stream local, sin red. Herramientas
+write/edit/bash reales en mkdtemp privado: cuatro turn_end y un agent_settled.
+Steering/follow-up encolados llegan a la segunda solicitud; ambos casos terminan
+con un solo settled. Por ello una frontera settled puede agrupar varias entradas
+explícitas: **no equivale necesariamente a una petición individual**. ADR-003 sigue
+abierto; antes de M1 resolver separación o advertencia de captura agrupada, sin
+atribuir snapshots individuales donde el runtime no expone una frontera aislada.
+
+Retry normalizado `429 rate limit exceeded` produce agent_end, auto_retry_start,
+nuevo agent_start, auto_retry_end y sólo después settled false. Abort de stream
+produce settled true; nueva petición posterior settled false. Son aserciones de
+runtime, no una lista de eventos fabricada ni test de transporte HTTP. Falta abort
+de herramienta, retry HTTP y restauración persistente. Metadatos registrados sin
+prompts/código; fixture elimina archivos y dispone sesión en finally.
+
+Drag: la implementación actual no hace hit-testing/drop al editor. No hay evidencia
+para declarar imposible o no confiable el protocolo de Pi/Herdr en general. La
+captura cruzada y coordenadas locales son un riesgo concreto: arrastrar fuera puede
+cambiar el rango. Mantener el arrastre literal como NOT IMPLEMENTED / validación
+humana NOT RUN. Alternativa propuesta y ya presente en el spike: seleccionar dentro
+del panel → `a` anexa al editor explícitamente, preservando borrador, sin envío.
+No equivale a FR-16 ni constituye una excepción aprobada. Comandos humanos para Pi
+y sesión Herdr nombrada, con integración oficial explícita, están en M0.md.
+
+Resultado automatizado de esta continuación: `npm run check` PASS 10/10. Sin PTY
+nueva, sin pruebas humanas; compatibilidad Herdr no certificada. M0 permanece abierto.
+

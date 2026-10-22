@@ -9,10 +9,10 @@
 ## 1. Resumen del estado
 
 - **Completado en este bloque:** investigación local de APIs; scaffold mínimo; dock sintético manual `/m0-diff`, selección teclado/mouse normalizado, append al editor y cleanup.
-- **Tests ejecutados:** `npm run check` PASS (5 tests); smoke PTY del CLI instalado PASS, repetidos al cierre. Revisión del arquitecto previa y final sin bloqueantes en el spike parcial.
-- **No comprobado:** mouse físico y matriz humana Pi/Herdr; drag/drop al editor; lifecycle con herramientas, colas/retry/aborto; snapshots (no implementados).
+- **Tests ejecutados:** `npm run check` PASS (10 tests: 5 UI + 5 lifecycle SDK). Smoke PTY histórico PASS, no repetido en esta continuación; no sustituye interacción humana. Arquitecto revisó plan y diff.
+- **No comprobado:** mouse físico y matriz humana Pi/Herdr; drag/drop al editor; lifecycle HTTP/proveedor, aborto de herramienta y resume. Lifecycle SDK local con herramientas, colas/retry/aborto de stream PASS (entrada nueva al final); snapshots no implementados.
 - **Siguiente acción:** completar matriz humana H1–H8 de `M0.md` y trazas lifecycle L1–L6 en fixture autorizado. M0 no está cerrado.
-- **Continuación:** protocolos precisados; checks repetidos PASS. Mouse físico y lifecycle real siguen pendientes; preparación de commit inicial por rutas explícitas documentada al final.
+- **Continuación:** comandos humanos A/B y evidencia SDK al final de `M0.md`; mouse físico, HTTP retry, aborto de herramienta y resume siguen pendientes.
 
 ## 2. Entregables documentales (2026-10-22)
 
@@ -229,4 +229,59 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
   sin bloqueantes; no ejecutó interacción humana ni confirmó compatibilidad.
 - M0 sigue abierto. Próximo paso exclusivo: operador ejecuta H1–H8; luego completar
   fixture retry e instrumentación/trazas L1–L6 antes de confirmar ADR-003. M1 bloqueado.
+
+### 2026-10-22 — M0 / lifecycle SDK y preparación humana
+
+**Cambió**
+- `tests/lifecycle.test.ts`: cinco casos contra AgentSession real, stream de modelo
+  local controlado; herramientas write/edit/bash reales en temporal privado.
+- `M0.md`: comandos exactos para terminal común y sesión Herdr de prueba, integración
+  oficial explícita y secuencia corta de mouse/foco/append/drop/cierre/restore.
+- `RESEARCH.md`: evidencia y límites; settled puede agrupar peticiones encoladas.
+  No se escribió código de M1 ni se cambió el spike UI o la instalación del usuario.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| Versiones; integration status; test -t 0 | Linux, Node 26.12.0, Pi 1.4.0, Herdr 0.9.5 | PASS / NO_TTY | Pi v9 current; sin interacción humana |
+| Primer npm run check | Node 26.12.0 | FAIL | 5 UI PASS; 5 SDK fallan por validación de API key antes del stream local |
+| npm run check (tres ejecuciones tras corrección) | Pi/TUI npm 1.4.0 | PASS | tsc; 10/10, 0 fallos; última suite 1462 ms |
+| L1-SDK | Workspace mkdtemp 0700 | PASS | 4 turn_end, un settled false; write/edit/bash, contenido final three |
+| L2/L3-SDK | Stream local detenido por gate | PASS | steer/followUp queued, requests ven 1→2 usuarios, un settled |
+| L4-SDK | Error normalizado 429→éxito | PASS | 2 agent_end, retry_start/end, un settled false |
+| L5-SDK | Abort durante stream y petición posterior | PASS | settled true y recuperación settled false |
+| lens_diagnostics source=lsp scope=paths | tests/lifecycle.test.ts | PASS con hints | Sin errores; 2 hints getModel deprecated (compat API del ejemplo SDK) |
+| H1–H8 Pi/Herdr físicos | Operador humano requerido | NOT RUN | Comandos preparados; NO_TTY no permite validación física |
+| PTY | No ejecutada en esta continuación | NOT RUN | No se usa para sustituir pruebas humanas |
+| L6, HTTP 429, abort bash | Fuera de cobertura de la nueva suite | NOT RUN | Sesión en memoria, error normalizado, abort stream solamente |
+
+**Fallos / límites / decisiones**
+- Hipótesis tras fallo inicial: prompt valida API key antes de llamar streamFunction.
+  Prueba mínima: clave ficticia en ModelRuntime en memoria; los cinco SDK pasan.
+  No se usaron credenciales reales ni HTTP; no persistencia de sesiones/prompts.
+- Errores transitorios de tipado (streamFn vs streamFunction y unión de argumentos)
+  corregidos consultando declaraciones; errores de reemplazo textual parcial no
+  afectaron archivos ajenos. Gate final tsc PASS.
+- Instrumentación SDK imprime sólo nombres de eventos/herramientas y aborted;
+  conteos de usuarios verifican consumo de cola sin imprimir contenido. Cleanup
+  session.dispose y borrado temporal en finally. No se escribe en Git para operar.
+- Arquitecto revisó plan y diff final: aprobado condicionado a esta entrada de
+  bitácora, ahora agregada. No verificó mouse ni aprobó compatibilidad Herdr.
+- Drag literal no implementado; no se demostró imposibilidad técnica del terminal.
+  Alternativa: seleccionar dentro del panel y pulsar a para anexar explícitamente.
+  No equivale a paridad FR-16 ni excepción aprobada. Cursor/undo no certificados.
+- M0 abierto: settled no basta para separar cada entrada encolada. ADR-003 pendiente.
+
+**Falta probar**
+- H1–H8 humanos en ambos entornos, convivencia runtime con integración oficial,
+  sesiones persistentes/reload/resume, HTTP retry y aborto de herramienta.
+
+**Próximo paso**
+- Operador ejecuta A/B de M0.md y devuelve tabla observada. No avanzar a M1.
+
+**Git**
+- Estado inicial limpio, base 0e19b47. Revisados status, diff y cached (vacío);
+  sólo cuatro rutas propias previstas. Commit lógico único para suite M0 y su
+  protocolo/evidencia: `test(lifecycle): verify turns queues retry and abort`.
+  Sin push, tags ni cambios de configuración.
 
