@@ -9,10 +9,11 @@
 ## 1. Resumen del estado
 
 - **Completado en este bloque:** investigación local de APIs; scaffold mínimo; dock sintético manual `/m0-diff`, selección teclado/mouse normalizado, append al editor y cleanup.
-- **Tests ejecutados:** `npm run check` PASS (11 tests: 6 UI + 5 lifecycle SDK). Sin PTY nueva; pruebas humanas recibidas por informe del operador, no simuladas.
+- **Tests ejecutados:** `npm run check` PASS (14 tests: 6 UI + 5 stream SDK + 3 HTTP SDK). Sin PTY nueva; pruebas humanas recibidas por informe del operador, no simuladas.
 - **Validado por humano:** Pi directo y pane Herdr con integración oficial: dock, mouse/rangos, foco funcional, anexado sin autosend; H8 cierre/resize/restauración sólo reportados parcialmente.
 - **Corregido:** indicador visual de foco en encabezado con accent del tema, sin modificar editor. Automatizado PASS; nueva validación humana del indicador pendiente.
-- **Pendiente:** HTTP retry, aborto de herramienta, restauración de sesiones, contrato de entradas agrupadas y drag literal. M0 abierto; no snapshots/M1.
+- **Lifecycle extendido:** HTTP loopback 429→200, aborto bash real y restore persistente SDK PASS. Contrato de iteración documentado, sin confundir colas agrupadas con petición individual.
+- **Pendiente:** revalidar foco visual humano, subcasos H7/H8 y restauración TUI; fronteras individuales de colas o excepción aprobada; drag literal. M0 abierto; no snapshots/M1.
 
 ## 2. Entregables documentales (2026-10-22)
 
@@ -321,4 +322,51 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
 
 **Próximo paso**
 - Completar fixtures técnicos M0 aislados, sin avanzar a M1.
+
+### 2026-10-22 — M0 / HTTP real, aborto bash y restore persistente SDK
+
+**Cambió**
+- `tests/lifecycle-http.test.ts`: servidor HTTP loopback efímero y adaptador real
+  openai-completions, sin reemplazar stream. Tres casos con workspace privado 0700,
+  sin credenciales reales, discovery/red de catálogo desactivados, cleanup finally.
+- `M0.md`: trazas, matriz de aceptación actual, contrato de iteración y evaluación
+  técnica del drag literal. `RESEARCH.md`: evidencia y decisión semántica ADR-003.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| npx --no-install tsx --test tests/lifecycle-http.test.ts (dos ejecuciones) | Linux 7.2.11-arch1-1, Node 26.12.0, Pi npm 1.4.0 | PASS 3/3 | HTTP 429→200, abort bash y restore SDK |
+| L4-HTTP | Servidor 127.0.0.1 puerto efímero | PASS | 2 solicitudes, 2 agent_end, retry_start/end, un settled false; un before_agent_start |
+| L5-bash + recuperación | Procesos bash/sleep reales | PASS | Ambos no vivos, sin after.txt ni request posterior al abort hasta petición nueva; settled true→false |
+| L6-SDK persistente + nueva sesión | Sesiones sintéticas en temporal privado | PASS | Mismo ID y mensajes al reabrir; otra sesión tiene ID nuevo y cero usuarios previos; 3 session_start |
+| npm run check | Node 26.12.0, npm 12.2.1, Pi/TUI 1.4.0 | PASS | tsc; 14/14, 0 fallos, suite 1769 ms |
+| lens_diagnostics source=lsp scope=paths | tests/lifecycle-http.test.ts | PASS | Clean confirmado; 0 diagnósticos |
+| /resume,/new,/reload TUI, detach/reattach | Interacción humana no ejecutada por agente | NOT RUN individualmente | SDK restore no sustituye matriz UI |
+
+**Fallos / límites / decisiones**
+- Tipos iniciales: provider retry pertenece a retry.provider, modo de bind debe
+  ser print (no sdk), sessionFile requiere narrowing explícito; corregidos antes
+  de pruebas, tsc final PASS. No fallos de ejecución en los fixtures HTTP.
+- Hooks registrados sólo por nombre; no cuerpos HTTP/headers/prompts en logs.
+  El error 429 es HTTP real local, no certifica proveedor externo/OAuth/TLS.
+- Abort puede omitir agent_before_settle: usar settled/shutdown para cleanup.
+  Se comprueba proceso ausente o zombie Linux (ha salido, puede esperar reaping);
+  no prometer que no existe entrada de proceso en sistemas contenedorizados.
+- Decisión ADR-003: no inferir petición individual si entran colas durante el run;
+  declarar ambigüedad/indisponibilidad antes que atribuir falsamente cambios. No hay
+  excepción aprobada para FR-03; sigue siendo bloqueo de aceptación, no cambio de DoD.
+- Drag: API pública tiene screenX/Y y capture, pero no payload de drop. El spike
+  sólo registra release y cambia cursor: falta preservar rango y reconocer editor.
+  Próximo experimento documentado; ninguna conclusión de imposibilidad ni paridad.
+- Arquitecto revisó plan y diff final del bloque HTTP/abort/restore sin bloqueantes.
+  Revisados status/diff/cached; staging previsto sólo de test HTTP y tres documentos.
+- M0 continúa abierto. No código de snapshots, parser ni UX M3. Sin push.
+
+**Falta probar**
+- H3 visual humano nuevo, H7/H8 individualizados (incluye restauración TUI),
+  gesto literal hacia editor y separación de peticiones encoladas/excepción aprobada.
+
+**Próximo paso**
+- Operador revalida H3 y precisa subcasos H8; luego experimento acotado de destino
+  drag y frontera de colas. No avanzar a M1.
 

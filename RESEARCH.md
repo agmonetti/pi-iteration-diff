@@ -318,3 +318,41 @@ Por ahora FR-16 NOT IMPLEMENTED y sin excepción aprobada. La alternativa selecc
 → a queda validada por humano; evaluar captura/hit-test y conservación de rango
 antes de decidir implementación literal, no extrapolar desde selección terminal.
 
+### Pendientes técnicos M0: evidencia HTTP/abort/restore (2026-10-22)
+
+`tests/lifecycle-http.test.ts` PASS 3/3; suite global PASS 14/14. Usa adaptador
+openai-completions real y servidor loopback efímero, sin stream mock ni salida a
+proveedores remotos. HTTP 429→200 con retry de proveedor deshabilitado provoca
+retry de AgentSession y un solo settled final; hook before_agent_start sólo una
+vez. Confirma mantener la ventana a través de agent_end y retry.
+
+Abort de bash real con sleep: termina ambos procesos (no vivos: ausentes o zombie
+en Linux), no ejecuta escritura posterior ni dispara otra solicitud antes de una
+petición nueva. Settled true omite agent_before_settle: cleanup no puede depender
+de ese hook. Reapertura de sesión persistente sintética privada conserva ID e
+historial; nueva sesión no comparte ID ni mensajes. session_start se emite en las
+tres instancias al bind de extensiones. Falta UI de /resume,/new,/reload y shutdown
+con layout montado; reapertura SDK no demuestra recuperación visual del terminal.
+
+**ADR-003 / contrato semántico establecido en M0:** petición aislada idle aceptada
+más continuaciones automáticas; turn_end/agent_end/retry no son fin. Settled cierra
+la ventana automática, aborted=true implica cancelada/parcial. Si entran mensajes
+explícitos por colas, marcar la ventana agrupada/ambigua, nunca individual ni Last
+iteration de una sola petición. Se rechaza atribución falsa: si no se demuestra una
+frontera individual, declarar indisponibilidad del delta individual en lugar de
+mostrar un grupo o un resultado anterior como último. Esa limitación **no es una
+excepción FR-03 aprobada**; aceptación de colas y gate M0 siguen abiertos. Tabla de
+señales, baseline temprano y política ante sesión/worktree/reload en M0.md. No se
+ha implementado captura; no se cambia alcance/requisitos ni se habilita M1.
+
+**Drag: siguiente experimento, no conclusión de inviabilidad.** Declaraciones públicas
+Pi TUI 1.4.0: TuiMouseEvent incluye screenX/Y, x/y locales y tamaño; capture retiene
+release en el componente origen. No existe payload de transferencia/drop en
+TuiMouseEventResult. Sería necesario conservar el rango seleccionado y reconocer
+el destino editor sin reenviar eventos que activen selección nativa. El spike no
+hace ninguna de esas dos cosas; el reporte de copia no permite culpar al terminal
+ni a Herdr. La extensión podría interpretar release como gesto explícito, pero su
+fiabilidad depende de pruebas humanas de captura/destino y resize aún pendientes.
+No se agregó código de UX M3 ni accesos internos al editor. H5 NOT IMPLEMENTED y
+sin excepción aprobada; seleccionar→a sigue siendo la alternativa validada.
+
