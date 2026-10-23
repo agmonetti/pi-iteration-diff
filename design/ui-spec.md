@@ -73,8 +73,12 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 ## 4. Hunks y Líneas de Código (Unified Diff)
 
 - **Fila única por línea:** Un único renglón visual por línea de diff; sin envoltorio automático (no wrap).
-- **Gutter compacto y fijo:** Columnas compactas para números de línea antiguos y nuevos (`old:new` en `dim`), fijas ante desplazamientos de código.
-- **Desplazamiento horizontal (Pan):** `←`/`→` o `h`/`l` desplazan únicamente el contenido del código, manteniendo fijo el separador y el gutter. Un indicador `«` señala código oculto a la izquierda.
+- **Gutter compacto y adaptativo:**
+  - Archivos creados: Columna única con números de línea nuevos (`newLine`), liberando 5 columnas adicionales para el código.
+  - Archivos eliminados: Columna única con números de línea antiguos (`oldLine`), liberando 5 columnas adicionales.
+  - Archivos modificados: Dos columnas compactas (`oldLine` y `newLine`) cuando ambas referencias son necesarias.
+  - Eliminación de sangrías redundantes: El código inicia en la columna 10 en archivos creados/eliminados (en lugar de columna 15).
+- **Gutter fijo ante desplazamiento horizontal:** `←`/`→` o `h`/`l` desplazan únicamente el contenido del código, manteniendo fijos el separador y el gutter. Un indicador `«` señala código oculto a la izquierda sin desplazar las columnas.
 - **Colores semánticos Pi Theme:** Adiciones (`toolDiffAdded`), eliminaciones (`toolDiffRemoved`), contexto (`text`), gutter (`dim`), borde (`border`), foco (`accent`).
 - **Encabezados de Hunk discretos:** Formato `@@ -12,3 +12,4 @@` en color tenue `muted`/`dim`.
 - **Selección de Hunk completo:** Posicionarse sobre el encabezado del hunk permite seleccionarlo íntegro para transferir.
@@ -85,17 +89,24 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 
 ### Cabecera (1 línea)
 - Formato: `│ DIFF · Last iteration · N files (+X / -Y)`
-- Estados contextuales concisos (sin tabs ficticios de Current/History):
-  - **Batch Net (Ventana agrupada):** `│ DIFF · Batch Net · N files (+X / -Y) [lote encolado]`
+- **Supresión de avisos rutinarios truncados:** Avisos técnicos extensos sobre snapshots y límites del visor se excluyen de la vista normal para maximizar el espacio útil de archivos.
+- **Detalles bajo demanda:** Conmutables mediante teclado (`d`) o clic con ratón en la cabecera (`y === 0`).
+- **Estados contextuales y advertencias críticas siempre visibles:**
+  - **Batch Net (Ventana agrupada):** `│ DIFF · Batch Net · N files (+X / -Y)`
+  - **Omisiones:** `│ DIFF · Last iteration [omisiones] · N files (+X / -Y)`
+  - **Parcial / Incompleta:** `│ DIFF · Last iteration [parcial] · N files (+X / -Y)`
   - **Interrumpida:** `│ DIFF · Last iteration (interrumpida) · N files`
-  - **Parcial / Truncada:** `│ DIFF · Last iteration [parcial/truncado] · N files`
-  - **Sin cambios:** `│ DIFF · Last iteration · Sin cambios netos observados`
+  - **Fallida:** `│ DIFF · Last iteration (fallida) · N files`
+  - **No disponible:** `│ DIFF · No disponible · Sin cambios netos`
+  - **Sin cambios:** `│ DIFF · Last iteration · Sin cambios netos`
 
 ### Footer (1 línea)
 - Adaptable al ancho del dock:
-  - Estándar (>= 50 cols): `│ a: anexa al editor · Enter/clic: toggle · ↑↓: navegar · Esc: editor · q: cerrar`
-  - Compacto (< 50 cols): `│ a: anexa · Enter: toggle · Esc: editor · q: cerrar`
-  - Estado de selección activa: `│ Sel: L12-14 (3 líneas) · a: anexa al editor`
+  - Sin selección (< 50 cols): `│ Enter: expandir · a: anexar · Esc: editor`
+  - Sin selección (< 75 cols): `│ Enter: expandir · a: anexar · ↑↓: navegar · Esc: editor`
+  - Estándar (>= 75 cols): `│ Enter: expandir · a: anexar · ↑↓: navegar · Esc: editor · d: detalles`
+  - Con selección (< 55 cols): `│ N líneas seleccionadas · a: anexar`
+  - Con selección (>= 55 cols): `│ Sel: old:X, new:Y (N líneas) · a: anexa al editor`
   - Modo inspección activo (`i`): `│ i: <ruta o línea completa sin truncar>`
 
 ---

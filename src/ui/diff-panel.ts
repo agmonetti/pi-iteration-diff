@@ -37,7 +37,7 @@ export type Entry =
   | { kind: "file_header"; file: DiffFile }
   | { kind: "file_path"; file: DiffFile }
   | { kind: "hunk"; file: DiffFile; row: DiffRow; hunkIndex: number }
-  | { kind: "row"; file: DiffFile; row: DiffRow; hunkIndex: number; rowIndex: number }
+  | { kind: "row"; file: DiffFile; row: DiffRow; hunkIndex: number; rowIndex: number; gutterMode: "new_only" | "old_only" | "dual" }
   | { kind: "notice"; text: string; file?: DiffFile };
 
 // Pi exposes this shape through VStack, not through the package entry exports.
@@ -125,6 +125,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private pressed = false;
   private panX = 0;
   private inspecting = false;
+  private showDetails = false;
 
   // Selection state
   private selectionAnchor: number | null = null;
@@ -156,6 +157,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       this.cursor = 0;
       this.panX = 0;
       this.inspecting = false;
+      this.showDetails = false;
       this.clearSelection();
       this.body.scrollToStart();
       this.pressed = false;
@@ -170,8 +172,20 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   private rebuild(): void {
     const entries: Entry[] = [];
-    for (const text of this.view.notices.slice(0, MAX_NOTICES)) entries.push({ kind: "notice", text });
-    if (this.view.notices.length > MAX_NOTICES) {
+    const hasFiles = this.view.files.length > 0;
+
+    for (const text of this.view.notices.slice(0, MAX_NOTICES)) {
+      if (hasFiles && !this.showDetails) {
+        if (text.startsWith("Diff neto entre snapshots") ||
+            text.startsWith("Límites del visor") ||
+            text.startsWith("Rutas omitidas en los snapshots") ||
+            text.startsWith("Avisos adicionales omitidos")) {
+          continue;
+        }
+      }
+      entries.push({ kind: "notice", text });
+    }
+    if (this.showDetails && this.view.notices.length > MAX_NOTICES) {
       entries.push({ kind: "notice", text: "Avisos adicionales omitidos por límite de vista." });
     }
     let remaining = MAX_CONTENT_ROWS;
@@ -187,13 +201,20 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const rows = file.getRows();
       const count = Math.min(rows.length, MAX_FILE_ROWS, remaining);
       let currentHunk = 0;
+      const hasOld = rows.some(r => r.oldLine !== undefined);
+      const hasNew = rows.some(r => r.newLine !== undefined);
+      const gutterMode: "new_only" | "old_only" | "dual" =
+        file.kind === "created" && !hasOld ? "new_only"
+        : file.kind === "deleted" && !hasNew ? "old_only"
+        : "dual";
+
       for (let index = 0; index < count; index++) {
         const row = rows[index]!;
         if (row.kind === "hunk") {
           currentHunk++;
           entries.push({ kind: "hunk", file, row, hunkIndex: currentHunk });
         } else {
-          entries.push({ kind: "row", file, row, hunkIndex: currentHunk, rowIndex: index });
+          entries.push({ kind: "row", file, row, hunkIndex: currentHunk, rowIndex: index, gutterMode });
         }
       }
       remaining -= count;
@@ -347,18 +368,23 @@ export class DiffPanel extends VStack implements Component, Focusable {
     }
     let scope = "Last iteration";
     const lower = rawTitle.toLowerCase();
+    const hasOmissions = this.view.notices.some(n => n.toLowerCase().includes("omitid") || n.toLowerCase().includes("omisiones"));
+    const isPartial = lower.includes("parcial") || this.view.notices.some(n => n.toLowerCase().includes("incompleta") || n.toLowerCase().includes("parcial"));
+
     if (lower.includes("agrupada") || lower.includes("batch")) {
       scope = "Batch Net";
     } else if (lower.includes("interrumpida") || lower.includes("cancelada")) {
       scope = "Last iteration (interrumpida)";
     } else if (lower.includes("fallida") || lower.includes("falló")) {
       scope = "Last iteration (fallida)";
-    } else if (lower.includes("parcial")) {
+    } else if (isPartial) {
       scope = "Last iteration [parcial]";
     } else if (lower.includes("no disponible")) {
       scope = "No disponible";
     } else if (lower.includes("capturando")) {
       scope = "Capturando";
+    } else if (hasOmissions) {
+      scope = "Last iteration [omisiones]";
     }
 
     const fileCount = this.view.files.length;
@@ -389,16 +415,27 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
     if (this.hasSelection()) {
       const summary = this.getSelectionSummary();
-      const text = truncateToWidth(`│ Sel: ${summary} · a: anexa al editor`, width, "…");
-      return this.actions.style("accent", text);
+      const entries = this.getSelectedEntries();
+      const rows = entries.filter((e): e is Entry & { kind: "row" } => e.kind === "row");
+      const count = rows.length || entries.length;
+      const lineWord = count === 1 ? "línea" : "líneas";
+      const short = width < 55;
+      const text = short
+        ? `│ ${count} ${lineWord} seleccionadas · a: anexar`
+        : `│ Sel: ${summary} · a: anexa al editor`;
+      return this.actions.style("accent", truncateToWidth(text, width, "…"));
     }
 
-    const short = width < 50;
     const panStr = this.panX > 0 ? ` [pan +${this.panX}]` : "";
-    const text = short
-      ? `Enter: abrir${panStr} · a: anexa · Esc: editor · q: cerrar`
-      : `Enter/clic: toggle${panStr} · a: anexa · ↑↓: navegar · Esc: editor · q: cerrar`;
-    return this.actions.style("muted", truncateToWidth(`│ ${text}`, width, "…"));
+    let text: string;
+    if (width < 50) {
+      text = `│ Enter: expandir${panStr} · a: anexar · Esc: editor`;
+    } else if (width < 75) {
+      text = `│ Enter: expandir${panStr} · a: anexar · ↑↓: navegar · Esc: editor`;
+    } else {
+      text = `│ Enter: expandir${panStr} · a: anexar · ↑↓: navegar · Esc: editor · d: detalles`;
+    }
+    return this.actions.style("muted", truncateToWidth(text, width, "…"));
   }
 
   private entryLine(index: number, width: number): string {
@@ -418,6 +455,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const parts = file.path.split("/");
       const basename = parts[parts.length - 1] || file.path;
 
+      let content: string;
       if (file.added !== undefined && file.removed !== undefined) {
         const kindBadge = `[${kind}]`;
         const kindStyled = this.actions.style("muted", kindBadge);
@@ -431,18 +469,20 @@ export class DiffPanel extends VStack implements Component, Focusable {
         const displayName = truncatePath(safeText(basename), avail);
         const nameWithChevron = this.actions.style("bold", `${chevron} ${displayName}`);
 
-        const line = `${prefix}${nameWithChevron} ${kindStyled} ${addStr}${sepStr}${delStr}`;
-        return selected ? this.actions.style("selectedBg", truncateToWidth(line, Math.max(0, width), "…"))
-                        : truncateToWidth(line, Math.max(0, width), "…");
+        content = `${nameWithChevron} ${kindStyled} ${addStr}${sepStr}${delStr}`;
+      } else {
+        const statMsg = "[estadísticas no disponibles]";
+        const kindBadge = `[${kind}]`;
+        const kindStyled = this.actions.style("muted", kindBadge);
+        const nameWithChevron = this.actions.style("bold", `${chevron} ${safeText(basename)}`);
+        content = `${nameWithChevron} ${kindStyled} ${this.actions.style("dim", statMsg)}${file.notice ? ` · ${this.actions.style("warning", safeText(file.notice))}` : ""}`;
       }
-      const statMsg = "[estadísticas no disponibles]";
-      const kindBadge = `[${kind}]`;
-      const kindStyled = this.actions.style("muted", kindBadge);
-      const nameWithChevron = this.actions.style("bold", `${chevron} ${safeText(basename)}`);
-      const text = `${nameWithChevron} ${kindStyled} ${this.actions.style("dim", statMsg)}${file.notice ? ` · ${this.actions.style("warning", safeText(file.notice))}` : ""}`;
-      const line = `${prefix}${text}`;
-      return selected ? this.actions.style("selectedBg", truncateToWidth(line, Math.max(0, width), "…"))
-                      : truncateToWidth(line, Math.max(0, width), "…");
+      if (selected) {
+        const lineContent = `${cursor} ${content}`;
+        const styledContent = this.actions.style("selectedBg", truncateToWidth(lineContent, Math.max(0, width - 1), "…"));
+        return `${border}${styledContent}`;
+      }
+      return truncateToWidth(`${prefix}${content}`, Math.max(0, width), "…");
     }
 
     // 2. File Path (Line 2 of 2: Indented secondary relative path)
@@ -451,22 +491,30 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const indent = "    ";
       const avail = Math.max(4, width - visibleWidth(prefix) - visibleWidth(indent));
       const displayPath = truncatePath(safeText(file.path), avail);
-      const line = `${prefix}${indent}${this.actions.style("dim", displayPath)}`;
-      return selected ? this.actions.style("selectedBg", truncateToWidth(line, Math.max(0, width), "…"))
-                      : truncateToWidth(line, Math.max(0, width), "…");
+      const content = `${indent}${this.actions.style("dim", displayPath)}`;
+      if (selected) {
+        const lineContent = `${cursor} ${content}`;
+        const styledContent = this.actions.style("selectedBg", truncateToWidth(lineContent, Math.max(0, width - 1), "…"));
+        return `${border}${styledContent}`;
+      }
+      return truncateToWidth(`${prefix}${content}`, Math.max(0, width), "…");
     }
 
     // 3. Notice
     if (entry.kind === "notice") {
-      const line = `${prefix}${this.actions.style("muted", safeText(entry.text))}`;
-      return truncateToWidth(line, Math.max(0, width), "…");
+      const content = this.actions.style("muted", safeText(entry.text));
+      return truncateToWidth(`${prefix}${content}`, Math.max(0, width), "…");
     }
 
     // 4. Hunk Header
     if (entry.kind === "hunk") {
-      const line = `${prefix}${this.actions.style("muted", safeText(entry.row.text))}`;
-      return selected ? this.actions.style("selectedBg", truncateToWidth(line, Math.max(0, width), "…"))
-                      : truncateToWidth(line, Math.max(0, width), "…");
+      const content = this.actions.style("muted", safeText(entry.row.text));
+      if (selected) {
+        const lineContent = `${cursor} ${content}`;
+        const styledContent = this.actions.style("selectedBg", truncateToWidth(lineContent, Math.max(0, width - 1), "…"));
+        return `${border}${styledContent}`;
+      }
+      return truncateToWidth(`${prefix}${content}`, Math.max(0, width), "…");
     }
 
     // 5. Code Row
@@ -475,29 +523,36 @@ export class DiffPanel extends VStack implements Component, Focusable {
     const next = row.newLine === undefined ? "" : String(row.newLine);
     const mark = row.kind === "added" ? "+" : row.kind === "removed" ? "-" : " ";
 
-    const numStr = this.actions.style("dim", `${old.padStart(4)} ${next.padStart(4)}`);
+    let numStr: string;
+    if (entry.gutterMode === "new_only") {
+      numStr = this.actions.style("dim", next.padStart(4));
+    } else if (entry.gutterMode === "old_only") {
+      numStr = this.actions.style("dim", old.padStart(4));
+    } else {
+      numStr = this.actions.style("dim", `${old.padStart(4)} ${next.padStart(4)}`);
+    }
+
     const markStr = row.kind === "added" ? this.actions.style("added", mark)
       : row.kind === "removed" ? this.actions.style("removed", mark)
       : mark;
 
     const rawCode = safeText(row.text);
     let codePart = rawCode;
-    let panIndicator = " ";
     if (this.panX > 0) {
       codePart = sliceByColumn(rawCode, this.panX, Number.MAX_SAFE_INTEGER);
-      panIndicator = "«";
     }
-    const panStyled = this.panX > 0 ? this.actions.style("dim", panIndicator) : " ";
+    const sep = this.panX > 0 ? this.actions.style("dim", "«") : " ";
     const codeStyled = row.kind === "added" ? this.actions.style("added", codePart)
       : row.kind === "removed" ? this.actions.style("removed", codePart)
       : this.actions.style("text", codePart);
 
-    const line = `${prefix}${numStr} ${markStr}${panStyled}${codeStyled}`;
+    const content = `${numStr} ${markStr}${sep}${codeStyled}`;
     if (selected) {
-      // Visual selection priority: applies selected background over the whole line
-      return this.actions.style("selectedBg", truncateToWidth(line, Math.max(0, width), "…"));
+      const lineContent = `${cursor} ${content}`;
+      const styledContent = this.actions.style("selectedBg", truncateToWidth(lineContent, Math.max(0, width - 1), "…"));
+      return `${border}${styledContent}`;
     }
-    return truncateToWidth(line, Math.max(0, width), "…");
+    return truncateToWidth(`${prefix}${content}`, Math.max(0, width), "…");
   }
 
   override render(width: number): string[] {
@@ -549,6 +604,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
   handleInput(data: string): void {
     if (matchesKey(data, "escape") || matchesKey(data, "tab")) { this.actions.editor(); return; }
     if (data === "q") { this.actions.close(); return; }
+    if (data === "d") { this.showDetails = !this.showDetails; this.rebuild(); this.actions.render(); return; }
     if (data === "i") { this.inspecting = !this.inspecting; this.actions.render(); return; }
     if (data === "a") { this.transferContext(); return; }
 
@@ -650,8 +706,12 @@ export class DiffPanel extends VStack implements Component, Focusable {
       return { ...result, render: true };
     }
 
-    // Header click focuses panel
+    // Header click focuses panel and toggles details on demand
     if (event.y === 0) {
+      if (event.type === "click" || (event.type === "press" && this.focused)) {
+        this.showDetails = !this.showDetails;
+        this.rebuild();
+      }
       return { ...result, focus: true, render: true };
     }
 

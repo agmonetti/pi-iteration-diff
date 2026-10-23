@@ -913,7 +913,50 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 | `tests/diff-panel.test.ts` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | Cobertura para layout 90/120/160/200, resize, 2-line headers, selection, multi-append, states |
 | `git status --short` | Entorno de desarrollo | PASS | Solo archivos modificados del proyecto; sin archivos extraños |
 
+### 2026-10-23 — M2 / M3: Pulido visual y optimización de espacio en dock
+
+**Estado:** Completado y verificado.
+
+**Cambió**
+- `src/ui/diff-panel.ts`:
+  - **Gutter compacto y adaptativo:**
+    - Archivos creados (`new_only`): Muestra únicamente números de línea nuevos (`newLine`) en 4 columnas, liberando 5 columnas adicionales para el código.
+    - Archivos eliminados (`old_only`): Muestra únicamente números de línea antiguos (`oldLine`) en 4 columnas, liberando 5 columnas.
+    - Archivos modificados (`dual`): Preserva ambas referencias `old` y `new` cuando ambas existen, manteniendo correspondencia exacta y alineación de hunks.
+  - **Reducción de sangría y cercanía al borde:**
+    - Código acercado al borde interior del dock: el código inicia en la columna 10 en archivos creados/eliminados (en lugar de columna 15, un 33% menos de columnas no útiles).
+    - Separador `pan` o espacio de 1 carácter (`sep = panX > 0 ? '«' : ' '`) garantizando un ancho de gutter 100% fijo durante desplazamiento horizontal.
+  - **Cabecera simplificada y avisos técnicos bajo demanda:**
+    - Eliminación de la vista normal de los textos técnicos extensos y truncados (`Diff neto entre snapshots...`, `Límites del visor...`, `Rutas omitidas...`).
+    - Vista de detalles bajo demanda: accesible mediante teclado con tecla `d` o haciendo clic con ratón en la cabecera (`y === 0`).
+    - Conservación visible y permanente de advertencias críticas en el alcance de la cabecera: `[omisiones]`, `[parcial]`, `Batch Net`, `(interrumpida)`, `(fallida)` y `No disponible`.
+  - **Refinamiento de selección visual:**
+    - El separador vertical `│` preserva su color y continuidad nativa de borde (`border`) sin verse roto por la selección.
+    - El contenido de la fila seleccionada aplica prioritariamente `selectedBg` preservando alto contraste en temas oscuros y claros.
+  - **Footer adaptable de 1 sola línea:**
+    - Sin selección estrecho (< 50 cols): `Enter: expandir · a: anexar · Esc: editor`
+    - Sin selección estándar (>= 50 cols): `Enter: expandir · a: anexar · ↑↓: navegar · Esc: editor · d: detalles`
+    - Con selección estrecho (< 55 cols): `N líneas seleccionadas · a: anexar`
+    - Con selección estándar (>= 55 cols): `Sel: old:X, new:Y (N líneas) · a: anexa al editor`
+- `tests/diff-panel.test.ts`:
+  - Actualización del footer test a `Enter: expandir`.
+  - 5 nuevos tests automatizados (total 96 tests):
+    1. Gutter compacto para creados, eliminados y modificados.
+    2. Comparativa de ancho útil de código a 90, 120, 160 y 200 columnas.
+    3. Omisión de avisos rutinarios en vista normal y conmutación bajo demanda con `d` y clic de cabecera.
+    4. Permanencia inmutable de advertencias críticas en cabecera.
+    5. Preservación del borde del dock y aplicación de `selectedBg` en selecciones.
+- `M2.md`, `M3.md`, `design/ui-spec.md`: documentación sincronizada con los cambios visuales y espaciales.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | 96/96 test suites pass (0 fallos, 0 errores tsc) |
+| Render ANSI real con `tsx` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | Código inicia en col 10 (creados/eliminados); header y footer en 1 línea; sin avisos técnicos en vista normal |
+| `git status --short` | Entorno de desarrollo | PASS | Solo archivos de código, tests y documentación modificados |
+
 **Siguiente paso**
-- Validación humana en Pi directo y Pi dentro de Herdr según el protocolo documentado en `M3.md`. No avanzar a M4 ni M5 sin autorización. No push.
+- Detenido según DoD. No avanzar a M4 ni M5. No push.
+
 
 

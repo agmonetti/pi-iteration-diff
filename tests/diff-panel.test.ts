@@ -262,9 +262,9 @@ test("responsive footer and file stats formatting with spaces", () => {
   }
   const tp = p as unknown as TestPanel;
 
-  // Narrow footer (< 45 cols)
+  // Narrow footer (< 50 cols)
   const narrowFooter = tp.footer(40);
-  assert.ok(narrowFooter.includes("Enter: abrir"));
+  assert.ok(narrowFooter.includes("Enter: expandir"));
   assert.ok(!narrowFooter.includes("↑↓: navegar"));
 
   // Standard footer
@@ -581,4 +581,213 @@ test("compact header formats concise status for Batch Net, cancelled, partial, a
   header = p.render(80)[0]!;
   assert.ok(header.includes("DIFF · Last iteration · Sin cambios netos"));
 });
+
+test("compact gutter differentiates created, deleted, and modified files with maximum usable code space", () => {
+  const p = panel().panel;
+  p.setView({
+    key: "gutter-kinds",
+    title: "Última iteración",
+    notices: [],
+    files: [
+      {
+        path: "src/new-feature.ts",
+        kind: "created",
+        added: 2,
+        removed: 0,
+        getRows: () => [
+          { kind: "hunk", text: "@@ -0,0 +1,2 @@" },
+          { kind: "added", newLine: 1, text: "export const answer = 42;" },
+          { kind: "added", newLine: 2, text: "export const pi = 3.14;" },
+        ],
+      },
+      {
+        path: "src/legacy.ts",
+        kind: "deleted",
+        added: 0,
+        removed: 1,
+        getRows: () => [
+          { kind: "hunk", text: "@@ -1,1 +0,0 @@" },
+          { kind: "removed", oldLine: 1, text: "export const deprecated = true;" },
+        ],
+      },
+      {
+        path: "src/calculator.ts",
+        kind: "modified",
+        added: 1,
+        removed: 1,
+        getRows: () => [
+          { kind: "hunk", text: "@@ -5,3 +5,3 @@" },
+          { kind: "context", oldLine: 5, newLine: 5, text: "function compute() {" },
+          { kind: "removed", oldLine: 6, text: "  return oldSum;" },
+          { kind: "added", newLine: 6, text: "  return newSum;" },
+        ],
+      },
+    ],
+  });
+
+  // Expand all three files
+  p.handleInput("\r"); // expand new-feature.ts
+  p.handleInput("]");
+  p.handleInput("\r"); // expand legacy.ts
+  p.handleInput("]");
+  p.handleInput("\r"); // expand calculator.ts
+
+  const rendered = p.render(120).join("\n");
+
+  // 1. Created file has single new column (no wasted dual gutter columns)
+  assert.match(rendered, /\s+1 \+ export const answer/);
+  assert.match(rendered, /\s+2 \+ export const pi/);
+
+  // 2. Deleted file has single old column
+  assert.match(rendered, /\s+1 - export const deprecated/);
+
+  // 3. Modified file preserves dual columns for old and new references
+  assert.match(rendered, /\s+5\s+5\s+function compute/);
+  assert.match(rendered, /\s+6\s+-\s+return oldSum/);
+  assert.match(rendered, /\s+6\s+\+\s+return newSum/);
+});
+
+test("usable code width comparison across 90, 120, 160, and 200 column terminals", () => {
+  const p = panel().panel;
+  const longCode = "const result = performVeryLongCalculationWithMultipleParameters(alpha, beta, gamma, delta, epsilon);";
+  p.setView({
+    key: "width-check",
+    title: "Última iteración",
+    notices: [],
+    files: [
+      {
+        path: "src/created.ts",
+        kind: "created",
+        added: 1,
+        removed: 0,
+        getRows: () => [
+          { kind: "hunk", text: "@@ -0,0 +1,1 @@" },
+          { kind: "added", newLine: 1, text: longCode },
+        ],
+      },
+    ],
+  });
+  p.handleInput("\r"); // expand
+
+  for (const terminalCols of [90, 120, 160, 200]) {
+    const dockCols = Math.max(34, Math.round(terminalCols * 0.45));
+    const lines = p.render(dockCols);
+    const codeLine = lines.find(line => line.includes("performVery"))!;
+    assert.ok(codeLine, `code rendered in ${dockCols} cols (terminal ${terminalCols})`);
+    assert.ok(visibleWidth(codeLine) <= dockCols, `line respects dock width ${dockCols}`);
+
+    // In created file, prefix + gutter is exactly 10 cols, leaving dockCols - 10 cols for code
+    // At terminalCols = 90 (dock = 41 cols), code has 31 usable cols (vs 26 previously)
+    if (dockCols === 41) {
+      assert.ok(codeLine.includes("const result = performVeryLo"));
+    }
+  }
+});
+
+test("technical notices are omitted in normal view and toggled under demand via 'd' and header click", () => {
+  const p = panel().panel;
+  p.setView({
+    key: "notices-toggle",
+    title: "Última iteración",
+    notices: [
+      "Diff neto entre snapshots de la ventana; no demuestra autoría ni conserva escrituras intermedias.",
+      "Límites del visor: 64 archivos; 256 KiB y 2000 líneas por archivo...",
+      "Rutas omitidas en los snapshots: 2 antes; 3 después.",
+    ],
+    files: [
+      {
+        path: "src/app.ts",
+        kind: "modified",
+        added: 1,
+        removed: 0,
+        getRows: () => [{ kind: "added", newLine: 1, text: "console.log('hello');" }],
+      },
+    ],
+  });
+
+  // 1. In normal view: routine notices are not rendered in the file list
+  let lines = p.render(100);
+  assert.ok(!lines.some(l => l.includes("Diff neto entre snapshots")));
+  assert.ok(!lines.some(l => l.includes("Límites del visor")));
+  // File header appears immediately at index 1
+  assert.ok(lines[1]!.includes("app.ts"));
+
+  // 2. Press 'd': details view is enabled and technical notices are rendered
+  p.handleInput("d");
+  lines = p.render(100);
+  assert.ok(lines.some(l => l.includes("Diff neto entre snapshots")));
+  assert.ok(lines.some(l => l.includes("Límites del visor")));
+
+  // 3. Press 'd' again: toggles back to clean normal view
+  p.handleInput("d");
+  lines = p.render(100);
+  assert.ok(!lines.some(l => l.includes("Diff neto entre snapshots")));
+
+  // 4. Mouse click on header (y = 0): toggles details view on demand
+  p.handleMouse({
+    type: "click", button: "left", x: 10, y: 0, screenX: 10, screenY: 0, width: 100, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  lines = p.render(100);
+  assert.ok(lines.some(l => l.includes("Diff neto entre snapshots")));
+});
+
+test("critical omission and partial warnings permanently surface in header", () => {
+  const p = panel().panel;
+
+  // Window with omissions
+  p.setView({
+    key: "omissions-header",
+    title: "Última iteración",
+    notices: ["Rutas omitidas en los snapshots: 4 antes; 1 después."],
+    files: [{ path: "src/worker.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] }],
+  });
+  assert.ok(p.render(100)[0]!.includes("DIFF · Last iteration [omisiones]"));
+
+  // Incomplete / partial window
+  p.setView({
+    key: "partial-header",
+    title: "Iteración · resultado no completo",
+    notices: ["Captura incompleta: pueden faltar archivos o cambios; la ausencia de cambios no demuestra un resultado vacío."],
+    files: [{ path: "src/worker.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] }],
+  });
+  assert.ok(p.render(100)[0]!.includes("DIFF · Last iteration [parcial]"));
+});
+
+test("selected lines preserve continuous dock border and apply selectedBg to content", () => {
+  const state = panel();
+  const p = state.panel;
+  p.setView({
+    key: "selection-style",
+    title: "Última iteración",
+    notices: [],
+    files: [
+      {
+        path: "src/index.ts",
+        kind: "modified",
+        added: 2,
+        removed: 0,
+        getRows: () => [
+          { kind: "hunk", text: "@@ -1,1 +1,3 @@" },
+          { kind: "added", newLine: 1, text: "first line" },
+          { kind: "added", newLine: 2, text: "second line" },
+        ],
+      },
+    ],
+  });
+  p.handleInput("\r"); // expand
+  p.handleInput("\x1b[B"); // path
+  p.handleInput("\x1b[B"); // hunk
+  p.handleInput("\x1b[B"); // added 1
+  p.handleInput("\x1b[1;2B"); // select added 1 and 2
+
+  assert.equal(p.hasSelection(), true);
+  const lines = p.render(80);
+  // Selected line has border '│' at column 0 and uses selectedBg
+  const selectedLine = lines.find(l => l.includes("first line"))!;
+  assert.ok(selectedLine.startsWith("│"));
+  assert.ok(state.roles.includes("selectedBg"));
+  assert.ok(state.roles.includes("border"));
+});
+
 
