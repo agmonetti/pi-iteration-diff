@@ -549,6 +549,22 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
 - Sólo contratos: captura/lifecycle aún pendientes. Bytes netos, sin modos, detección de renames ni hunks. UI y editor intactos.
 - Commit atómico de las cuatro rutas de este incremento; sin push. Siguiente: captura acotada y política de exclusiones.
 
+### 2026-10-23 — M1.2 / captura acotada y comparación integrada
+
+**Cambió**
+- `src/snapshots/capture.ts`: buffers en RAM, enumeración Git read-only, límites configurables, cancelación, exclusiones de ignorados/secretos/binarios/enlaces, detección de carreras y validación Linux de descriptor antes de lectura.
+- `src/snapshots/model.ts`: omisiones por prefijo impiden falsos cambios al modificar políticas ignore/exclude.
+- `tests/snapshot-capture.test.ts`: cinco integraciones reproducibles con cambios previos staged/unstaged/untracked, dos iteraciones, shell, creación/borrado, neto vacío, filtros, límites/timeout/cancelación, linked worktree y submódulo. Índice por bytes y HEAD intactos.
+- `M1.md`, `RESEARCH.md`: política de datos, defaults y limitaciones reales, sin dependencias nuevas ni cambios visuales.
+
+**Pruebas ejecutadas**
+- `npm run check` PASS, tsc + 21/21, 0 fallos, 2970 ms; Linux/Node 26.12.0/Pi 1.4.0. Captura+comparación: 5 integraciones PASS.
+- Status/diff/cached revisados: `AGENTS.md` ajeno excluido; cached vacío antes del staging propio.
+
+**Límites / próximo paso**
+- Sólo Linux/procfs para lectura segura, no snapshot atómico ni detector universal de secretos. Límite de contenido no equivale a RSS; metadata FS cancelable sólo cooperativamente. Detalles en M1.md.
+- Sin fallos de suite en este incremento. Lifecycle aún pendiente: no declarar M1 completo. Próximo: controlador y hooks reales de Pi.
+
 
 
 

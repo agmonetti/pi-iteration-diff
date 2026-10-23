@@ -447,3 +447,22 @@ No se amplían pruebas ni se reabre investigación. M1 no iniciado ni autorizado
 riesgos de correlación, límites/seguridad de snapshots e internals del layout se
 trasladan documentados, no se consideran resueltos por el cierre de factibilidad.
 
+## 15. M1 autorizado / backend de captura (2026-10-23)
+
+Usuario autoriza M1, sin M2 ni cambios de UI. Backend mínimo: buffers efímeros en
+RAM, Git sólo para descubrir/enumerar alcance, comparación por bytes independiente
+de commits. No índice temporal ni objetos Git. Capturas secuenciales y acotadas;
+omisiones por ruta/prefijo y cobertura global impiden inferir ausencia falsa.
+
+Seguridad de lectura: Node no expone openat2 con RESOLVE_BENEATH. Se usa O_NOFOLLOW/
+O_NONBLOCK, lstat de padres, rechazo de hardlinks y validación Linux de fd en procfs
+antes de leer. En otras plataformas falla cerrado (contenido omitido); portabilidad
+pendiente, no se introduce FFI. Esto no es una garantía frente a escritor malicioso
+ni atomicidad del workspace. Defaults, filtros best-effort, cota de contenidos vs
+RSS y cancelación cooperativa de metadata documentados en `M1.md`.
+
+Ignorados tracked y untracked se registran sin contenido, incluidos prefijos de
+directorios; cambios de ignore/exclude producen incertidumbre, no creación ficticia.
+Fixtures pasan con linked worktree, gitlink/submódulo, dirty/staged/untracked,
+Unicode/CRLF, shell, binarios, enlaces y límites. Sin cambios de instalación real.
+

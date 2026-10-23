@@ -28,11 +28,18 @@ export function compareSnapshots(before: Snapshot, after: Snapshot): NetDelta {
   if (before.root !== after.root) throw new Error("Snapshot roots differ");
   const issues = [...new Set([...before.issues, ...after.issues])];
   const changes: FileDelta[] = [];
+  const unknown = (snapshot: Snapshot, path: string): boolean => {
+    if (!snapshot.enumerationComplete) return true;
+    const parts = path.split("/");
+    return parts.some((_, i) => {
+      const prefix = parts.slice(0, i + 1).join("/");
+      return snapshot.omitted.has(prefix) || snapshot.omitted.has(`${prefix}/`);
+    });
+  };
   for (const path of new Set([...before.files.keys(), ...after.files.keys()])) {
     const old = before.files.get(path);
     const next = after.files.get(path);
-    if ((!old && (!before.enumerationComplete || before.omitted.has(path))) ||
-        (!next && (!after.enumerationComplete || after.omitted.has(path)))) {
+    if ((!old && unknown(before, path)) || (!next && unknown(after, path))) {
       if (!issues.includes("unknown-endpoint")) issues.push("unknown-endpoint");
       continue;
     }
