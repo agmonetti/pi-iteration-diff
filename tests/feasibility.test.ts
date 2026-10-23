@@ -92,14 +92,14 @@ test("real fullscreen SGR header click expands exactly once without selection or
   f.tui.start();
   try {
     f.tui.renderNow(true);
-    f.terminal.input("\x1b[<0;90;2M");
-    f.terminal.input("\x1b[<0;90;2m");
+    f.terminal.input("\x1b[<0;90;3M");
+    f.terminal.input("\x1b[<0;90;3m");
     f.tui.renderNow(true);
     assert.ok(f.tui.getScreenLines().some(line => line.includes("▾ fixture.ts")));
     assert.equal(f.tui.getFocusedComponent(), f.panel);
     assert.equal(f.draft(), "existing draft");
-    f.terminal.input("\x1b[<0;90;2M");
-    f.terminal.input("\x1b[<0;90;2m");
+    f.terminal.input("\x1b[<0;90;3M");
+    f.terminal.input("\x1b[<0;90;3m");
     f.tui.renderNow(true);
     assert.ok(f.tui.getScreenLines().some(line => line.includes("▸ fixture.ts")));
   } finally { dock.close(); f.tui.stop(); }

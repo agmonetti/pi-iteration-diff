@@ -46,9 +46,90 @@ interface PanelMouseDispatch extends TuiMouseEventResult {
   target: { component: Component; originX: number; originY: number; width: number; height: number };
 }
 
+export function localizeNotice(text: string): string {
+  if (text.startsWith("Diff neto entre snapshots") || text.startsWith("Net diff between")) {
+    return "Net diff between window snapshots; does not prove authorship or retain intermediate writes.";
+  }
+  if (text.startsWith("Ventana agrupada") || text.startsWith("Grouped window")) {
+    return text.replace("Ventana agrupada", "Grouped window").replace("entradas observadas", "inputs observed").replace("no es la última iteración individual.", "not the last individual iteration.");
+  }
+  if (text.startsWith("No se pudo verificar la atribución") || text.startsWith("Could not verify attribution")) {
+    return "Could not verify attribution to an individual input.";
+  }
+  if (text.startsWith("La captura es parcial") || text.startsWith("Capture is partial")) {
+    return "Capture is partial; does not represent a complete result.";
+  }
+  if (text.startsWith("Ejecución cancelada") || text.startsWith("Run cancelled")) {
+    return "Run cancelled: only observed net changes are shown.";
+  }
+  if (text.startsWith("La ejecución falló") || text.startsWith("Run failed")) {
+    return "Run failed: only observed net changes are shown.";
+  }
+  if (text.startsWith("Captura incompleta") || text.startsWith("Incomplete capture")) {
+    return "Incomplete capture: files or changes may be missing; lack of changes does not prove an empty result.";
+  }
+  if (text.startsWith("Rutas omitidas en los snapshots") || text.startsWith("Omitted paths")) {
+    return text.replace("Rutas omitidas en los snapshots:", "Omitted paths in snapshots:").replace("antes;", "before;").replace("después.", "after.");
+  }
+  if (text.startsWith("Avisos de captura") || text.startsWith("Capture notices")) {
+    return text.replace("Avisos de captura:", "Capture notices:");
+  }
+  if (text.startsWith("Límites del visor") || text.startsWith("Viewer limits")) {
+    return "Viewer limits: 64 files; 256 KiB and 2000 lines per file; 2 MiB and 16000 lines total; 32128 max rows; 3 context lines.";
+  }
+  if (text.startsWith("Límite de archivos:") || text.startsWith("File limit:")) {
+    return text.replace("Límite de archivos: se muestran", "File limit: showing")
+      .replace("de", "of")
+      .replace("cambios; el resto no se construye.", "changes; remainder not built.");
+  }
+  if (text.startsWith("Contenido no válido como UTF-8") || text.startsWith("Invalid UTF-8")) {
+    return "Invalid UTF-8 content: textual diff unavailable.";
+  }
+  if (text.startsWith("Diff no disponible: límite total de 16000 líneas")) {
+    return "Diff unavailable: 16,000 total lines viewer limit.";
+  }
+  if (text.startsWith("Diff no disponible: límite de 2000 líneas por archivo")) {
+    return "Diff unavailable: 2,000 lines per file limit.";
+  }
+  if (text.startsWith("Diff no disponible: límite de 250000 celdas")) {
+    return "Diff unavailable: 250,000 comparison cells per file limit.";
+  }
+  if (text.startsWith("Diff no disponible: límite total de 1000000 celdas")) {
+    return "Diff unavailable: 1,000,000 total comparison cells limit.";
+  }
+  if (text.startsWith("No se observaron cambios") || text.startsWith("Sin cambios netos") || text.startsWith("No net changes")) {
+    return "No net changes observed in this iteration.";
+  }
+  if (text.startsWith("Sin cambios verificables") || text.startsWith("No verifiable changes")) {
+    return "No verifiable changes in available capture; does not imply the window is empty.";
+  }
+  if (text.startsWith("Diff no disponible: archivo binario.") || text.startsWith("Diff unavailable")) {
+    return "Diff unavailable: binary file.";
+  }
+  if (text.startsWith("Captura no disponible:") || text.startsWith("Capture unavailable:")) {
+    return text.replace("Captura no disponible:", "Capture unavailable:");
+  }
+  if (text.startsWith("No hay una captura de iteración disponible.")) {
+    return "No iteration capture available.";
+  }
+  if (text.startsWith("Captura invalidada por cambio de sesión o raíz.")) {
+    return "Capture invalidated by session or root change.";
+  }
+  if (text.startsWith("La entrada todavía no tiene una ejecución confirmada.")) {
+    return "Input does not yet have a confirmed run.";
+  }
+  if (text.startsWith("Captura en curso; todavía no hay un diff final disponible.")) {
+    return "Capture in progress; no final diff available yet.";
+  }
+  if (text.startsWith("Avisos adicionales omitidos por límite de vista.")) {
+    return "Additional notices omitted due to view limit.";
+  }
+  return text;
+}
+
 /** All workspace strings are untrusted terminal data, never ANSI markup. */
 function safeText(text: string): string {
-  const bounded = text.length > MAX_TEXT_LENGTH ? `${text.slice(0, MAX_TEXT_LENGTH)}… [texto truncado]` : text;
+  const bounded = text.length > MAX_TEXT_LENGTH ? `${text.slice(0, MAX_TEXT_LENGTH)}… [text truncated]` : text;
   return stripTerminalSequences(bounded).replaceAll("\t", "    ")
     .replace(/[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "");
 }
@@ -136,9 +217,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
   constructor(private readonly actions: Actions) {
     super();
     this.body = new VirtualDiffScroll(() => this.diffEntries.length, (index, width) => this.entryLine(index, width));
-    this.addChild({ invalidate() {}, render: width => [this.heading(width)] }, { basis: 1, shrink: 1, minSize: 0 });
+    this.addChild({ invalidate() {}, render: width => this.heading(width) }, { basis: 2, shrink: 0, minSize: 2 });
     this.addChild(this.body, { basis: 0, grow: 1, shrink: 1, minSize: 0 });
-    this.addChild({ invalidate() {}, render: width => [this.footer(width)] }, { basis: 1, shrink: 1, minSize: 0 });
+    this.addChild({ invalidate() {}, render: width => [this.footer(width)] }, { basis: 1, shrink: 0, minSize: 1 });
     this.rebuild();
   }
 
@@ -177,25 +258,29 @@ export class DiffPanel extends VStack implements Component, Focusable {
     for (const text of this.view.notices.slice(0, MAX_NOTICES)) {
       if (hasFiles && !this.showDetails) {
         if (text.startsWith("Diff neto entre snapshots") ||
+            text.startsWith("Net diff between") ||
             text.startsWith("Límites del visor") ||
+            text.startsWith("Viewer limits") ||
             text.startsWith("Rutas omitidas en los snapshots") ||
-            text.startsWith("Avisos adicionales omitidos")) {
+            text.startsWith("Omitted paths") ||
+            text.startsWith("Avisos adicionales omitidos") ||
+            text.startsWith("Additional notices omitted")) {
           continue;
         }
       }
-      entries.push({ kind: "notice", text });
+      entries.push({ kind: "notice", text: localizeNotice(text) });
     }
     if (this.showDetails && this.view.notices.length > MAX_NOTICES) {
-      entries.push({ kind: "notice", text: "Avisos adicionales omitidos por límite de vista." });
+      entries.push({ kind: "notice", text: "Additional notices omitted due to view limit." });
     }
     let remaining = MAX_CONTENT_ROWS;
     for (const file of this.view.files.slice(0, MAX_FILES)) {
       entries.push({ kind: "file_header", file });
       entries.push({ kind: "file_path", file });
       if (!this.expanded.has(file.path)) continue;
-      if (file.notice) entries.push({ kind: "notice", text: file.notice, file });
+      if (file.notice) entries.push({ kind: "notice", text: localizeNotice(file.notice), file });
       if (remaining === 0) {
-        entries.push({ kind: "notice", text: `Contenido omitido: límite global de ${MAX_CONTENT_ROWS} filas. Contraé otros archivos.` });
+        entries.push({ kind: "notice", text: `Content omitted: global limit of ${MAX_CONTENT_ROWS} rows. Collapse other files.` });
         continue;
       }
       const rows = file.getRows();
@@ -219,14 +304,14 @@ export class DiffPanel extends VStack implements Component, Focusable {
       }
       remaining -= count;
       if (count < rows.length) {
-        entries.push({ kind: "notice", text: `Diff truncado: ${count}/${rows.length} filas (máximo ${MAX_FILE_ROWS}/archivo y ${MAX_CONTENT_ROWS} global).` });
+        entries.push({ kind: "notice", text: `Diff truncated: ${count}/${rows.length} rows (maximum ${MAX_FILE_ROWS}/file and ${MAX_CONTENT_ROWS} total).` });
       }
     }
     if (this.view.files.length > MAX_FILES) {
-      entries.push({ kind: "notice", text: `Lista truncada: ${MAX_FILES}/${this.view.files.length} archivos.` });
+      entries.push({ kind: "notice", text: `List truncated: ${MAX_FILES}/${this.view.files.length} files.` });
     }
     if (entries.length === 0) {
-      entries.push({ kind: "notice", text: "No se observaron cambios en esta iteración." });
+      entries.push({ kind: "notice", text: "No changes observed in this iteration." });
     }
     this.diffEntries = entries;
     this.cursor = Math.max(0, Math.min(this.cursor, entries.length - 1));
@@ -287,7 +372,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private getSelectionSummary(): string {
     const entries = this.getSelectedEntries();
     const rows = entries.filter((e): e is Entry & { kind: "row" } => e.kind === "row");
-    if (!rows.length) return `${entries.length} ${entries.length === 1 ? "línea" : "líneas"}`;
+    if (!rows.length) return `${entries.length} ${entries.length === 1 ? "line" : "lines"}`;
     const oldNums = rows.map(r => r.row.oldLine).filter((n): n is number => n !== undefined);
     const newNums = rows.map(r => r.row.newLine).filter((n): n is number => n !== undefined);
     const parts: string[] = [];
@@ -302,7 +387,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       parts.push(min === max ? `new:${min}` : `new:${min}-${max}`);
     }
     const range = parts.join(", ");
-    return `${range} (${rows.length} ${rows.length === 1 ? "línea" : "líneas"})`;
+    return `${range} (${rows.length} ${rows.length === 1 ? "line" : "lines"})`;
   }
 
   /** Format the selected context according to approved plain text diff format. */
@@ -361,44 +446,83 @@ export class DiffPanel extends VStack implements Component, Focusable {
     this.actions.editor();
   }
 
-  private heading(width: number): string {
+  private getScope(): string {
     const rawTitle = safeText(this.view.title);
-    if (rawTitle.toUpperCase().startsWith("DIFF:")) {
-      return this.actions.style(this.focused ? "accent" : "muted", truncateToWidth(`│ ${rawTitle}`, width, "…"));
-    }
-    let scope = "Last iteration";
     const lower = rawTitle.toLowerCase();
-    const hasOmissions = this.view.notices.some(n => n.toLowerCase().includes("omitid") || n.toLowerCase().includes("omisiones"));
-    const isPartial = lower.includes("parcial") || this.view.notices.some(n => n.toLowerCase().includes("incompleta") || n.toLowerCase().includes("parcial"));
+    const isPartial = lower.includes("parcial") ||
+      lower.includes("resultado no completo") ||
+      this.view.notices.some(n => n.toLowerCase().includes("incompleta") || n.toLowerCase().includes("parcial"));
 
     if (lower.includes("agrupada") || lower.includes("batch")) {
-      scope = "Batch Net";
-    } else if (lower.includes("interrumpida") || lower.includes("cancelada")) {
-      scope = "Last iteration (interrumpida)";
-    } else if (lower.includes("fallida") || lower.includes("falló")) {
-      scope = "Last iteration (fallida)";
-    } else if (isPartial) {
-      scope = "Last iteration [parcial]";
-    } else if (lower.includes("no disponible")) {
-      scope = "No disponible";
-    } else if (lower.includes("capturando")) {
-      scope = "Capturando";
-    } else if (hasOmissions) {
-      scope = "Last iteration [omisiones]";
+      return "Batch Net";
+    }
+    if (lower.includes("sin atribución") || lower.includes("unverified")) {
+      return "Unverified";
+    }
+    if (lower.includes("interrumpida") || lower.includes("cancelada") || lower.includes("cancelled")) {
+      return "Cancelled";
+    }
+    if (lower.includes("fallida") || lower.includes("falló") || lower.includes("failed")) {
+      return "Failed";
+    }
+    if (isPartial) {
+      return "Partial";
+    }
+    if (lower.includes("no disponible") || lower.includes("unavailable")) {
+      return "Unavailable";
+    }
+    if (lower.includes("capturando") || lower.includes("capturing")) {
+      return "Capturing";
+    }
+    return "Last iteration";
+  }
+
+  private heading(width: number): string[] {
+    if (width <= 0) return [];
+    const rawTitle = safeText(this.view.title);
+    const scope = rawTitle.toUpperCase().startsWith("DIFF:") ? rawTitle : this.getScope();
+    const leftText = scope.startsWith("DIFF") ? scope : `DIFF · ${scope}`;
+    const leftPrefix = `│ ${leftText}`;
+    const fileCount = this.view.files.length;
+    const rightText = `${fileCount} ${fileCount === 1 ? "file" : "files"}`;
+
+    const titleStyle = this.focused ? "accent" : "muted";
+    const spacesCount = width - visibleWidth(leftPrefix) - visibleWidth(rightText);
+    let line1: string;
+    if (spacesCount >= 1) {
+      const leftStyled = this.actions.style(titleStyle, leftPrefix);
+      const rightStyled = this.actions.style("muted", rightText);
+      line1 = `${leftStyled}${" ".repeat(spacesCount)}${rightStyled}`;
+    } else {
+      if (width - visibleWidth(rightText) - 1 >= visibleWidth("│ DIFF")) {
+        const availLeft = width - visibleWidth(rightText) - 1;
+        const leftTrunc = truncateToWidth(leftPrefix, availLeft, "…");
+        line1 = `${this.actions.style(titleStyle, leftTrunc)} ${this.actions.style("muted", rightText)}`;
+      } else {
+        line1 = this.actions.style(titleStyle, truncateToWidth(leftPrefix, width, "…"));
+      }
     }
 
-    const fileCount = this.view.files.length;
-    let titleContent: string;
+    const border = this.actions.style("border", "│");
+    let line2Content: string;
     if (fileCount === 0) {
-      titleContent = `DIFF · ${scope} · Sin cambios netos`;
+      line2Content = this.actions.style("dim", "No changes");
     } else {
-      const totalAdded = this.view.files.reduce((sum, f) => sum + (f.added ?? 0), 0);
-      const totalRemoved = this.view.files.reduce((sum, f) => sum + (f.removed ?? 0), 0);
-      const filesStr = `${fileCount} ${fileCount === 1 ? "file" : "files"}`;
-      titleContent = `DIFF · ${scope} · ${filesStr} (+${totalAdded} / -${totalRemoved})`;
+      const hasAdded = this.view.files.some(f => f.added !== undefined);
+      const hasRemoved = this.view.files.some(f => f.removed !== undefined);
+      if (!hasAdded && !hasRemoved) {
+        line2Content = this.actions.style("dim", "stats unavailable");
+      } else {
+        const totalAdded = this.view.files.reduce((sum, f) => sum + (f.added ?? 0), 0);
+        const totalRemoved = this.view.files.reduce((sum, f) => sum + (f.removed ?? 0), 0);
+        const addStr = this.actions.style("added", `+${totalAdded}`);
+        const sepStr = this.actions.style("dim", " / ");
+        const delStr = this.actions.style("removed", `-${totalRemoved}`);
+        line2Content = `${addStr}${sepStr}${delStr}`;
+      }
     }
-    const text = truncateToWidth(`│ ${titleContent}`, width, "…");
-    return this.actions.style(this.focused ? "accent" : "muted", text);
+    const line2 = truncateToWidth(`${border} ${line2Content}`, width, "…");
+    return [line1, line2];
   }
 
   private footer(width: number): string {
@@ -418,22 +542,22 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const entries = this.getSelectedEntries();
       const rows = entries.filter((e): e is Entry & { kind: "row" } => e.kind === "row");
       const count = rows.length || entries.length;
-      const lineWord = count === 1 ? "línea" : "líneas";
+      const lineWord = count === 1 ? "line" : "lines";
       const short = width < 55;
       const text = short
-        ? `│ ${count} ${lineWord} seleccionadas · a: anexar`
-        : `│ Sel: ${summary} · a: anexa al editor`;
+        ? `│ ${count} ${lineWord} selected · a: append`
+        : `│ Sel: ${summary} · a: append to editor`;
       return this.actions.style("accent", truncateToWidth(text, width, "…"));
     }
 
     const panStr = this.panX > 0 ? ` [pan +${this.panX}]` : "";
     let text: string;
     if (width < 50) {
-      text = `│ Enter: expandir${panStr} · a: anexar · Esc: editor`;
+      text = `│ Enter: expand${panStr} · a: append · Esc: editor`;
     } else if (width < 75) {
-      text = `│ Enter: expandir${panStr} · a: anexar · ↑↓: navegar · Esc: editor`;
+      text = `│ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor`;
     } else {
-      text = `│ Enter: expandir${panStr} · a: anexar · ↑↓: navegar · Esc: editor · d: detalles`;
+      text = `│ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor · d: details`;
     }
     return this.actions.style("muted", truncateToWidth(text, width, "…"));
   }
@@ -450,7 +574,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
     // 1. File Header (Line 1 of 2: Name, chevron, status badge, statistics)
     if (entry.kind === "file_header") {
       const { file } = entry;
-      const kind = { created: "creado", modified: "modificado", deleted: "eliminado" }[file.kind];
+      const kind = { created: "created", modified: "modified", deleted: "deleted" }[file.kind];
       const chevron = this.expanded.has(file.path) ? "▾" : "▸";
       const parts = file.path.split("/");
       const basename = parts[parts.length - 1] || file.path;
@@ -471,11 +595,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
         content = `${nameWithChevron} ${kindStyled} ${addStr}${sepStr}${delStr}`;
       } else {
-        const statMsg = "[estadísticas no disponibles]";
+        const statMsg = "[stats unavailable]";
         const kindBadge = `[${kind}]`;
         const kindStyled = this.actions.style("muted", kindBadge);
         const nameWithChevron = this.actions.style("bold", `${chevron} ${safeText(basename)}`);
-        content = `${nameWithChevron} ${kindStyled} ${this.actions.style("dim", statMsg)}${file.notice ? ` · ${this.actions.style("warning", safeText(file.notice))}` : ""}`;
+        content = `${nameWithChevron} ${kindStyled} ${this.actions.style("dim", statMsg)}${file.notice ? ` · ${this.actions.style("warning", safeText(localizeNotice(file.notice)))}` : ""}`;
       }
       if (selected) {
         const lineContent = `${cursor} ${content}`;
@@ -557,7 +681,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   override render(width: number): string[] {
     if (width <= 0) return [];
-    return [this.heading(width), ...this.body.visible(width), this.footer(width)];
+    return [...this.heading(width), ...this.body.visible(width), this.footer(width)];
   }
 
   private reveal(): void {
@@ -707,7 +831,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
     }
 
     // Header click focuses panel and toggles details on demand
-    if (event.y === 0) {
+    if (event.y === 0 || event.y === 1) {
       if (event.type === "click" || (event.type === "press" && this.focused)) {
         this.showDetails = !this.showDetails;
         this.rebuild();
@@ -742,8 +866,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
     if (event.button !== "left") return;
 
     // Line click and range dragging
-    if (event.y > 0 && event.y < event.height - 1) {
-      const targetIndex = Math.max(0, Math.min(this.diffEntries.length - 1, this.body.scrollTop + event.y - 1));
+    if (event.y >= 2 && event.y < event.height - 1) {
+      const targetIndex = Math.max(0, Math.min(this.diffEntries.length - 1, this.body.scrollTop + event.y - 2));
       if (event.type === "press") {
         this.pressed = true;
         this.cursor = targetIndex;

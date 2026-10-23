@@ -44,7 +44,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     handler: async (_args: string, ctx: ExtensionCommandContext): Promise<void> => {
       if (dock) { dismiss(); return; }
       if (ctx.mode !== "tui") {
-        ctx.ui.notify("El diff requiere Pi TUI fullscreen", "warning"); return;
+        ctx.ui.notify("Diff requires Pi TUI fullscreen", "warning"); return;
       }
       const version = ++generation;
       const state = capture.state;
@@ -107,12 +107,12 @@ export default function iterationDiff(pi: ExtensionAPI): void {
             // Polling by identity also covers state changes while a prior render was queued.
             refresh();
             return tui.terminal.columns < 90
-              ? [truncateToWidth("Diff oculto: ampliá a 90 columnas; /iteration-diff cierra", width)] : [];
+              ? [truncateToWidth("Diff hidden: expand to 90 columns; /iteration-diff closes", width)] : [];
           } };
         });
       } catch (error) {
         dismiss();
-        ctx.ui.notify(error instanceof Error ? error.message : "No se pudo abrir el diff", "warning");
+        ctx.ui.notify(error instanceof Error ? error.message : "Failed to open diff", "warning");
       }
     },
   };
@@ -124,7 +124,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     dismiss();
     if (registeredDiff) return;
     if (pi.getCommands().some(entry => entry.name === "diff" || entry.name.startsWith("diff:"))) {
-      ctx.ui.notify("/diff está ocupado; usá /iteration-diff", "info");
+      ctx.ui.notify("/diff is occupied; use /iteration-diff", "info");
     } else {
       pi.registerCommand("diff", command);
       registeredDiff = true;

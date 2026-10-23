@@ -25,18 +25,19 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 ┌────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────┐
 │  PI TRANSCRIPT / CONVERSATION                              │  DIFF DOCK (45% terminal width)                         │
 │                                                            │                                                         │
-│  User: Refactorizá el cálculo de tasas                     │  │ DIFF · Last iteration · 2 files (+12 / -4)           │
-│  Agent: Apliqué la normalización en calculator.ts...       │  │                                                      │
-│                                                            │  │ ▾ calculator.ts [modificado] +3 / -2                 │
-│                                                            │  │   src/utils/calculator.ts                            │
+│  User: Refactorizá el cálculo de tasas                     │  │ DIFF · Last iteration                        2 files │
+│  Agent: Apliqué la normalización en calculator.ts...       │  │ +12 / -4                                             │
+│                                                            │  │                                                      │
+│                                                            │  │ ▾ calculator.ts [modified] +3 / -2                   │
+│                                                            │  │     src/utils/calculator.ts                          │
 │                                                            │  │   11   11   const offset = init();                   │
 │                                                            │  │   12   12 - const max = balance;                     │
 │                                                            │  │   12   12 + const max = clamp(limit);                │
 │                                                            │  │                                                      │
-├────────────────────────────────────────────────────────────┤  │ ▸ rate.ts [creado] +9 / -0                           │
-│  PI NATIVE EDITOR                                          │  │   src/core/rate.ts                                   │
+├────────────────────────────────────────────────────────────┤  │ ▸ rate.ts [created] +9 / -0                          │
+│  PI NATIVE EDITOR                                          │  │     src/core/rate.ts                                 │
 │  > Revisá también las excepciones|                         │  │                                                      │
-│                                                            │  │ Enter: toggle · a: anexa al editor · Esc: editor     │
+│                                                            │  │ Enter: expand · a: append · ↑↓: navigate · Esc: edit │
 └────────────────────────────────────────────────────────────┴──┴──────────────────────────────────────────────────────┘
 ```
 
@@ -63,8 +64,8 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 - **Colapso inicial:** Al recibir una nueva iteración, todos los archivos inician contraídos.
 - **Expansiones independientes:** `Enter` o clic en el encabezado alternan únicamente ese archivo. Múltiples archivos pueden permanecer abiertos a la vez.
 - **Encabezado de dos líneas:**
-  - **Línea 1 (Principal):** Indicador de expansión (`▾`/`▸`), nombre del archivo destacado (`bold`), estado (`[creado]`, `[modificado]`, `[eliminado]`) y estadísticas de cambios (`+3 / -2`).
-  - **Línea 2 (Secundaria):** Ruta relativa atenuada (`dim`/`muted`), sangrada discretamente (`  src/path/to/file.ts`).
+  - **Línea 1 (Principal):** Indicador de expansión (`▾`/`▸`), nombre del archivo destacado (`bold`), estado (`[created]`, `[modified]`, `[deleted]`) y estadísticas de cambios (`+3 / -2`).
+  - **Línea 2 (Secundaria):** Ruta relativa atenuada (`dim`/`muted`), sangrada discretamente (`    src/path/to/file.ts`).
 - **Inspección de ruta completa:** La ruta nunca se pierde; ante anchos reducidos se trunca con `truncatePath` y el modo de inspección `i` o la barra inferior permiten ver la ruta completa sin cortes.
 - **Diferenciación visual:** Distingue el archivo activo (cursor `>`), el archivo expandido (`▾`) y el estado de foco del panel (`accent`).
 
@@ -85,29 +86,33 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 
 ---
 
-## 5. Cabecera y Footer Compactos y Responsivos
+## 5. Cabecera y Footer Compactos y Responsivos (English-only)
 
-### Cabecera (1 línea)
-- Formato: `│ DIFF · Last iteration · N files (+X / -Y)`
-- **Supresión de avisos rutinarios truncados:** Avisos técnicos extensos sobre snapshots y límites del visor se excluyen de la vista normal para maximizar el espacio útil de archivos.
-- **Detalles bajo demanda:** Conmutables mediante teclado (`d`) o clic con ratón en la cabecera (`y === 0`).
-- **Estados contextuales y advertencias críticas siempre visibles:**
-  - **Batch Net (Ventana agrupada):** `│ DIFF · Batch Net · N files (+X / -Y)`
-  - **Omisiones:** `│ DIFF · Last iteration [omisiones] · N files (+X / -Y)`
-  - **Parcial / Incompleta:** `│ DIFF · Last iteration [parcial] · N files (+X / -Y)`
-  - **Interrumpida:** `│ DIFF · Last iteration (interrumpida) · N files`
-  - **Fallida:** `│ DIFF · Last iteration (fallida) · N files`
-  - **No disponible:** `│ DIFF · No disponible · Sin cambios netos`
-  - **Sin cambios:** `│ DIFF · Last iteration · Sin cambios netos`
+### Cabecera de Dos Líneas (`basis: 2`)
+- **Línea 1 (Título y alcance):** `│ DIFF · <Scope>` a la izquierda y cantidad de archivos alineada a la derecha (`N files` o `1 file`).
+  - **Alcances contextuales (ADR-003):**
+    - `Last iteration`: Iteración individual completa normal.
+    - `Batch Net`: Ventana agrupada con múltiples entradas.
+    - `Unverified`: Ventana sin atribución verificada.
+    - `Partial`: Captura incompleta o parcial.
+    - `Cancelled`: Ejecución interrumpida o cancelada.
+    - `Failed`: Ejecución fallida con cambios netos observados.
+    - `Unavailable`: Diff o captura no disponible.
+    - `Capturing`: Captura en curso.
+  - **Diferenciación conceptual de exclusiones y omisiones:** Las rutas excluidas por política (.git, node_modules, límites de snapshot) no añaden `[omissions]` a la cabecera; sus detalles permanecen accesibles bajo demanda en la vista compacta de información (`d`).
+- **Línea 2 (Resumen de cambios):** `│ +added / -removed` utilizando los tokens semánticos de Pi (`toolDiffAdded`, `toolDiffRemoved`, `dim`).
+  - Sin cambios: `│ No changes` en estilo `dim`.
+  - Estadísticas no disponibles: `│ stats unavailable` en estilo `dim`.
+- **Detalles bajo demanda:** Conmutables mediante teclado (`d`) o clic con ratón en la cabecera (`y === 0 || y === 1`).
 
 ### Footer (1 línea)
-- Adaptable al ancho del dock:
-  - Sin selección (< 50 cols): `│ Enter: expandir · a: anexar · Esc: editor`
-  - Sin selección (< 75 cols): `│ Enter: expandir · a: anexar · ↑↓: navegar · Esc: editor`
-  - Estándar (>= 75 cols): `│ Enter: expandir · a: anexar · ↑↓: navegar · Esc: editor · d: detalles`
-  - Con selección (< 55 cols): `│ N líneas seleccionadas · a: anexar`
-  - Con selección (>= 55 cols): `│ Sel: old:X, new:Y (N líneas) · a: anexa al editor`
-  - Modo inspección activo (`i`): `│ i: <ruta o línea completa sin truncar>`
+- Todo en inglés, adaptable al ancho del dock:
+  - Sin selección (< 50 cols): `│ Enter: expand · a: append · Esc: editor`
+  - Sin selección (< 75 cols): `│ Enter: expand · a: append · ↑↓: navigate · Esc: editor`
+  - Estándar (>= 75 cols): `│ Enter: expand · a: append · ↑↓: navigate · Esc: editor · d: details`
+  - Con selección (< 55 cols): `│ N lines selected · a: append`
+  - Con selección (>= 55 cols): `│ Sel: old:X, new:Y (N lines) · a: append to editor`
+  - Modo inspección activo (`i`): `│ i: <full path or raw line text>`
 
 ---
 

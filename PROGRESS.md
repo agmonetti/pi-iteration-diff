@@ -34,8 +34,8 @@
 |---|---|---|
 | M0 Factibilidad | **CLOSED / PASS** | 14/14 PASS; H3/H7/H8 confirmados por operador; ADR-003 aprobado; pendientes de producto diferidos explícitamente |
 | M1 Snapshots | **CLOSED / PASS (CROSS-PLATFORM CI PASS)** | Run 40018853023 (commit 116b6a8): ubuntu 56/56, macos 55/56 (1 skip procfs), windows 54/56 (2 skips procfs + bash-abort); tsc + checkout limpio. Motor y ADR-003 certificados |
-| M2 Visor | **CLOSED / PASS** | Dock 45%, redimensionamiento interactivo, explorador inline de dos líneas, hunks unified, header/footer compactos (91/91 tests pass) |
-| M3 Selección y Contexto | **CLOSED / PASS** | Selección por teclado/mouse, selección de hunk, formato [path \| diff \| old:X \| new:Y], anexado con 'a' al editor nativo sin autoenvío (91/91 tests pass) |
+| M2 Visor | **CLOSED / PASS** | Dock 45%, redimensionamiento interactivo, explorador inline de dos líneas, hunks unified, header/footer compactos (97/97 tests pass) |
+| M3 Selección y Contexto | **CLOSED / PASS** | Selección por teclado/mouse, selección de hunk, formato [path \| diff \| old:X \| new:Y], anexado con 'a' al editor nativo sin autoenvío (97/97 tests pass) |
 | M4 Herdr/robustez | **NOT STARTED** | Matriz e2e + cleanup + performance |
 | M5 Distribución | **NOT STARTED** | Paquete instalable, README, CI, release |
 
@@ -957,6 +957,50 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 
 **Siguiente paso**
 - Detenido según DoD. No avanzar a M4 ni M5. No push.
+
+---
+
+## 2026-10-23 — UI: English-only labels y cabecera de dos líneas
+
+**Objetivo:** Separar la cabecera del dock en dos líneas (Línea 1: título/alcance + cantidad de archivos alineada a la derecha; Línea 2: estadísticas de cambios netos con tokens semánticos), estandarizar todas las etiquetas y mensajes visibles propios de la extensión a inglés, y diferenciar conceptualmente exclusiones intencionales por política de capturas parciales/fallidas según ADR-003.
+
+**Cambió**
+- `src/ui/diff-panel.ts`:
+  - **Cabecera de dos líneas (`basis: 2`, `minSize: 2`):**
+    - Línea 1: `│ DIFF · <Scope>` a la izquierda y cantidad de archivos alineada a la derecha (`N files` o `1 file`).
+    - Línea 2: Resumen de cambios `│ +added / -removed` usando los tokens semánticos de Pi (`toolDiffAdded`, `toolDiffRemoved`, `dim`) o `│ No changes` en dim cuando está vacío.
+    - Ancho mínimo de 34 columnas: ambas líneas caben holgadamente sin truncamiento ni elisión de estadísticas.
+  - **Diferenciación conceptual de exclusiones vs capturas parciales:**
+    - Rutas excluidas por política (ej. `.git`, `node_modules`, límites de snapshot) no generan advertencias engañosas como `[omissions]`.
+    - Indicadores breves y precisos de alcance según contrato ADR-003: `Last iteration`, `Batch Net`, `Unverified`, `Partial`, `Cancelled`, `Failed`, `Unavailable`, `Capturing`.
+    - Detalles técnicos y motivos permanecen accesibles bajo demanda en la vista compacta (`d` o clic en cabecera).
+  - **Localización estricta en inglés:**
+    - Badges de archivo: `[created]`, `[modified]`, `[deleted]`, `[stats unavailable]`.
+    - Footer interactivo: `Enter: expand`, `a: append`, `↑↓: navigate`, `Esc: editor`, `d: details`, `Sel: <ranges> (N lines) · a: append to editor`, `N lines selected · a: append`.
+    - Mensajes vacíos y avisos: `No changes observed in this iteration.`, `Content omitted: ...`, `Diff truncated: ...`, `List truncated: ...`, `Net diff between ...`, `Omitted paths in snapshots: ...`, `Viewer limits: ...`.
+  - **Interacción y mouse:**
+    - Clic en cabecera ampliado a `y === 0 || y === 1` para alternar la vista de detalles.
+    - Clic y arrastre de filas de código adaptados al nuevo offset (`y >= 2`, target `body.scrollTop + event.y - 2`), preservando intacta la selección por arrastre y la transferencia de contexto (`a`).
+- `src/index.ts`:
+  - Mensajes de notificación en inglés (`Diff requires Pi TUI fullscreen...`, `Failed to open diff`, `/diff is occupied; use /iteration-diff`).
+- `tests/diff-panel.test.ts` y `tests/feasibility.test.ts`:
+  - Ajuste de índices de línea y coordenadas de fila SGR para dar cabida a la cabecera de dos líneas.
+  - Actualización de aserciones de badges, footer y cabecera a inglés.
+  - Test comprehensivo añadido para anchos de 34, 45, 60 y 100 columnas, temas oscuro y claro, todos los estados ADR-003 y ausencia total de textos residuales en español.
+- `design/ui-spec.md`, `M2.md`, `M3.md`: especificación y documentación de arquitectura actualizadas.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run typecheck` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | 0 errores tsc |
+| `npm test` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | 97/97 tests pass (0 fallos, 0 errores) |
+| `npm run check` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | typecheck + 97 tests pass |
+| Matriz de anchos 34, 45, 60, 100 cols | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | Cabecera y estadísticas visibles sin truncar a 34 columnas |
+| Matriz de temas dark/light | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | Roles semánticos `added`, `removed`, `dim`, `border`, `accent` |
+| Matriz de estados ADR-003 | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | Complete, Partial, Batch Net, Cancelled, Failed, Unavailable, Empty |
+
+**Siguiente paso**
+- Commit atómico en inglés según política de Conventional Commits. Sin push. Detenido según DoD.
 
 
 

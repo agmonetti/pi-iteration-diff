@@ -59,14 +59,14 @@ for (const count of [0, 1, 10, 2_500]) {
     const p = panel().panel;
     p.setView(view(f.files));
     const lines = p.render(100);
-    assert.ok(lines.length <= 24);
+    assert.ok(lines.length <= 25);
     assert.ok(!lines.some(line => line.includes("@@")));
     assert.equal(f.calls.reduce((sum, n) => sum + n, 0), 0);
-    if (count === 0) assert.ok(lines.some(line => line.includes("No se observaron cambios")));
-    else assert.ok(lines.some(line => line.includes("▸ file-0.ts [modificado]") && /\+1\s*\/\s*-1/.test(line)));
+    if (count === 0) assert.ok(lines.some(line => line.includes("No changes observed")));
+    else assert.ok(lines.some(line => line.includes("▸ file-0.ts [modified]") && /\+1\s*\/\s*-1/.test(line)));
     if (count > 2_000) {
       p.handleInput("\x1b[F");
-      assert.ok(p.render(100).some(line => line.includes("Lista truncada: 2000/2500")));
+      assert.ok(p.render(100).some(line => line.includes("List truncated: 2000/2500")));
     }
   });
 }
@@ -80,10 +80,10 @@ test("created/deleted kinds, exact zero statistics and unavailable notices stay 
     { path: "binary.dat", kind: "modified", notice: "Diff no disponible: archivo binario.", getRows: noRows },
   ]));
   const text = p.render(140).join("\n");
-  assert.match(text, /new\.ts \[creado\] \+2\s*\/\s*-0/);
-  assert.match(text, /old\.ts \[eliminado\] \+0\s*\/\s*-4/);
-  assert.ok(text.includes("binary.dat [modificado] [estadísticas no disponibles]"));
-  assert.ok(text.includes("Diff no disponible: archivo binario."));
+  assert.match(text, /new\.ts \[created\] \+2\s*\/\s*-0/);
+  assert.match(text, /old\.ts \[deleted\] \+0\s*\/\s*-4/);
+  assert.ok(text.includes("binary.dat [modified] [stats unavailable]"));
+  assert.ok(text.includes("Diff unavailable: binary file."));
 });
 
 test("independent expansions preserve state across same key, focus, invalidate and width changes", () => {
@@ -109,7 +109,7 @@ test("independent expansions preserve state across same key, focus, invalidate a
   assert.ok(p.render(100).some(line => line.includes("▾ file-1")));
   p.setView(view(f.files, "iteration-2"));
   assert.equal(p.render(100).filter(line => line.includes("▸ file-")).length, 3);
-  assert.ok(p.render(100)[1]!.startsWith("│>"));
+  assert.ok(p.render(100)[2]!.startsWith("│>"));
 });
 
 test("keyboard file/hunk navigation and Enter; only editor/close controls, no feedback", () => {
@@ -139,11 +139,11 @@ test("header press/click toggles once, direct click toggles independently and wh
   const f = files(40);
   const p = panel().panel;
   p.setView(view(f.files));
-  assert.equal(p.handleMouse(mouse("press", 1))?.focus, true);
-  p.handleMouse(mouse("release", 1));
-  p.handleMouse(mouse("click", 1));
+  assert.equal(p.handleMouse(mouse("press", 2))?.focus, true);
+  p.handleMouse(mouse("release", 2));
+  p.handleMouse(mouse("click", 2));
   assert.ok(p.render(100).some(line => line.includes("▾ file-0")));
-  p.handleMouse(mouse("click", 6));
+  p.handleMouse(mouse("click", 7));
   assert.ok(p.render(100).some(line => line.includes("▾ file-1")));
   p.handleMouse(mouse("wheel", 3, 8));
   assert.ok(!p.render(100).some(line => line.includes("file-0.ts")));
@@ -165,11 +165,11 @@ test("large expanded content is visibly bounded and only viewport text is read",
   p.render(100);
   assert.ok(textReads - before <= 22);
   p.handleInput("\x1b[F");
-  assert.ok(p.render(120).some(line => line.includes("límite global de 12000")));
+  assert.ok(p.render(120).some(line => line.includes("global limit of 12000 rows")));
   p.handleInput("\x1b[H");
   p.handleInput("]");
   p.handleInput("\x1b[A");
-  assert.ok(p.render(160).some(line => line.includes("Diff truncado: 2000/100000")));
+  assert.ok(p.render(160).some(line => line.includes("Diff truncated: 2000/100000")));
 });
 
 test("ANSI and control injection is removed from title, notices, paths and code; Unicode respects cells", () => {
@@ -233,7 +233,7 @@ test("real Pi viewport routes page navigation, wheel and resize independently of
     assert.ok(!tui.getScreenLines().some(line => line.includes("file-0.ts")));
     assert.equal(nativeScroll.scrollTop, nativeTop);
     terminal.input("\x1b[5~"); terminal.input("\x1b[H"); tui.renderNow(true);
-    terminal.input("\x1b[<0;140;2M"); terminal.input("\x1b[<0;140;2m"); tui.renderNow(true);
+    terminal.input("\x1b[<0;140;3M"); terminal.input("\x1b[<0;140;3m"); tui.renderNow(true);
     assert.ok(tui.getScreenLines().some(line => line.includes("▾ file-0.ts")));
     for (const height of [1, 2, 3]) {
       terminal.rows = height; terminal.resize(); tui.renderNow(true);
@@ -264,12 +264,12 @@ test("responsive footer and file stats formatting with spaces", () => {
 
   // Narrow footer (< 50 cols)
   const narrowFooter = tp.footer(40);
-  assert.ok(narrowFooter.includes("Enter: expandir"));
-  assert.ok(!narrowFooter.includes("↑↓: navegar"));
+  assert.ok(narrowFooter.includes("Enter: expand"));
+  assert.ok(!narrowFooter.includes("↑↓: navigate"));
 
   // Standard footer
   const stdFooter = tp.footer(80);
-  assert.ok(stdFooter.includes("↑↓: navegar"));
+  assert.ok(stdFooter.includes("↑↓: navigate"));
 
   // Cursor present on active index
   const activeRow = tp.entryLine(0, 50);
@@ -288,8 +288,8 @@ test("34-column headers keep status and exact counts when the path is long", () 
     path: "src/a-very-long-directory/long-name.ts", kind: "modified", added: 123, removed: 45,
     getRows: () => { throw new Error("collapsed file content was requested"); },
   }]));
-  const header = p.render(34)[1]!;
-  assert.ok(header.includes("[modificado]"));
+  const header = p.render(34)[2]!;
+  assert.ok(header.includes("[modified]"));
   assert.match(header, /\+123\s*\/\s*-45/);
   assert.ok(visibleWidth(header) <= 34);
 });
@@ -410,12 +410,12 @@ test("two-line file headers display bold basename, status, stats and indented se
   }]));
   const lines = p.render(60);
   // Line 1: Header with basename, chevron, status and stats
-  const headerLine = lines[1]!;
+  const headerLine = lines[2]!;
   assert.ok(headerLine.includes("▸ calculator.ts"));
-  assert.ok(headerLine.includes("[modificado]"));
+  assert.ok(headerLine.includes("[modified]"));
   assert.match(headerLine, /\+12\s*\/\s*-5/);
   // Line 2: Secondary line with indented relative path
-  const pathLine = lines[2]!;
+  const pathLine = lines[3]!;
   assert.ok(pathLine.includes("    src/utils/calculator.ts"));
 });
 
@@ -438,11 +438,11 @@ test("independent file expansion works via Enter and click on either line 1 or l
 
   // Expand via mouse click on path line of file 1
   p.handleMouse({
-    type: "press", button: "left", x: 5, y: 2, screenX: 5, screenY: 2, width: 60, height: 24,
+    type: "press", button: "left", x: 5, y: 3, screenX: 5, screenY: 3, width: 60, height: 24,
     shift: false, alt: false, ctrl: false,
   });
   p.handleMouse({
-    type: "click", button: "left", x: 5, y: 2, screenX: 5, screenY: 2, width: 60, height: 24,
+    type: "click", button: "left", x: 5, y: 3, screenX: 5, screenY: 3, width: 60, height: 24,
     shift: false, alt: false, ctrl: false,
   });
   assert.ok(p.render(60).some(line => line.includes("▾ one.ts")));
@@ -477,8 +477,8 @@ test("keyboard range selection with Shift+Up and Shift+Down selects contiguous r
   const footer = (p as unknown as TestPanel).footer(80);
   assert.ok(footer.includes("old:11"));
   assert.ok(footer.includes("new:11-12"));
-  assert.ok(footer.includes("3 líneas"));
-  assert.ok(footer.includes("a: anexa al editor"));
+  assert.ok(footer.includes("3 lines"));
+  assert.ok(footer.includes("a: append to editor"));
 });
 
 test("hunk selection selects all rows in the hunk from hunk header", () => {
@@ -557,29 +557,37 @@ test("compact header formats concise status for Batch Net, cancelled, partial, a
     { path: "a.ts", kind: "modified", added: 3, removed: 1, getRows: () => [] },
     { path: "b.ts", kind: "created", added: 5, removed: 0, getRows: () => [] },
   ] });
-  let header = p.render(80)[0]!;
-  assert.ok(header.includes("DIFF · Last iteration · 2 files (+8 / -1)"));
-  assert.ok(!header.includes("Current"));
-  assert.ok(!header.includes("History"));
+  let lines = p.render(80);
+  assert.ok(lines[0]!.includes("DIFF · Last iteration"));
+  assert.ok(lines[0]!.includes("2 files"));
+  assert.ok(lines[1]!.includes("+8 / -1"));
+  assert.ok(!lines[0]!.includes("Current"));
+  assert.ok(!lines[0]!.includes("History"));
 
   // Batch net
   p.setView({ key: "k2", title: "Ventana agrupada · diff neto", notices: [], files: [
     { path: "a.ts", kind: "modified", added: 2, removed: 0, getRows: () => [] },
   ] });
-  header = p.render(80)[0]!;
-  assert.ok(header.includes("DIFF · Batch Net · 1 file (+2 / -0)"));
+  lines = p.render(80);
+  assert.ok(lines[0]!.includes("DIFF · Batch Net"));
+  assert.ok(lines[0]!.includes("1 file"));
+  assert.ok(lines[1]!.includes("+2 / -0"));
 
   // Cancelled
   p.setView({ key: "k3", title: "Ejecución cancelada", notices: [], files: [
     { path: "a.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] },
   ] });
-  header = p.render(80)[0]!;
-  assert.ok(header.includes("DIFF · Last iteration (interrumpida) · 1 file (+1 / -0)"));
+  lines = p.render(80);
+  assert.ok(lines[0]!.includes("DIFF · Cancelled"));
+  assert.ok(lines[0]!.includes("1 file"));
+  assert.ok(lines[1]!.includes("+1 / -0"));
 
   // Empty iteration
   p.setView({ key: "k4", title: "Última iteración", notices: [], files: [] });
-  header = p.render(80)[0]!;
-  assert.ok(header.includes("DIFF · Last iteration · Sin cambios netos"));
+  lines = p.render(80);
+  assert.ok(lines[0]!.includes("DIFF · Last iteration"));
+  assert.ok(lines[0]!.includes("0 files"));
+  assert.ok(lines[1]!.includes("No changes"));
 });
 
 test("compact gutter differentiates created, deleted, and modified files with maximum usable code space", () => {
@@ -707,21 +715,21 @@ test("technical notices are omitted in normal view and toggled under demand via 
 
   // 1. In normal view: routine notices are not rendered in the file list
   let lines = p.render(100);
-  assert.ok(!lines.some(l => l.includes("Diff neto entre snapshots")));
-  assert.ok(!lines.some(l => l.includes("Límites del visor")));
-  // File header appears immediately at index 1
-  assert.ok(lines[1]!.includes("app.ts"));
+  assert.ok(!lines.some(l => l.includes("Net diff between")));
+  assert.ok(!lines.some(l => l.includes("Viewer limits")));
+  // File header appears immediately at index 2 (line 0 and 1 are 2-line header)
+  assert.ok(lines[2]!.includes("app.ts"));
 
   // 2. Press 'd': details view is enabled and technical notices are rendered
   p.handleInput("d");
   lines = p.render(100);
-  assert.ok(lines.some(l => l.includes("Diff neto entre snapshots")));
-  assert.ok(lines.some(l => l.includes("Límites del visor")));
+  assert.ok(lines.some(l => l.includes("Net diff between")));
+  assert.ok(lines.some(l => l.includes("Viewer limits")));
 
   // 3. Press 'd' again: toggles back to clean normal view
   p.handleInput("d");
   lines = p.render(100);
-  assert.ok(!lines.some(l => l.includes("Diff neto entre snapshots")));
+  assert.ok(!lines.some(l => l.includes("Net diff between")));
 
   // 4. Mouse click on header (y = 0): toggles details view on demand
   p.handleMouse({
@@ -729,29 +737,33 @@ test("technical notices are omitted in normal view and toggled under demand via 
     shift: false, alt: false, ctrl: false,
   });
   lines = p.render(100);
-  assert.ok(lines.some(l => l.includes("Diff neto entre snapshots")));
+  assert.ok(lines.some(l => l.includes("Net diff between")));
 });
 
-test("critical omission and partial warnings permanently surface in header", () => {
+test("differentiates intentional path omissions from partial captures in header and details", () => {
   const p = panel().panel;
 
-  // Window with omissions
+  // Window with intentional policy omissions: does NOT show [omissions] in header
   p.setView({
     key: "omissions-header",
     title: "Última iteración",
     notices: ["Rutas omitidas en los snapshots: 4 antes; 1 después."],
     files: [{ path: "src/worker.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] }],
   });
-  assert.ok(p.render(100)[0]!.includes("DIFF · Last iteration [omisiones]"));
+  const omissionLines = p.render(100);
+  assert.ok(omissionLines[0]!.includes("DIFF · Last iteration"));
+  assert.ok(!omissionLines[0]!.includes("[omisiones]"));
+  assert.ok(!omissionLines[0]!.includes("[omissions]"));
 
-  // Incomplete / partial window
+  // Incomplete / partial window: displays Partial scope badge
   p.setView({
     key: "partial-header",
     title: "Iteración · resultado no completo",
     notices: ["Captura incompleta: pueden faltar archivos o cambios; la ausencia de cambios no demuestra un resultado vacío."],
     files: [{ path: "src/worker.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] }],
   });
-  assert.ok(p.render(100)[0]!.includes("DIFF · Last iteration [parcial]"));
+  const partialLines = p.render(100);
+  assert.ok(partialLines[0]!.includes("DIFF · Partial"));
 });
 
 test("selected lines preserve continuous dock border and apply selectedBg to content", () => {
@@ -788,6 +800,122 @@ test("selected lines preserve continuous dock border and apply selectedBg to con
   assert.ok(selectedLine.startsWith("│"));
   assert.ok(state.roles.includes("selectedBg"));
   assert.ok(state.roles.includes("border"));
+});
+
+test("two-line header across widths 34, 45, 60, 100, dark/light themes, all states and English-only labels", () => {
+  const recordedRoles: string[] = [];
+  let isLightTheme = false;
+  const p = new DiffPanel({
+    render() {},
+    editor() {},
+    close() {},
+    style(role, text) {
+      recordedRoles.push(role);
+      if (isLightTheme) {
+        if (role === "added") return `\x1b[32m${text}\x1b[39m`;
+        if (role === "removed") return `\x1b[31m${text}\x1b[39m`;
+        if (role === "dim") return `\x1b[90m${text}\x1b[39m`;
+        if (role === "border") return `\x1b[37m${text}\x1b[39m`;
+        return text;
+      }
+      if (role === "added") return `\x1b[32m${text}\x1b[39m`;
+      if (role === "removed") return `\x1b[31m${text}\x1b[39m`;
+      if (role === "dim") return `\x1b[2m${text}\x1b[22m`;
+      return text;
+    },
+  });
+
+  const states: Array<{ title: string; notices: string[]; expectedScope: string; files: DiffFile[] }> = [
+    {
+      title: "Última iteración",
+      notices: [],
+      expectedScope: "Last iteration",
+      files: [{ path: "src/a.ts", kind: "modified", added: 12, removed: 4, getRows: () => [] }],
+    },
+    {
+      title: "Iteración · resultado no completo",
+      notices: ["Captura incompleta: pueden faltar archivos o cambios; la ausencia de cambios no demuestra un resultado vacío."],
+      expectedScope: "Partial",
+      files: [{ path: "src/b.ts", kind: "created", added: 5, removed: 0, getRows: () => [] }],
+    },
+    {
+      title: "Ventana agrupada · diff neto",
+      notices: ["Ventana agrupada (2 entradas observadas): no es la última iteración individual."],
+      expectedScope: "Batch Net",
+      files: [{ path: "src/c.ts", kind: "deleted", added: 0, removed: 7, getRows: () => [] }],
+    },
+    {
+      title: "Ejecución cancelada",
+      notices: ["Ejecución cancelada: solo se muestran cambios netos observados."],
+      expectedScope: "Cancelled",
+      files: [{ path: "src/d.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] }],
+    },
+    {
+      title: "La ejecución falló",
+      notices: ["La ejecución falló: solo se muestran cambios netos observados."],
+      expectedScope: "Failed",
+      files: [{ path: "src/e.ts", kind: "modified", added: 2, removed: 1, getRows: () => [] }],
+    },
+    {
+      title: "Diff no disponible",
+      notices: ["No hay una captura de iteración disponible."],
+      expectedScope: "Unavailable",
+      files: [],
+    },
+    {
+      title: "Última iteración",
+      notices: ["Sin cambios netos observados en esta ventana."],
+      expectedScope: "Last iteration",
+      files: [],
+    },
+  ];
+
+  for (const st of states) {
+    p.setView({ key: `st-${st.expectedScope}`, title: st.title, notices: st.notices, files: st.files });
+
+    for (const w of [34, 45, 60, 100]) {
+      const rendered = p.render(w);
+      const line0 = rendered[0]!;
+      const line1 = rendered[1]!;
+
+      assert.ok(visibleWidth(line0) <= w, `line 0 width ${visibleWidth(line0)} exceeds ${w}`);
+      assert.ok(visibleWidth(line1) <= w, `line 1 width ${visibleWidth(line1)} exceeds ${w}`);
+
+      assert.ok(line0.includes(`DIFF · ${st.expectedScope}`), `line 0 missing scope ${st.expectedScope} at width ${w}`);
+      const fileCountWord = st.files.length === 1 ? "1 file" : `${st.files.length} files`;
+      assert.ok(line0.includes(fileCountWord), `line 0 missing file count ${fileCountWord} at width ${w}`);
+
+      if (st.files.length === 0) {
+        assert.ok(line1.includes("No changes"), `line 1 should show No changes for empty state at width ${w}`);
+      } else {
+        const added = st.files.reduce((sum, f) => sum + (f.added ?? 0), 0);
+        const removed = st.files.reduce((sum, f) => sum + (f.removed ?? 0), 0);
+        assert.ok(line1.includes(`+${added}`), `line 1 missing added stats +${added}`);
+        assert.ok(line1.includes(`-${removed}`), `line 1 missing removed stats -${removed}`);
+      }
+
+      const fullText = rendered.join("\n");
+      assert.ok(!fullText.includes("Última iteración"));
+      assert.ok(!fullText.includes("Ventana agrupada"));
+      assert.ok(!fullText.includes("cancelada"));
+      assert.ok(!fullText.includes("fallida"));
+      assert.ok(!fullText.includes("Sin cambios"));
+      assert.ok(!fullText.includes("creado"));
+      assert.ok(!fullText.includes("modificado"));
+      assert.ok(!fullText.includes("eliminado"));
+      assert.ok(!fullText.includes("expandir"));
+      assert.ok(!fullText.includes("anexar"));
+      assert.ok(!fullText.includes("navegar"));
+    }
+  }
+
+  assert.ok(recordedRoles.includes("added"), "must use 'added' semantic role");
+  assert.ok(recordedRoles.includes("removed"), "must use 'removed' semantic role");
+  assert.ok(recordedRoles.includes("dim"), "must use 'dim' semantic role");
+  assert.ok(recordedRoles.includes("border"), "must use 'border' semantic role");
+
+  isLightTheme = true;
+  p.render(60);
 });
 
 
