@@ -6,6 +6,8 @@ Construir `pi-iteration-diff`, una **extensión ligera de Pi Coding Agent** para
 
 Antes de escribir código, leer en orden: `AGENTS.md` → `REQUIREMENTS.md` → `RESEARCH.md` → `PROGRESS.md`. Al terminar cada bloque de trabajo, actualizar `PROGRESS.md`.
 
+**Portabilidad obligatoria del producto:** Linux, macOS y Windows nativo en entornos soportados por Pi. Arch Linux es sólo el entorno de desarrollo; WSL es Linux, no evidencia de Windows nativo. Mantener un motor compartido de snapshots con adaptaciones mínimas justificadas; no exigir mecanismos internos idénticos. Documentar garantías de seguridad por SO y estados parciales ante identidad no verificable. CI debe ejecutar integración en `ubuntu-latest`, `macos-latest` y `windows-latest`; un workflow sin ejecutar es **NOT RUN**, nunca soporte certificado.
+
 **Regla principal:** no ampliar alcance ni considerar terminado el proyecto porque «ya funciona algo parecido». El producto debe cumplir los criterios de aceptación, no solamente mostrar un `git diff` en una TUI.
 
 ## 1. Reglas de colaboración y ejecución
@@ -62,6 +64,7 @@ La estructura es **propuesta**, no directorios ya existentes. Simplificar cuando
 - Render y captura deben degradarse de forma segura ante errores. Restaurar root/editor/focus y liberar recursos.
 - Aplicación de feedback: construir un bloque compacto con `path`, `side`, `line range`, `excerpt`, `intent` y comentario. Preservar el texto previo y el orden del borrador; no autoenviar y no editar el código directamente.
 - Tests de salida ANSI, terminal pequeño, caracteres combinados, tabs y emojis; no depender de capturas de pantalla para verificar datos del diff.
+- Filesystem: no sustituir seguridad por `realpath` previo a `open`. Validar descriptor, identidad de archivo/padres y límites antes/después de leer; registrar carreras detectadas como parciales. No prometer exclusión de carreras adversariales ABA con APIs de Node. Preservar comprobaciones adicionales disponibles por SO y documentar límites, sin tres motores independientes.
 
 ## 4. Protección de datos y de la máquina del usuario
 
@@ -140,7 +143,7 @@ El proyecto solo se considera completado cuando:
 - Se pueden seleccionar líneas y rangos con teclado y mouse en fullscreen, conservar selección al navegar y añadir **múltiples** fragmentos al prompt con `FIX`/`DISCUSS` sin borrar borrador ni enviar automáticamente.
 - El flujo de **arrastrar rangos hacia el editor** se probó; si el protocolo terminal lo impide en el entorno objetivo, documentar la limitación con evidencia, ofrecer alternativa de una acción y **no declarar paridad completa** sin aprobación del usuario.
 - Funciona en Pi sin Herdr y dentro de Herdr sin romper integración oficial, mouse, focus, resize y recuperación del layout.
-- Test suite y typecheck pasan; pruebas manuales obligatorias registradas, sin regresiones ni cambios del índice Git.
+- Test suite y typecheck pasan; integración del motor ejecutada realmente en Linux, macOS y Windows nativo (WSL separado), con garantías/limitaciones explícitas por SO; pruebas manuales obligatorias registradas, sin regresiones ni cambios del índice Git.
 - Documentación de instalación, uso, límites y compatibilidad actualizada; `PROGRESS.md` consigna evidencia del DoD.
 
 Leer los criterios verificables y el roadmap completo en `REQUIREMENTS.md`.

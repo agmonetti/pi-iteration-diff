@@ -27,7 +27,7 @@ test("capture two net iterations with dirty/staged files, shell edits and intact
     const before = await captureSnapshot(w.root);
     assert.deepEqual(before.issues, []);
     assert.equal(await workspaceRoot(w.root), w.root);
-    await exec("bash", ["-c", "printf intermediate > dirty.txt; printf final > dirty.txt; printf new > 'new 😀.txt'; rm deleted.txt"], { cwd: w.root });
+    await exec(process.execPath, ["-e", "const fs = require('node:fs'); fs.writeFileSync('dirty.txt', 'intermediate'); fs.writeFileSync('dirty.txt', 'final'); fs.writeFileSync('new 😀.txt', 'new'); fs.unlinkSync('deleted.txt')"], { cwd: w.root });
     const after = await captureSnapshot(w.root);
     const delta = compareSnapshots(before, after);
     assert.equal(delta.status, "complete");
@@ -61,7 +61,7 @@ test("filters ignored (even tracked), secrets, binary, links, subtrees and exter
     await w.write("custom.txt", "excluded");
     await external.write("outside.txt", "must not capture");
     await symlink(join(external.root, "outside.txt"), join(w.root, "symbol.txt"));
-    await symlink(external.root, join(w.root, "external"));
+    await symlink(external.root, join(w.root, "external"), process.platform === "win32" ? "junction" : "dir");
     await link(join(external.root, "outside.txt"), join(w.root, "hard.txt"));
     const capture = await captureSnapshot(w.root, { exclude: ["custom.txt"] });
     assert.deepEqual([...capture.files.keys()].sort(), [".gitignore", "text.txt"]);
@@ -105,7 +105,7 @@ test("unreadable and special files are partial, and disappearing tracked files a
     await w.git("add", "--", "private", "pipe");
     const before = await captureSnapshot(w.root);
     await chmod(join(w.root, "private"), 0);
-    if (process.getuid?.() !== 0) {
+    if (process.platform !== "win32" && process.getuid?.() !== 0) {
       const unavailable = await captureSnapshot(w.root);
       assert.equal(unavailable.omitted.get("private"), "file-unavailable");
       assert.equal(compareSnapshots(before, unavailable).status, "partial");
@@ -114,7 +114,8 @@ test("unreadable and special files are partial, and disappearing tracked files a
     await chmod(join(w.root, "private"), 0o600);
     await rm(join(w.root, "private"));
     await rm(join(w.root, "pipe"));
-    await exec("mkfifo", [join(w.root, "pipe")]);
+    if (process.platform === "win32") await mkdir(join(w.root, "pipe"));
+    else await exec("mkfifo", [join(w.root, "pipe")]);
     const after = await captureSnapshot(w.root);
     assert.equal(after.omitted.get("pipe"), "unsupported-file-type");
     assert.deepEqual(compareSnapshots(before, after).changes.map(c => [c.path, c.kind]), [["private", "deleted"]]);
@@ -189,7 +190,7 @@ test("linked worktree scope excludes sibling worktree and submodule contents", a
     await w.write("sibling", "not in linked");
     await mkdir(join(linked, "sub"));
     await exec("git", ["-C", linked, "update-index", "--add", "--cacheinfo", `160000,${(await w.git("rev-parse", "HEAD")).toString().trim()},sub`]);
-    await exec("bash", ["-c", "printf hidden > sub/hidden"], { cwd: linked });
+    await exec(process.execPath, ["-e", "require('node:fs').writeFileSync('sub/hidden', 'hidden')"], { cwd: linked });
     const snapshot = await captureSnapshot(linked);
     assert.equal(await workspaceRoot(linked), linked);
     assert.deepEqual([...snapshot.files.keys()], ["base"]);

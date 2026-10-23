@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -12,10 +12,12 @@ export async function workspace(): Promise<{
   write: (path: string, content: string | Buffer) => Promise<void>;
   close: () => Promise<void>;
 }> {
-  const root = await mkdtemp(join(tmpdir(), "pi-m1-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "pi-m1 space-é-")));
   const git = async (...args: string[]): Promise<Buffer> => (await exec("git", ["-C", root, ...args], { encoding: "buffer" })).stdout;
   try {
     await git("init", "-q");
+    await git("config", "core.autocrlf", "false");
+    await git("config", "core.symlinks", "true");
     return { root, git, write: (path, content) => writeFile(join(root, path), content), close: () => rm(root, { recursive: true, force: true }) };
   } catch (error) {
     await rm(root, { recursive: true, force: true });

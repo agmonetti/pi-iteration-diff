@@ -2,7 +2,7 @@
 
 **Proyecto provisional:** `pi-iteration-diff`  
 **Fecha de investigación:** 2026-10-22  
-**Estado inicial:** investigación documental. **Estado vigente:** M0 cerrado; M1 autorizado e implementado con gate automatizado PASS. ADR-003 vigente, UI congelada y M2 no iniciado. Acta M0 y decisiones M1 al final.
+**Estado inicial:** investigación documental. **Estado vigente:** M0 cerrado; auditoría funcional M1 aceptada; corrección obligatoria de portabilidad en curso, certificación CI multiplataforma pendiente. ADR-003 vigente, UI congelada y M2 no iniciado. Acta M0 y decisiones M1 al final.
 **Objetivo:** panel de diffs a la derecha de la conversación de Pi, invocado manualmente, con selección de líneas/rangos y envío al editor nativo de Pi; compatible con Pi ejecutado dentro de Herdr.
 
 > Esta investigación es contexto para decisiones, **no prueba de compatibilidad** con las versiones instaladas del usuario. Contrastar APIs, versiones y código fuente antes de implementar. Separa observaciones verificadas de hipótesis.
@@ -485,8 +485,80 @@ Nuevo candidato libera resultado previo: retención de una ventana, no historial
 Gate 2026-10-23: tsc + 40/40 PASS; suites dirigidas 20/20 lifecycle y 9/9 snapshots.
 Incluye SDK real y transporte HTTP loopback, no sólo eventos simulados. Arquitecto
 read-only aprobó tras corregir exclusión `.env*` con regresión por variantes.
-Linux/procfs y metadatos FS cooperativos son límites actuales, no compatibilidad
-universal. Git no enumera FIFO untracked: se prueba regular tracked → FIFO y se
+Linux/procfs y metadatos FS cooperativos eran los límites de esta implementación
+inicial; la corrección multiplataforma posterior se documenta en §16. Git no enumera FIFO untracked: se prueba regular tracked → FIFO y se
 excluye como desconocido. Sólo archivos elegibles/enumerables, no auditoría completa
 de entradas especiales. Sin nuevas pruebas humanas ni adelanto de M2.
+
+## 16. Corrección obligatoria M1: portabilidad (2026-10-23)
+
+Linux, macOS y Windows nativo son requisitos P0 del producto (NFR-10). Arch sólo
+es desarrollo. La aceptación funcional anterior no certifica otros SO. WSL ejecuta
+Linux y no sustituye Windows nativo. Se conserva un motor TypeScript/Node, sin FFI,
+binarios adicionales, tres motores independientes ni cambios de UI/ADR-003.
+
+### Auditoría del acceso y decisión mínima
+
+- Dependencias encontradas: rechazo `platform !== linux`, `/proc/self/fd`, flags
+  POSIX O_NOFOLLOW/O_NONBLOCK, separación `/` de Git vs `path` del host, rechazo
+  de root mediante `/`, comparación textual, `trimEnd` del root y SIGKILL directo.
+  Tests también asumían `/tmp` canónico, `/proc/PID/stat`, bash, chmod POSIX y FIFO.
+- El protocolo compartido conserva identidades bigint `dev/ino` (ino cero no es
+  verificable), tipo regular, nlink=1, tamaño y timestamps ns. Guarda identidades
+  de root/padres, abre, compara fstat con lstat, revalida padres y destino canónico
+  dentro del root **antes de leer**, y repite validación tras lectura acotada +1.
+  Sólo publica tras todos los checks; carreras detectadas/identidad no verificable
+  son omisiones parciales. No se sustituyó por realpath previo a open.
+- Adaptaciones justificadas: Windows usa O_RDONLY porque no implementa los flags
+  POSIX; Linux conserva su validación adicional del descriptor en procfs antes
+  de leer, sin imponerla a macOS/Windows. No se elimina esa protección Linux.
+- Canonicalización de raíz con Node; `parse(root).root` cubre volumen/UNC. Se elimina
+  sólo el terminador de línea de Git, no espacios finales válidos del root POSIX.
+  Git entrega rutas relativas con `/`; paths públicos/exclude usan ese contrato,
+  no se convierten indiscriminadamente backslashes (son nombres válidos POSIX).
+  Windows rechaza separadores alternativos, drives/ADS, namespaces, dispositivos
+  DOS y aliases de punto/espacio final; `.git` se rechaza sin depender de case.
+  No se baja todo a minúscula: puede haber directorios Windows case-sensitive.
+  Se compara el prefijo canónico exacto con frontera de directorio y la identidad
+  del destino, tolerando Unicode/case alias legítimos de nombres bajo ese root.
+- Git se invoca sin shell/pager/fsmonitor. Se eliminan overrides GIT_* heredados;
+  se preservan configs normales/ignores (incluido core.excludesfile). Sólo rev-parse
+  y ls-files: no hooks, filtros de checkout ni helpers de transporte. Se presupone
+  Git confiable en PATH y configuración/FS de trabajo no hostil. Al abortar/cap,
+  Node termina el proceso directo y espera close; no lanza shell ni descendientes
+  propios. No se promete supervisar un Git malicioso que cree procesos arbitrarios.
+
+### Carreras y garantías particulares (no equivalentes)
+
+Node no expone openat2/RESOLVE_BENEATH ni apertura Windows con control completo de
+reparse points. Validar lstat→open→fstat→padres/ruta cierra carreras detectables,
+**no** elimina la ventana entre comprobaciones ni ataques ABA (sustituir/restaurar
+ancestros manteniendo identidades observadas). En macOS/Windows no puede probarse
+atómicamente la ubicación del descriptor antes de leer: un movimiento adversarial
+puede hacer que un descriptor ya abierto apunte temporalmente fuera del root.
+Las comprobaciones de publicación no son una garantía de que nunca se leyeron bytes
+externos bajo un atacante activo. Linux conserva su check prelectura de fd, pero
+incluso allí un movimiento posterior no produce snapshot atómico ni sandbox hostil.
+No se afirma que carreras no observadas se conviertan mágicamente en parciales.
+Symlinks/junctions que Node reconoce se rechazan; otros reparse tags, FS remotos y
+metadatos no confiables no están certificados. Límites y transparencia funcional
+son comunes; mecanismos y garantías de contención difieren por plataforma.
+
+### Validación requerida y bloqueo
+
+`.github/workflows/portability.yml` define runners nativos ubuntu/macos/windows,
+Node 26, typecheck y suite completa. Integra pruebas de rutas/Unicode/CRLF/case,
+write por subprocess Node nativo, dos iteraciones, límites/enlaces/worktrees,
+carreras controladas, cancelación durante metadata/lectura/proceso y Git intacto.
+Se mantienen los 42 casos previos: en Windows el caso HTTP de aborto con PIDs POSIX
+queda SKIP explícito (no simula equivalencia); las pruebas nativas de cancelación
+Git sí son obligatorias. chmod/FIFO se prueban en POSIX; Windows usa un directorio
+no regular y junctions. Symlink de archivo Windows exige permiso real: falla si
+no está disponible, no se transforma silenciosamente en PASS. SDK bash se mantiene
+con Git Bash soportado por Pi; el proceso de tests sigue siendo Node Windows nativo.
+
+No hay remote configurado; no se hace push. No es posible ejecutar GitHub Actions
+para estos cambios desde este checkout. Los tres jobs quedan **NOT RUN** hasta
+una ejecución externa real con URL/run ID y logs. Linux local es evidencia Linux
+local, no ubuntu-latest; macOS/Windows permanecen sin certificar. No avanzar a M2.
 

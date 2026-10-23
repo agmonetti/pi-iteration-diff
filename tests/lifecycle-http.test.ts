@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { execFileSync } from "node:child_process";
 import { registerCaptureLifecycle } from "../src/lifecycle/pi-lifecycle.js";
 import type { IterationCapture } from "../src/lifecycle/iteration-capture.js";
-import { chmod, mkdtemp, readFile, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -22,18 +22,21 @@ async function waitUntil(check: () => Promise<boolean>): Promise<void> {
 
 async function stopped(pid: number): Promise<boolean> {
   try {
-    // Linux zombies have exited but can await reaping by the container's init.
-    const stat = await readFile(`/proc/${pid}/stat`, "utf8");
-    return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z");
+    process.kill(pid, 0);
+    // POSIX zombies have exited but can await reaping by init; ps works on Linux/macOS.
+    return execFileSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" }).trim().startsWith("Z");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return true;
+    if (typeof (error as { status?: unknown }).status === "number" && (error as { status: number }).status === 1) return true;
     throw error;
   }
 }
 
 for (const scenario of ["http-retry", "bash-abort", "restore"] as const) {
-  test(`M0 real HTTP lifecycle: ${scenario}`, { timeout: 20000 }, async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "pi-m0-http-"));
+  test(`M0 real HTTP lifecycle: ${scenario}`, { timeout: 20000,
+    skip: scenario === "bash-abort" && process.platform === "win32" ? "POSIX shell PIDs are not native Windows PIDs; native capture cancellation is tested separately" : false,
+  }, async () => {
+    const cwd = await realpath(await mkdtemp(join(tmpdir(), "pi-m0-http-")));
     await chmod(cwd, 0o700);
     const sessions: Session[] = [];
     const captures: IterationCapture[] = [];

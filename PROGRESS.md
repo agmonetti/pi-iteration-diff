@@ -2,8 +2,8 @@
 
 **Proyecto:** `pi-iteration-diff`  
 **Última actualización:** 2026-10-23
-**Estado general:** `M1 ACCEPTED — AUDITORÍA FINAL DEL MOTOR PASS`
-**Milestone activo:** ninguno — detenido antes de M2; UI congelada
+**Estado general:** `M1 FUNCTIONAL ACCEPTED — PORTABILIDAD CI PENDIENTE`
+**Milestone activo:** corrección obligatoria de portabilidad M1 — detenido antes de M2; UI congelada
 **Versión del producto:** 0.0.0 privada; prototipo sintético, no producto.
 
 ## 1. Resumen del estado
@@ -15,7 +15,7 @@
 - **Lifecycle extendido:** HTTP loopback 429→200, aborto bash real y restore persistente SDK PASS. Contrato de iteración documentado, sin confundir colas agrupadas con petición individual.
 - **Decisión final aprobada:** ADR-003; usuario acepta provisionalmente indisponibilidad individual de ventanas agrupadas y diff conjunto diferenciado de Last iteration. Sin garantía de atribución. Drag literal DEFERRED a M3 sin eliminar FR-16.
 - **M0 cerrado:** matriz final y acta en `M0.md`; no se reabrió factibilidad ni diseño.
-- **M1 cerrado:** motor efímero acotado, delta por bytes y lifecycle ADR-003 con ventanas individuales/agrupadas/no verificables/parciales explícitas. Gate actual: tsc + 42/42 PASS tras auditoría final; gate histórico M1: 40/40, lifecycle dirigido 20/20 y snapshots dirigido 9/9. Evidencia y límites al final y en `M1.md`.
+- **Auditoría funcional M1 aceptada:** 42/42 PASS históricos. Corrección obligatoria posterior: motor compartido Linux/macOS/Windows implementado; certificación multiplataforma pendiente de CI real. Gate local y garantías particulares al final y en `M1.md`; ningún PASS local equivale a macOS/Windows/ubuntu-latest.
 - **Parada:** sin M2, visor definitivo, hunks, historial ni drag/drop. Sin nuevas pruebas humanas de Pi/Herdr.
 
 ## 2. Entregables documentales (2026-10-22)
@@ -33,7 +33,7 @@
 | Milestone | Estado | Evidencia/criterio pendiente |
 |---|---|---|
 | M0 Factibilidad | **CLOSED / PASS** | 14/14 PASS; H3/H7/H8 confirmados por operador; ADR-003 aprobado; pendientes de producto diferidos explícitamente |
-| M1 Snapshots | **ACCEPTED / PASS** | Auditoría final: 42/42 global + CLI PTY aislado; dos carreras corregidas con regresiones; límites ADR-003 conservados |
+| M1 Snapshots | **FUNCTIONAL ACCEPTED / PORTABILITY PENDING** | Auditoría funcional 42/42 aceptada; corrección posterior compartida, gates locales al final. CI real ubuntu/macos/windows NOT RUN; ADR-003/UI intactos |
 | M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
 | M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
 | M4 Herdr/robustez | **NOT STARTED** | Matriz e2e + cleanup + performance |
@@ -663,4 +663,91 @@ carreras demostrables. No autoriza M2 ni cambia requisitos/UI/dependencias.
   con regresión y evidencia documental de cierre. Rutas explícitas, status/diff/cached
   revisados antes de cada commit; sin push ni M2.
 - Siguiente paso: esperar autorización explícita del usuario, no comenzar el visor.
+
+### 2026-10-23 — M1 / corrección obligatoria de portabilidad
+
+**Estado:** implementación compartida revisada; **CI MULTIPLATAFORMA PENDIENTE**.
+La auditoría funcional previa sigue aceptada. No se declara DoD de portabilidad
+satisfecho ni macOS/Windows certificados. M2 no iniciado, UI congelada.
+
+**Cambió**
+- `src/snapshots/capture.ts`: se elimina el rechazo global no-Linux. Protocolo
+  compartido con lstat/fstat bigint, identidad no nula, nlink=1, tipo/tamaño/timestamps
+  ns, revalidación de root/padres/destino canónico antes/después de leer. Carreras
+  detectadas/identidad no verificable producen omisiones parciales. Root de volumen
+  y HOME rechazados; rutas Git POSIX y aliases peligrosos Windows tratados sin
+  lowercasing global; terminador de Git retirado sin truncar espacios del root.
+- Adaptaciones mínimas comprobables: flags POSIX frente a O_RDONLY Windows;
+  comprobación fd/procfs **adicional obligatoria sólo en Linux**, no exigida a otros
+  SO ni eliminada para conseguir portabilidad. Sin tres motores ni dependencias.
+- Git directo, sin shell/pager/fsmonitor; overrides GIT_* heredados eliminados,
+  configuración/ignores normales preservados. Aborto/cap mata y espera close.
+  Se presupone Git confiable en PATH; no supervisor de descendientes maliciosos.
+- `tests/fixtures/workspace.ts`: root canónico, espacios/Unicode, config sólo del
+  fixture (autocrlf=false, symlinks=true), cleanup finally.
+- `tests/snapshot-capture.test.ts`: conserva ocho casos, escrituras externas mediante
+  proceso Node nativo, junction Windows y directorio especial donde no existe FIFO.
+  chmod/permisos POSIX sólo se afirman en POSIX. Shell bash sigue cubierto por SDK.
+- `tests/snapshot-portability.test.ts`, `tests/snapshot-identity.test.ts`: 14 casos
+  nuevos sobre rutas/case/Unicode/CRLF, Git overrides/ignores, carreras controladas
+  en apertura/lectura, crecimiento/hardlink, identidad cero, cancelación metadata/
+  lectura/proceso, integridad Git y preservación de garantía Linux antes de leer.
+  No se usan sleeps para provocar carreras FS; mocks envuelven IO real.
+- `tests/lifecycle-http.test.ts`: root real y detección POSIX de procesos terminados
+  con kill(0)/ps en lugar de procfs. Caso HTTP bash-abort con PIDs POSIX SKIP explícito
+  en Windows; no se falsifica correspondencia con PIDs Win32. Cancelación nativa del
+  motor tiene tests obligatorios propios. Ningún caso previo se elimina.
+- `.github/workflows/portability.yml`: ubuntu-latest/macos-latest/windows-latest,
+  Node 26, npm ci, check completo y checkout intacto. Windows exige win32 sin WSL.
+- `AGENTS.md`, `REQUIREMENTS.md`, `M1.md`, `RESEARCH.md`, `PROGRESS.md`: NFR-10/P0,
+  gate real de tres SO, garantías/limitaciones particulares y NOT RUN transparentes.
+  Snapshot/NetDelta/CaptureState/ADR-003, lifecycle y UI de producto intactos.
+
+**Pruebas ejecutadas — Linux 7.2.11-arch1-1 (no WSL), Node 26.12.0, npm 12.2.1,
+Git 2.56.0, Pi/TUI npm fijados 1.4.0**
+
+| Comando / caso | Resultado | Evidencia |
+|---|---|---|
+| `npm run check`, tras protocolo compartido y antes de tests nuevos | PASS | tsc + los 42/42 anteriores, sin skips; 7204 ms. |
+| `npm run check`, con primeras regresiones | PASS | tsc + 52/52; 4952 ms. |
+| `npm run check`, con identidad/metadata/integridad | PASS | tsc + 55/55; 4225 ms. |
+| `npm run check`, gate final incluyendo garantía procfs | PASS | tsc + 56/56, cero fallos/skips/cancelados; 5902 ms. |
+| Integridad Git de fixtures | PASS | Índice/config por bytes, staging/diff/status e historial por comandos antes/después; captura no los modifica. |
+| Cancelación subprocess nativo | PASS | Aborto, timeout y exceso stdout; retorno tras close, PID ya no vivo. Mocks sustituyen sólo ejecutable de regresión; integración restante usa Git real. |
+| Medición existente 512 × 4 KiB | PASS | Gate final: 2 097 152 bytes, 857,8 ms; RSS total 102 502 400 bytes, no incremental/SLA. Primera ejecución concurrente dio 2358 ms con maxMs=10000 explícito del benchmark; no se aumentan defaults. |
+| LSP activo 6 rutas TS, severity=error | PARCIAL | 0 errores recibidos; 5 clean confirmados, 1 inconcluso. tsc PASS es gate completo de tipos. |
+| Revisión arquitecto del plan | CONDICIONAL | Exigió no rebajar Linux, reglas Windows, límites ABA explícitos y CI no inventado; incorporado. |
+| Revisión arquitecto del código/tests/workflow | APROBADO a nivel código | Sin bloqueantes concretos; no reejecutó tests. Recomendó regresión procfs fallido/mismatch; agregada y gate 56/56 PASS. |
+| `git diff --check`, status/diff/cached | PASS | Inicio limpio; cached vacío, sólo cambios propios de esta corrección. |
+| CI ubuntu-latest | NOT RUN | Sin remote configurado; no push autorizado. Workflow no equivale a ejecución. |
+| CI macos-latest | NOT RUN | Falta runner real, URL/run ID y logs; no certificación. |
+| CI windows-latest (nativo) | NOT RUN | Falta runner real, URL/run ID y logs; WSL no es sustituto. |
+| WSL / Pi/Herdr manual / PTY nuevo | NOT RUN | No se modificó UI ni instalación real; no reutilizar PASS previo como evidencia nueva. |
+
+**Fallos / garantías / limitaciones**
+- Sin fallos de ejecución de tests en este bloque. Lint YAML inicial señaló dos
+  líneas largas del workflow; se dividieron con folding YAML y quedó clean.
+- Node no expone anclaje atómico de ancestros ni control completo de reparse tags.
+  En macOS/Windows el protocolo no prueba atómicamente ubicación actual del fd;
+  un escritor malicioso puede mover/restaurar directorios (ABA) y evadir checks.
+  No se garantiza que nunca se hayan leído bytes externos bajo ese ataque, ni se
+  dice que una carrera no observada automáticamente quede parcial. Linux conserva
+  su check prelectura pero tampoco es snapshot atómico frente a movimientos futuros.
+  Alcance: workspace cooperativo, no sandbox hostil. Rechazo de symlinks/junctions
+  reconocidos por Node, hardlinks/especiales e identidades no verificables probado.
+- Windows sin privilegios de symlink debe fallar el test de archivo enlazado, no
+  saltarlo. FIFO/chmod no equivalen a ACL/objetos especiales Windows; junctions sí
+  se prueban allí. FS remotos, otros reparse tags, UNC y directorios Windows
+  case-sensitive no certificados. Secretos best-effort y metadata IO cooperativo
+  conservan sus límites anteriores.
+- Decisión sin ampliar alcance: un motor compartido y dos diferencias de capacidad
+  pequeñas; no FFI, runtime nuevo ni reescritura. Sin cambios al diseño UI congelado.
+
+**Git / próximo paso / parada**
+- Un commit lógico de motor + regresiones + matriz + garantías documentadas, mensaje
+  `fix(snapshots): add shared cross-platform identity checks`, por rutas explícitas.
+  Sin push ni cambios de configuración global/instalación Pi/Herdr.
+- Próximo paso exclusivo: ejecutar externamente CI en los tres runners nativos y
+  registrar run ID/logs/resultados reales; corregir sólo fallos reproducidos. La
+  certificación y DoD de portabilidad siguen pendientes. **Detenerse antes de M2.**
 

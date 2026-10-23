@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { constants } from "node:fs";
+import { constants, type BigIntStats } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import type { Snapshot } from "./model.js";
 
 export interface CaptureLimits {
@@ -24,8 +24,11 @@ export const defaultLimits: Readonly<CaptureLimits> = {
 /** Bounded, read-only Git subprocess; stderr and contents never enter diagnostics. */
 async function git(root: string, args: string[], signal: AbortSignal, cap: number): Promise<Buffer> {
   return new Promise((fulfill, reject) => {
-    const child = spawn("git", ["--no-optional-locks", "-C", root, ...args], {
-      stdio: ["ignore", "pipe", "ignore"], env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    // These metadata-only commands must not inherit repository overrides or launch fsmonitor/pagers.
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith("GIT_")));
+    const child = spawn("git", ["--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", root, ...args], {
+      shell: false, windowsHide: true, stdio: ["ignore", "pipe", "ignore"],
+      env: { ...env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0" },
     });
     const chunks: Buffer[] = [];
     let size = 0;
@@ -48,13 +51,43 @@ async function git(root: string, args: string[], signal: AbortSignal, cap: numbe
 }
 
 export async function workspaceRoot(cwd: string, signal: AbortSignal = AbortSignal.timeout(defaultLimits.maxMs)): Promise<string> {
-  const root = await realpath((await git(cwd, ["rev-parse", "--show-toplevel"], signal, 16_384)).toString("utf8").trimEnd());
-  if (root === sep || root === homedir()) throw new Error("unsafe-workspace-root");
+  const root = await realpath((await git(cwd, ["rev-parse", "--show-toplevel"], signal, 16_384)).toString("utf8").replace(/\r?\n$/, ""));
+  if (await unsafeRoot(root)) throw new Error("unsafe-workspace-root");
   return root;
 }
 
+async function unsafeRoot(root: string): Promise<boolean> {
+  return root === parse(root).root || root === await realpath(homedir());
+}
+
 function validPath(path: string): boolean {
-  return !!path && !isAbsolute(path) && !path.split("/").some(p => p === ".." || p === "." || p === "" || p === ".git");
+  return !!path && !path.includes("\0") && !isAbsolute(path) && !path.split("/").some(p =>
+    p === ".." || p === "." || p === "" || p.toLowerCase() === ".git" ||
+    process.platform === "win32" && (/[\\\\:]/.test(p) || /[. ]$/.test(p) ||
+      /^(?:con|prn|aux|nul|conin\$|conout\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(p)));
+}
+
+function sameIdentity(a: BigIntStats, b: BigIntStats): boolean {
+  return a.ino !== 0n && b.ino !== 0n && a.ino === b.ino && a.dev === b.dev;
+}
+
+function sameFile(a: BigIntStats, b: BigIntStats): boolean {
+  return sameIdentity(a, b) && b.isFile() && b.nlink === 1n && a.size === b.size &&
+    a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs;
+}
+
+async function verifyPath(root: string, absolute: string, expected: BigIntStats): Promise<void> {
+  const canonical = await realpath(absolute);
+  // Compare canonical spelling, not blanket lowercasing (Windows can have case-sensitive directories).
+  if (!canonical.startsWith(`${root}${sep}`) || !sameFile(expected, await lstat(absolute, { bigint: true })) ||
+      !sameFile(expected, await lstat(canonical, { bigint: true }))) throw new Error("file-raced");
+}
+
+async function verifyParents(parents: readonly { path: string; stat: BigIntStats }[]): Promise<void> {
+  for (const parent of parents) {
+    const current = await lstat(parent.path, { bigint: true });
+    if (!current.isDirectory() || !sameIdentity(parent.stat, current)) throw new Error("unsafe-parent");
+  }
 }
 
 function sensitivePath(path: string): boolean {
@@ -82,7 +115,9 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
   const check = (): void => { if (signal.aborted) throw new Error("capture-cancelled-or-timeout"); };
   try {
     check();
-    if (root !== await realpath(root) || root === sep || root === homedir()) throw new Error("unsafe-workspace-root");
+    if (root !== await realpath(root) || await unsafeRoot(root)) throw new Error("unsafe-workspace-root");
+    const rootStat = await lstat(root, { bigint: true });
+    if (!rootStat.isDirectory() || rootStat.ino === 0n) throw new Error("unverifiable-root-identity");
     // Require the worktree root, not a directory prefix that could include sibling projects.
     if (root !== await workspaceRoot(root, signal)) throw new Error("workspace-root-mismatch");
     check();
@@ -105,22 +140,34 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
         }
         const parts = path.split("/");
         if (parts.length > limits.maxDepth) throw new Error("depth-limit");
+        const parents = [{ path: root, stat: rootStat }];
         for (let i = 1; i < parts.length; i++) {
-          if (!(await lstat(join(root, ...parts.slice(0, i)))).isDirectory()) throw new Error("unsafe-parent");
+          const parent = join(root, ...parts.slice(0, i));
+          const stat = await lstat(parent, { bigint: true });
+          if (!stat.isDirectory() || stat.ino === 0n) throw new Error("unsafe-parent");
+          parents.push({ path: parent, stat });
         }
         const absolute = resolve(root, path);
-        const metadata = await lstat(absolute);
+        const local = relative(root, absolute);
+        if (!local || isAbsolute(local) || local === ".." || local.startsWith(`..${sep}`)) throw new Error("unsupported-path");
+        const metadata = await lstat(absolute, { bigint: true });
         observed = true;
-        if (!metadata.isFile() || metadata.nlink > 1) throw new Error("unsupported-file-type");
-        if (metadata.size > limits.maxFileBytes) throw new Error("file-size-limit");
-        if (bytes + metadata.size > limits.maxBytes) throw new Error("memory-limit");
+        if (!metadata.isFile() || metadata.nlink !== 1n) throw new Error("unsupported-file-type");
+        if (metadata.ino === 0n) throw new Error("unverifiable-file-identity");
+        if (metadata.size > BigInt(limits.maxFileBytes)) throw new Error("file-size-limit");
+        if (BigInt(bytes) + metadata.size > BigInt(limits.maxBytes)) throw new Error("memory-limit");
         check();
-        handle = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-        // Linux fd validation closes ancestor-symlink races before reading any content.
-        if (process.platform !== "linux" || await realpath(`/proc/self/fd/${handle.fd}`) !== absolute || relative(root, absolute).startsWith(`..${sep}`)) throw new Error("unsafe-open-file");
-        const before = await handle.stat();
-        if (!before.isFile() || before.nlink > 1 || before.ino !== metadata.ino || before.dev !== metadata.dev || before.size !== metadata.size) throw new Error("file-raced");
-        const buffer = Buffer.alloc(before.size + 1);
+        // Windows does not implement POSIX no-follow/non-blocking open flags.
+        const flags = process.platform === "win32" ? constants.O_RDONLY : constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK;
+        handle = await open(absolute, flags);
+        // Retain Linux's additional descriptor-path guarantee; other hosts use the shared identity protocol.
+        if (process.platform === "linux" && await realpath(`/proc/self/fd/${handle.fd}`) !== absolute) throw new Error("unsafe-open-file");
+        const before = await handle.stat({ bigint: true });
+        if (!sameFile(metadata, before)) throw new Error("file-raced");
+        await verifyParents(parents);
+        await verifyPath(root, absolute, before);
+        check();
+        const buffer = Buffer.alloc(Number(before.size) + 1);
         let read = 0;
         while (read < buffer.length) {
           check();
@@ -128,9 +175,11 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
           if (!result.bytesRead) break;
           read += result.bytesRead;
         }
-        const after = await handle.stat();
+        const after = await handle.stat({ bigint: true });
+        await verifyParents(parents);
+        if (BigInt(read) !== before.size || !sameFile(before, after)) throw new Error("file-raced");
+        await verifyPath(root, absolute, before);
         check();
-        if (read !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs || await realpath(absolute) !== absolute) throw new Error("file-raced");
         const content = buffer.subarray(0, read);
         let text: string;
         try { text = new TextDecoder("utf-8", { fatal: true }).decode(content); }

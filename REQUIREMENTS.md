@@ -67,6 +67,7 @@ Si otro proceso modifica archivos entre snapshots, pueden aparecer cambios de te
 - **NFR-07 — Compatibilidad:** versionar adaptador interno de Pi y probar en versiones reales soportadas; Herdr opcional.
 - **NFR-08 — Transparencia:** diferenciar «delta neto observado» de «cambios inequívocamente causados por Pi».
 - **NFR-09 — Finalización:** un milestone se cierra cuando cumple sus checks. No expandir alcance para optimizaciones cosméticas no solicitadas.
+- **NFR-10 — Portabilidad P0:** el producto debe capturar/comparar archivos ordinarios en Linux, macOS y Windows nativo dentro de entornos soportados por Pi. Arch Linux sólo es el entorno de desarrollo; WSL no certifica Windows. Un motor compartido, con adaptaciones mínimas demostradas y garantías de seguridad particulares documentadas. Mantener límites, exclusiones, identidad verificada y resultados parciales ante incertidumbre; no afirmar equivalencia de mecanismos contra carreras. Gate obligatorio: integración real en `ubuntu-latest`, `macos-latest` y `windows-latest`, con creación/modificación/borrado, preexistentes, rutas/Unicode/case/separadores, symlinks/junctions cuando aplique, worktrees, límites, cancelación y Git intacto. Sin ejecución real: NOT RUN, no certificación.
 
 ## 5. User stories / escenarios BDD
 
@@ -181,7 +182,7 @@ Pueden revisarse tras el spike. Incluir identificador de snapshot/diff en una se
 | Milestone | Entregable | Gate de salida |
 |---|---|---|
 | **M0 — Factibilidad** | Prototipos mínimos: split TUI, mouse dentro/fuera de Herdr, editor intacto, identificación correcta de eventos; matriz de compatibilidad. | Evidencia reproducible PASS/FAIL; ADR confirmado y riesgos abiertos explícitos. |
-| **M1 — Captura** | Motor before/after aislado, fixtures, seguridad/exclusiones, separación por sesión/worktree. | US-01, 02, 07, 08 automatizadas; sin mutación del Git index. |
+| **M1 — Captura** | Motor before/after compartido Linux/macOS/Windows, fixtures, seguridad/exclusiones, separación por sesión/worktree. | US-01, 02, 07, 08 automatizadas; sin mutación de Git; NFR-10 con CI nativa real en los tres SO. |
 | **M2 — Visor** | Diff estructurado, dock, navegación, empty/error states, fallback estrecho. | FR-01–05, 10, 11, 13 pasan. |
 | **M3 — Selección/feedback** | Rango de mouse/teclado, FIX/DISCUSS, anexado al prompt, drag-to-editor investigado e implementado donde viable. | US-03, 04, 05; sin sobreescritura ni envío automático. |
 | **M4 — Herdr/robustez** | Test matrix real, resize, pane zoom, session switch/reload, conflictos, límites/benchmark. | US-06, FR-12–15, NFR relevantes. |
@@ -234,6 +235,7 @@ Toda prueba real debe tener fecha, versión, comando/pasos, resultado (PASS/FAIL
 - [ ] Todos los requisitos P0 implementados y probados.
 - [ ] Drag-to-editor FR-16 probado con evidencia y estado final transparente; paridad completa solo si funciona, o excepción aprobada por el usuario.
 - [ ] Typecheck y todos los tests automatizados PASS con comandos reproducibles.
+- [ ] NFR-10: integración del motor PASS real en Linux, macOS y Windows nativo; WSL separado; matriz y garantías particulares registradas (workflow no ejecutado = NOT RUN).
 - [ ] Pruebas manuales en Pi y Herdr PASS (o bloqueos explícitos que impiden declarar release listo).
 - [ ] No escritura no autorizada en staging/config global/sesiones ajenas.
 - [ ] Sin autoapertura, sin autosend, sin pérdida de borradores.
