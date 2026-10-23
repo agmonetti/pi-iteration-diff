@@ -2,8 +2,8 @@
 
 **Proyecto:** `pi-iteration-diff`  
 **Última actualización:** 2026-10-23
-**Estado general:** `M1 FUNCTIONAL ACCEPTED — PORTABILIDAD CI PENDIENTE`
-**Milestone activo:** corrección obligatoria de portabilidad M1 — detenido antes de M2; UI congelada
+**Estado general:** `M1 ACCEPTED — CROSS-PLATFORM CI PASS`
+**Milestone activo:** M1 cerrado; detenido antes de M2; UI congelada
 **Versión del producto:** 0.0.0 privada; prototipo sintético, no producto.
 
 ## 1. Resumen del estado
@@ -33,7 +33,7 @@
 | Milestone | Estado | Evidencia/criterio pendiente |
 |---|---|---|
 | M0 Factibilidad | **CLOSED / PASS** | 14/14 PASS; H3/H7/H8 confirmados por operador; ADR-003 aprobado; pendientes de producto diferidos explícitamente |
-| M1 Snapshots | **FUNCTIONAL ACCEPTED / PORTABILITY PENDING** | Auditoría funcional 42/42 aceptada; corrección posterior compartida, gates locales al final. CI real ubuntu/macos/windows NOT RUN; ADR-003/UI intactos |
+| M1 Snapshots | **CLOSED / PASS (CROSS-PLATFORM CI PASS)** | Run 40018853023 (commit 116b6a8): ubuntu 56/56, macos 55/56 (1 skip procfs), windows 54/56 (2 skips procfs + bash-abort); tsc + checkout limpio. Motor y ADR-003 certificados |
 | M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
 | M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
 | M4 Herdr/robustez | **NOT STARTED** | Matriz e2e + cleanup + performance |
@@ -785,4 +785,27 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
   Status/diff/cached y `git diff --check` revisados, sin problemas. Commit local de infraestructura
   previsto: `ci: scope native portability checks to main` con tres rutas explícitas.
   Sin push, releases, paquetes ni avance a M2.
+
+### 2026-10-23 — M1 / verificación final de evidencia CI y cierre de milestone
+
+**Cambió**
+- `M1.md`, `PROGRESS.md`: evidencia CI auditada directamente sobre GitHub Actions Run 40018853023.
+  Cierre formal de M1 como `ACCEPTED — CROSS-PLATFORM CI PASS`. Sin modificar código ni workflows.
+  M2 no iniciado, UI congelada.
+
+**Pruebas ejecutadas / evidencia auditada**
+| Caso / Runner | Entorno y versión | Resultado | Evidencia / desglose |
+|---|---|---|---|
+| Run 40018853023 | Commit `116b6a8dc292d8eaa5fcb9477ca2b66c07c6ea00` (`116b6a8`) | SUCCESS | Disparado por push a main, contiene la corrección multiplataforma `9272ec9` y scoping `116b6a8`. |
+| `native (ubuntu-latest)` | Ubuntu 24.04.5 LTS, Node v26.12.1, git 2.55.0, wsl: false | PASS | `npm run check` (tsc + tsx): 56/56 pass, 0 fail, 0 skipped, 0 cancelled (11778 ms); checkout limpio. |
+| `native (macos-latest)` | macOS 26.6.2 arm64, Node v26.12.1, git 2.56.0, wsl: false | PASS | `npm run check` (tsc + tsx): 55/56 pass, 0 fail, 1 skipped (procfs Linux-only), 0 cancelled (3896 ms); checkout limpio. |
+| `native (windows-latest)` | Windows Server 2025 win32 x64, Node v26.12.1, git 2.56.0.windows.2, wsl: false | PASS | `npm run check` (tsc + tsx): 54/56 pass, 0 fail, 2 skipped (procfs Linux-only, bash-abort POSIX PIDs), 0 cancelled (40212 ms); checkout limpio. |
+| `npm run check` local | Linux 7.2.11-arch1-1, Node v26.12.0, npm 12.2.1 | PASS | tsc + 56/56 pass, 0 fail, 0 skipped, 0 cancelled (gate local previo). |
+
+**Dictamen y cierre de M1**
+- **M1 ACCEPTED — CROSS-PLATFORM CI PASS**.
+- Se auditó que `npm run check` ejecuta de forma efectiva `npm run typecheck && npm test` en los tres runners.
+- No hay `continue-on-error`, pasos ocultos ni fallos ignorados; el paso final de verificación de checkout limpio pasó en los tres entornos.
+- Las dos omisiones en Windows y una en macOS corresponden a capacidades del sistema operativo explícitamente declaradas (garantía procfs Linux-only y PIDs POSIX del fixture bash-abort de M0); la cancelación nativa del motor y toda la suite de snapshots se ejecutan y pasan al 100%.
+- UI permanece congelada. M2 no iniciado. No se realiza push.
 
