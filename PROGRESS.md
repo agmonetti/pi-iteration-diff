@@ -826,3 +826,18 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 `npm run check` completado con éxito: **81/81 test suites pass**, 0 fallos, 0 errores de TypeScript.
 
 **Siguiente paso:** Detenerse antes de M3 (selección de rangos, FIX/DISCUSS y transferencia al editor). No push.
+
+### 2026-10-23 — Auditoría de fidelidad visual M2 vs. /design
+
+**Cambió**
+- `design/M2_UI_AUDIT.md`: matriz de cumplimiento completa (IMPLEMENTED, PARTIAL, MISSING, CONFLICT) con referencias de código, desviaciones visuales observadas (rigidez dimensional de 34 columnas, jerarquía tipográfica, foco), problemas de usabilidad (truncamiento de rutas y footers), diferenciación estricta entre limitaciones de Pi TUI y decisiones de implementación, y correcciones priorizadas.
+- Sin cambios de runtime ni código fuente de M2; congelación de UI respetada.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux, Node 26.12.0 | PASS | 81/81 test suites pass, 0 fallos |
+| `git status --short` | Entorno de desarrollo | PASS | Solo `design/M2_UI_AUDIT.md` y `PROGRESS.md` modificados/añadidos |
+
+**Siguiente paso**
+- Mantener congelada la UI hasta M3 y utilizar las recomendaciones de `M2_UI_AUDIT.md` al planificar el siguiente milestone.
