@@ -247,6 +247,41 @@ test("real Pi viewport routes page navigation, wheel and resize independently of
   } finally { dock.close(); tui.stop(); }
 });
 
+test("responsive footer and file stats formatting with spaces", () => {
+  const p = panel().panel;
+  p.setView(view([{
+    path: "src/balance.ts", kind: "modified", added: 3, removed: 2,
+    getRows: () => [{ kind: "added", token: "line", oldLine: undefined, newLine: 12, text: "if (limit === 0) {" }],
+  }]));
+  // Expand file
+  p.handleInput("\r");
+
+  interface TestPanel {
+    footer(width: number): string;
+    entryLine(index: number, width: number): string;
+  }
+  const tp = p as unknown as TestPanel;
+
+  // Narrow footer (< 45 cols)
+  const narrowFooter = tp.footer(40);
+  assert.ok(narrowFooter.includes("Enter: abrir"));
+  assert.ok(!narrowFooter.includes("↑↓: navegar"));
+
+  // Standard footer
+  const stdFooter = tp.footer(80);
+  assert.ok(stdFooter.includes("↑↓: navegar"));
+
+  // Cursor present on active index
+  const activeRow = tp.entryLine(0, 50);
+  assert.ok(activeRow.includes("> "));
+
+  // File stats with spaces
+  const fileHeader = tp.entryLine(0, 50);
+  assert.match(fileHeader, /\+3\s*\/\s*-2/);
+});
+
+
+
 test("34-column headers keep status and exact counts when the path is long", () => {
   const p = panel().panel;
   p.setView(view([{

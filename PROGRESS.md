@@ -841,3 +841,20 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 
 **Siguiente paso**
 - Mantener congelada la UI hasta M3 y utilizar las recomendaciones de `M2_UI_AUDIT.md` al planificar el siguiente milestone.
+
+### 2026-10-23 — M2 / Corrección de fidelidad visual según auditoría
+
+**Cambió**
+- `src/ui/layout-adapter.ts`: dock adaptable con ancho base de 40 columnas y acotación responsiva (`minSize: 34`, `maxSize: 55`).
+- `src/ui/diff-panel.ts`: footer responsivo que conmuta a modo corto (< 45 cols) para evitar truncamientos y estadísticas formateadas con espacios explícitos (`+3 / -2`).
+- `tests/diff-panel.test.ts`: pruebas de regresión añadidas para footer responsivo, formateo de estadísticas y estado del dock.
+- `M2.md`, `design/M2_UI_AUDIT.md`: documentación actualizada con la resolución de las desviaciones visuales.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | 82/82 test suites pass, 0 fallos, tsc limpio |
+| `git status --short` | Entorno de desarrollo | PASS | Archivos modificados y nuevos correctos |
+
+**Siguiente paso**
+- Detenerse antes de M3 (selección de rangos, FIX/DISCUSS y transferencia al editor). No push.

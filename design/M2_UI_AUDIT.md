@@ -103,3 +103,12 @@
   }
   ```
 - **Optimización del Gutter y Ancho Mínimo:** Evaluar elevar `MIN_COLUMNS_THRESHOLD` de 90 a 100 columnas si el dock requiere 34+ celdas para evitar el colapso visual de rutas y código.
+
+---
+
+## 7. Estado de Corrección (Implementado en M2 Corrección de Fidelidad Visual)
+
+- **Dock adaptable:** Implementado en `src/ui/layout-adapter.ts` mediante `basis: 40, minSize: 34, maxSize: 55`, permitiendo adaptación fluida en terminales anchas y medianas.
+- **Footer responsivo:** Implementado en `src/ui/diff-panel.ts` con conmutación automática a modo corto (< 45 cols) para evitar truncamiento.
+- **Estadísticas de archivo:** Formateadas con espacios explícitos (`+3 / -2`) según los mockups.
+- **Verificación:** Suite de pruebas ampliada a 82/82 tests pasando exitosamente (`npm run check`).

@@ -138,7 +138,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
     return this.actions.style(this.focused ? "accent" : "muted", text);
   }
   private footer(width: number): string {
-    return this.actions.style("muted", truncateToWidth("│ Enter/clic abrir · ↑↓ PgUp/PgDn · [] archivo · {} hunk · Esc editor · q cerrar", width, "…"));
+    const short = width < 45;
+    const text = short
+      ? "Enter: abrir · Esc: editor · q: cerrar"
+      : "Enter/clic: abrir · ↑↓: navegar · Esc: editor · q: cerrar";
+    return this.actions.style("muted", truncateToWidth(`│ ${text}`, width, "…"));
   }
   private entryLine(index: number, width: number): string {
     const entry = this.diffEntries[index];
@@ -151,7 +155,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const kind = { created: "creado", modified: "modificado", deleted: "eliminado" }[file.kind];
       if (file.added !== undefined && file.removed !== undefined) {
         const marker = `${prefix}${this.expanded.has(file.path) ? "▾" : "▸"} `;
-        const suffix = ` [${kind}] +${file.added}/-${file.removed}`;
+        const suffix = ` [${kind}] +${file.added} / -${file.removed}`;
         const available = Math.max(0, width - visibleWidth(marker) - visibleWidth(suffix));
         const path = truncateToWidth(safeText(file.path), available, "…");
         return truncateToWidth(`${marker}${path}${suffix}`, Math.max(0, width), "…");
