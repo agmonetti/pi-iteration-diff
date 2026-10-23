@@ -2,7 +2,7 @@
 
 **Proyecto provisional:** `pi-iteration-diff`  
 **Fecha de investigación:** 2026-10-22  
-**Estado inicial:** investigación documental. **Estado vigente:** M0 cerrado, gate de factibilidad PASS; H3/H7/H8 confirmados por humano y ADR-003 aprobado. Acta al final. M1 no autorizado.
+**Estado inicial:** investigación documental. **Estado vigente:** M0 cerrado; M1 autorizado e implementado con gate automatizado PASS. ADR-003 vigente, UI congelada y M2 no iniciado. Acta M0 y decisiones M1 al final.
 **Objetivo:** panel de diffs a la derecha de la conversación de Pi, invocado manualmente, con selección de líneas/rangos y envío al editor nativo de Pi; compatible con Pi ejecutado dentro de Herdr.
 
 > Esta investigación es contexto para decisiones, **no prueba de compatibilidad** con las versiones instaladas del usuario. Contrastar APIs, versiones y código fuente antes de implementar. Separa observaciones verificadas de hipótesis.
@@ -465,4 +465,28 @@ Ignorados tracked y untracked se registran sin contenido, incluidos prefijos de
 directorios; cambios de ignore/exclude producen incertidumbre, no creación ficticia.
 Fixtures pasan con linked worktree, gitlink/submódulo, dirty/staged/untracked,
 Unicode/CRLF, shell, binarios, enlaces y límites. Sin cambios de instalación real.
+
+### Integración ADR-003 y gate M1
+
+`src/lifecycle/pi-lifecycle.ts` usa exclusivamente eventos públicos verificados en
+Pi 1.4.0. Captura idle en input y espera baseline antes de seguir; confirma texto
+por huella efímera en before_agent_start user. Transforms/expansiones/images/custom/
+source extension se degradan conservadoramente si falta correlación. Message_start
+user adicional o input durante ventana marca agrupación aun si su consumo es incierto.
+Turn_end/before_settle sólo actualizan outcome; retries/agent_end no cierran. Settled
+captura final (incluido aborto); error final nunca completo. Detalles y tabla M1.md.
+
+Controlador aislado de Pi/TUI, serializa IO y verifica identidad tras awaits;
+invalida síncronamente antes de resolver scope async y no reconstruye buffers al
+resume/reload. Sin evento público post-input para consumo/preflight: candidato no
+confirmado retiene sólo un baseline acotado hasta reemplazo/shutdown, nunca publica.
+Nuevo candidato libera resultado previo: retención de una ventana, no historial.
+
+Gate 2026-10-23: tsc + 40/40 PASS; suites dirigidas 20/20 lifecycle y 9/9 snapshots.
+Incluye SDK real y transporte HTTP loopback, no sólo eventos simulados. Arquitecto
+read-only aprobó tras corregir exclusión `.env*` con regresión por variantes.
+Linux/procfs y metadatos FS cooperativos son límites actuales, no compatibilidad
+universal. Git no enumera FIFO untracked: se prueba regular tracked → FIFO y se
+excluye como desconocido. Sólo archivos elegibles/enumerables, no auditoría completa
+de entradas especiales. Sin nuevas pruebas humanas ni adelanto de M2.
 

@@ -58,7 +58,7 @@ function validPath(path: string): boolean {
 }
 
 function sensitivePath(path: string): boolean {
-  return path.split("/").some(part => /^(?:\.env(?:\..*)?|\.ssh|\.gnupg|\.aws|\.azure|\.kube|\.npmrc|\.netrc|\.pypirc|credentials(?:\..*)?|secrets?(?:\..*)?|id_(?:rsa|ed25519|ecdsa)(?:\..*)?)$/i.test(part) || /\.(?:pem|key|p12|pfx|keystore)$/i.test(part));
+  return path.split("/").some(part => /^(?:\.env.*|\.ssh|\.gnupg|\.aws|\.azure|\.kube|\.npmrc|\.netrc|\.pypirc|credentials(?:\..*)?|secrets?(?:\..*)?|id_(?:rsa|ed25519|ecdsa)(?:\..*)?)$/i.test(part) || /\.(?:pem|key|p12|pfx|keystore)$/i.test(part));
 }
 
 function sensitiveContent(text: string): boolean {

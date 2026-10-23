@@ -2,9 +2,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 import { mountDock, type DockHandle } from "./ui/layout-adapter.js";
 import { appendExcerpt, FeasibilityPanel } from "./ui/feasibility-panel.js";
+import { registerCaptureLifecycle } from "./lifecycle/pi-lifecycle.js";
 
-/** M0 only: no /diff alias, filesystem capture, persistence, or model messages. */
+/** M0 UI remains synthetic; M1 captures silently without persistence or model messages. */
 export default function feasibilitySpike(pi: ExtensionAPI): void {
+  registerCaptureLifecycle(pi);
   let dock: DockHandle | undefined;
   let unsubscribe: (() => void) | undefined;
   const close = (): void => {

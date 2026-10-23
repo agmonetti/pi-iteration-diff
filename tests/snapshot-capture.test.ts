@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, readFile, rm, symlink, link } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, symlink, link } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
@@ -51,7 +51,7 @@ test("filters ignored (even tracked), secrets, binary, links, subtrees and exter
     await w.git("add", "--", "ignored.txt");
     await w.write(".gitignore", "ignored.txt\nuntracked-ignored.txt\n");
     await w.write("untracked-ignored.txt", "ignored");
-    await w.write(".env", "fixture secret");
+    for (const path of [".env", ".envrc", ".environment", ".env-local"]) await w.write(path, "fixture secret");
     await w.write("key.pem", "fixture");
     await w.write("tokens.txt", "api_key=synthetic-private-fixture");
     await w.write("nul.bin", Buffer.from([0, 1]));
@@ -65,6 +65,7 @@ test("filters ignored (even tracked), secrets, binary, links, subtrees and exter
     const capture = await captureSnapshot(w.root, { exclude: ["custom.txt"] });
     assert.deepEqual([...capture.files.keys()].sort(), [".gitignore", "text.txt"]);
     assert.equal(capture.omitted.get("ignored.txt"), "policy");
+    for (const path of [".env", ".envrc", ".environment", ".env-local"]) assert.equal(capture.omitted.get(path), "policy");
     assert.ok(!capture.files.has("external/outside.txt"));
     assert.equal(capture.files.get("text.txt")?.toString(), "é\r\n😀\t");
     assert.equal(compareSnapshots(capture, capture).status, "partial");
@@ -92,6 +93,44 @@ test("limits and cancellation expose partial results without invented deletions"
     const timed = await captureSnapshot(w.root, { maxMs: 1 });
     assert.equal(timed.enumerationComplete, false);
     assert.ok(timed.issues.includes("capture-cancelled-or-timeout"));
+  } finally { await w.close(); }
+});
+
+test("unreadable and special files are partial, and disappearing tracked files are absent", async () => {
+  const w = await workspace();
+  try {
+    await w.write("private", "fixture");
+    await w.write("pipe", "regular before run");
+    await w.git("add", "--", "private", "pipe");
+    const before = await captureSnapshot(w.root);
+    await chmod(join(w.root, "private"), 0);
+    if (process.getuid?.() !== 0) {
+      const unavailable = await captureSnapshot(w.root);
+      assert.equal(unavailable.omitted.get("private"), "file-unavailable");
+      assert.equal(compareSnapshots(before, unavailable).status, "partial");
+      assert.equal(compareSnapshots(before, unavailable).changes.length, 0);
+    }
+    await chmod(join(w.root, "private"), 0o600);
+    await rm(join(w.root, "private"));
+    await rm(join(w.root, "pipe"));
+    await exec("mkfifo", [join(w.root, "pipe")]);
+    const after = await captureSnapshot(w.root);
+    assert.equal(after.omitted.get("pipe"), "unsupported-file-type");
+    assert.deepEqual(compareSnapshots(before, after).changes.map(c => [c.path, c.kind]), [["private", "deleted"]]);
+  } finally { await w.close(); }
+});
+
+test("bounded capture measurement: 512 files / 2 MiB", async () => {
+  const w = await workspace();
+  try {
+    for (let i = 0; i < 512; i++) await w.write(`file-${i}`, "x".repeat(4096));
+    const start = performance.now();
+    const snapshot = await captureSnapshot(w.root, { maxMs: 10_000 });
+    const elapsed = performance.now() - start;
+    assert.deepEqual(snapshot.issues, []);
+    assert.equal(snapshot.files.size, 512);
+    assert.equal(snapshot.bytes, 2 * 1024 * 1024);
+    console.log(`M1 measurement: 512 files, ${snapshot.bytes} retained bytes, ${elapsed.toFixed(1)} ms; RSS ${process.memoryUsage().rss} bytes (whole test process, not capture allocation)`);
   } finally { await w.close(); }
 });
 

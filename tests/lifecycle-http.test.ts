@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import { execFileSync } from "node:child_process";
+import { registerCaptureLifecycle } from "../src/lifecycle/pi-lifecycle.js";
+import type { IterationCapture } from "../src/lifecycle/iteration-capture.js";
 import { chmod, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -33,6 +36,7 @@ for (const scenario of ["http-retry", "bash-abort", "restore"] as const) {
     const cwd = await mkdtemp(join(tmpdir(), "pi-m0-http-"));
     await chmod(cwd, 0o700);
     const sessions: Session[] = [];
+    const captures: IterationCapture[] = [];
     let requests = 0;
     const statuses: number[] = [];
     const paths: string[] = [];
@@ -61,6 +65,7 @@ for (const scenario of ["http-retry", "bash-abort", "restore"] as const) {
       response.end("data: [DONE]\n\n");
     });
     try {
+      execFileSync("git", ["-C", cwd, "init", "-q"]);
       await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
       const address = server.address();
       assert.ok(address && typeof address !== "string");
@@ -79,6 +84,7 @@ for (const scenario of ["http-retry", "bash-abort", "restore"] as const) {
         const resourceLoader = new DefaultResourceLoader({ cwd, agentDir: cwd, settingsManager, noExtensions: true,
           noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
           extensionFactories: [pi => {
+            captures.push(registerCaptureLifecycle(pi, { exclude: ["sessions"] }));
             pi.on("session_start", () => { hooks.push("session_start"); });
             pi.on("input", () => { hooks.push("input"); });
             pi.on("before_agent_start", () => { hooks.push("before_agent_start"); });
@@ -126,6 +132,11 @@ for (const scenario of ["http-retry", "bash-abort", "restore"] as const) {
         assert.equal(requests, 1, "abort prevents another provider request before recovery");
         for (const pid of childPids) await waitUntil(() => stopped(pid));
         await assert.rejects(readFile(join(cwd, "after.txt")), { code: "ENOENT" });
+        const interrupted = captures.at(-1)?.state;
+        assert.ok(interrupted && "window" in interrupted && interrupted.window);
+        assert.equal(interrupted.state, "unavailable");
+        assert.equal(interrupted.window.status, "cancelled");
+        assert.ok(interrupted.window.delta.changes.some(change => change.path === "shell.pid"));
         await session.prompt("synthetic recovery request");
         assert.equal(trace.at(-1), "agent_settled:false");
       }
@@ -141,13 +152,27 @@ for (const scenario of ["http-retry", "bash-abort", "restore"] as const) {
         assert.equal(session.sessionId, id);
         assert.equal(session.messages.filter(message => message.role === "user").length, 1);
         assert.equal(session.getLastAssistantText(), "done");
+        assert.equal(captures.at(-1)?.state.state, "unavailable", "resume must not recover ephemeral snapshots");
         await session.prompt("synthetic restored request");
         assert.equal(session.messages.filter(message => message.role === "user").length, 2);
         assert.equal(trace.at(-1), "agent_settled:false");
         const fresh = await open(SessionManager.create(cwd, join(cwd, "sessions")));
         assert.notEqual(fresh.sessionId, id);
         assert.equal(fresh.messages.filter(message => message.role === "user").length, 0);
+        assert.equal(captures.at(-1)?.state.state, "unavailable");
+        await fresh.prompt("synthetic new session request");
+        await fresh.waitForIdle();
+        const freshState = captures.at(-1)?.state;
+        assert.ok(freshState?.state === "individual");
+        assert.equal(freshState.window.id.sessionId, fresh.sessionId);
+        const original = captures[0].state;
+        assert.ok(original.state === "individual");
+        assert.notEqual(freshState.window.id.runtimeEpoch, original.window.id.runtimeEpoch);
       }
+      const completed = captures.at(-1)?.state;
+      assert.ok(completed?.state === "individual");
+      assert.equal(completed.window.status, "complete");
+      assert.equal(completed.window.delta.changes.length, 0);
       assert.ok(paths.every(path => path === "/v1/chat/completions"));
       assert.deepEqual(hooks.slice(0, 3), ["session_start", "input", "before_agent_start"]);
       if (scenario === "http-retry") {

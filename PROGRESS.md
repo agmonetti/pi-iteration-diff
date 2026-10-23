@@ -1,9 +1,9 @@
 # PROGRESS.md — Bitácora viva del proyecto
 
 **Proyecto:** `pi-iteration-diff`  
-**Última actualización:** 2026-10-22  
-**Estado general:** `M0 CERRADO — GATE DE FACTIBILIDAD PASS`
-**Milestone activo:** M1 autorizado — implementación incremental; UI congelada
+**Última actualización:** 2026-10-23
+**Estado general:** `M1 CERRADO — GATE DEL MOTOR PASS`
+**Milestone activo:** ninguno — detenido antes de M2; UI congelada
 **Versión del producto:** 0.0.0 privada; prototipo sintético, no producto.
 
 ## 1. Resumen del estado
@@ -14,7 +14,9 @@
 - **Corregido y revalidado:** indicador visual accent del tema, sin modificar editor; test y confirmación humana PASS.
 - **Lifecycle extendido:** HTTP loopback 429→200, aborto bash real y restore persistente SDK PASS. Contrato de iteración documentado, sin confundir colas agrupadas con petición individual.
 - **Decisión final aprobada:** ADR-003; usuario acepta provisionalmente indisponibilidad individual de ventanas agrupadas y diff conjunto diferenciado de Last iteration. Sin garantía de atribución. Drag literal DEFERRED a M3 sin eliminar FR-16.
-- **Cierre definitivo:** matriz final y acta en `M0.md`; no más investigación M0 ni ampliación de infraestructura. M1 no autorizado.
+- **M0 cerrado:** matriz final y acta en `M0.md`; no se reabrió factibilidad ni diseño.
+- **M1 cerrado:** motor efímero acotado, delta por bytes y lifecycle ADR-003 con ventanas individuales/agrupadas/no verificables/parciales explícitas. Gate actual: tsc + 40/40 PASS; lifecycle dirigido 20/20 y snapshots dirigido 9/9. Evidencia y límites al final y en `M1.md`.
+- **Parada:** sin M2, visor definitivo, hunks, historial ni drag/drop. Sin nuevas pruebas humanas de Pi/Herdr.
 
 ## 2. Entregables documentales (2026-10-22)
 
@@ -31,7 +33,7 @@
 | Milestone | Estado | Evidencia/criterio pendiente |
 |---|---|---|
 | M0 Factibilidad | **CLOSED / PASS** | 14/14 PASS; H3/H7/H8 confirmados por operador; ADR-003 aprobado; pendientes de producto diferidos explícitamente |
-| M1 Snapshots | **IN PROGRESS** | Contratos y comparación neta probados; captura y lifecycle pendientes |
+| M1 Snapshots | **CLOSED / PASS** | 40/40 global; 20/20 lifecycle y 9/9 snapshots dirigidos; delta neto, Git intacto y ambigüedad explícita |
 | M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
 | M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
 | M4 Herdr/robustez | **NOT STARTED** | Matriz e2e + cleanup + performance |
@@ -565,6 +567,43 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
 **Límites / próximo paso**
 - Sólo Linux/procfs para lectura segura, no snapshot atómico ni detector universal de secretos. Límite de contenido no equivale a RSS; metadata FS cancelable sólo cooperativamente. Detalles en M1.md.
 - Sin fallos de suite en este incremento. Lifecycle aún pendiente: no declarar M1 completo. Próximo: controlador y hooks reales de Pi.
+
+### 2026-10-23 — M1.3 / lifecycle real y cierre del motor
+
+**Cambió**
+- `src/lifecycle/iteration-capture.ts`: controlador sin Pi/UI, identidad session/root/epoch/sequence, baseline confirmado, buffers efímeros, estado individual sólo si completo/exitoso, Batch Net separado, aborto/error/parcial/no verificable explícitos. Capturas serializadas, cancelación síncrona y guardas contra publicaciones obsoletas.
+- `src/lifecycle/pi-lifecycle.ts`, `src/index.ts`: wiring público Pi 1.4.0 en input/before_agent_start/message_start/turn_end/before_settle/settled/sesión. Captura silenciosa; spike UI intacto y sintético. No escritura en editor, sesiones, índice, objetos ni historia para operar.
+- `tests/iteration-capture.test.ts` (8): candidatos, transformaciones/custom/images, colas, errores, parciales, invalidación baseline/final, cambio root/session/runtime, serialización y doble settled.
+- `tests/lifecycle-capture.test.ts` (9): AgentSession real + stream local, herramientas write/edit/bash/custom, dos iteraciones/vacío, steering/followUp, retry/aborto/error, inputs consumidos/transformados, preflight y reload. No red remota.
+- `tests/lifecycle-http.test.ts` (3 existentes ampliados): mismo HTTP loopback real, ahora también motor M1; retry 429→200, cancelación bash y recuperación, reapertura sin recuperar buffers y sesión nueva sin mezcla de identidades.
+- Captura: regresión `.env*` y tests adicionales para permisos, FIFO tracked, límites y medición reproducible de 512 archivos/2 MiB. `M1.md` y `RESEARCH.md`: contratos/límites vigentes.
+
+**Pruebas reales — 2026-10-23 16:36 UTC−03**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux, UID 1000, Node 26.12.0/npm 12.2.1, Pi npm 1.4.0 | PASS | tsc + 40/40, 0 fallos, 4799 ms |
+| `npx --no-install tsx --test tests/iteration-capture.test.ts tests/lifecycle-capture.test.ts tests/lifecycle-http.test.ts` | Mismo, SDK real + HTTP local | PASS | 20/20, 4341 ms |
+| `npx --no-install tsx --test tests/snapshot-model.test.ts tests/snapshot-capture.test.ts` | Repos privados mkdtemp, cleanup finally | PASS | 9/9, 893 ms; índice por bytes y HEAD intactos |
+| Medición en suite completa anterior | 512 × 4 KiB, captura secuencial | PASS | 2 097 152 bytes, 373.6 ms; RSS total proceso 100 929 536 bytes, no cota incremental ni SLA |
+| LSP activo en 11 rutas TS | source=lsp, paths explícitos | PASS tipos con hints/warnings | 0 errores, 5 clean + 6 findings; 2 hints getModel deprecado y advertencias auxiliares de estilo, no se maquillan como cero diagnósticos |
+| LSP recheck 4 rutas finales | source=lsp, severity=error | PARCIAL | 0 errores recibidos; 2 clean confirmados, 2 inconclusos por servidor silencioso; tsc final PASS es el gate de tipos |
+| Revisión arquitecto CLI delegado | Lectura de fuentes/tests y check independiente | PASS tras corrección | 39/39 en su revisión; detectó discrepancia `.env*`, corregida con regresión; follow-up read-only aprueba sin bloqueantes |
+| Pi/Herdr manual / PTY nuevo | No cambia UI | NOT RUN | No inferir validación humana nueva a partir de SDK |
+
+**Fallos y correcciones documentados**
+- Primer test FIFO untracked falló: Git no enumera ese tipo como untracked. Hipótesis/prueba: crear archivo regular tracked y reemplazarlo por FIFO; Git sí lista la ruta y el motor la omite explícitamente sin bloquearse ni inventar borrado. Prueba corregida PASS. Alcance: archivos enumerables por Git, no inventario de especiales untracked.
+- Arquitecto encontró filtro `.env`/`.env.*` más estrecho que política `.env*`; se amplió por segmento antes de lectura y se probaron `.envrc`, `.environment`, `.env-local`. Follow-up aprobado.
+- Diagnósticos de desarrollo corrigieron imports (Pi usa `typebox` ya instalado), APIs SDK setModel/newSession inexistentes para ese uso y narrowing TypeScript en asserts. Sin dependencias nuevas; gate final limpio de errores.
+
+**DoD M1 / límites / parada**
+- PASS: delta neto aislado con preexistentes preservados; escrituras de cualquier herramienta observadas por contenido; creación/borrado/vacío; colas sin atribución individual falsa; retries conservan baseline; aborto/error no completados; scope y trabajos async no se mezclan; límites/exclusiones y Git intacto probados.
+- Linux/procfs para lectura segura; fuera de repo/otros SO fail closed. Secretos best-effort, no detector universal; no atomicidad ni causalidad forense frente a escritores externos. Metadata FS sólo cancelable cooperativamente; contenido acotado no equivale a RSS total. Ignorados/especiales no elegibles fuera de alcance anunciado.
+- Candidato consumido/preflight fallido no publica; su buffer acotado puede vivir hasta siguiente input/shutdown. Nuevo candidato libera resultado anterior para no acumular historial. Resume/reload no restaura snapshots.
+- M1 cerrado; no declarar producto completo ni paridad FR-03 para colas. UI congelada sin cambios; M2/M3 no implementados ni autorizados. Detenerse y esperar autorización M2.
+
+**Git**
+- Commits previos de este bloque: `dffe660 feat(snapshots): define net delta and coverage contracts`; `e3b0bae feat(snapshots): capture bounded workspace content without mutating Git`.
+- Commit final lógico: `feat(lifecycle): capture observed iteration windows with safe attribution`. Status/diff/cached revisados, sólo rutas propias explícitas; `AGENTS.md` previo ajeno preservado y excluido. Sin push, amend ni configuración global.
 
 
 
