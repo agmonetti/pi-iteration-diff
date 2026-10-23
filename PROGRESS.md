@@ -2,7 +2,7 @@
 
 **Proyecto:** `pi-iteration-diff`  
 **Última actualización:** 2026-10-23
-**Estado general:** `M1 CERRADO — GATE DEL MOTOR PASS`
+**Estado general:** `M1 ACCEPTED — AUDITORÍA FINAL DEL MOTOR PASS`
 **Milestone activo:** ninguno — detenido antes de M2; UI congelada
 **Versión del producto:** 0.0.0 privada; prototipo sintético, no producto.
 
@@ -15,7 +15,7 @@
 - **Lifecycle extendido:** HTTP loopback 429→200, aborto bash real y restore persistente SDK PASS. Contrato de iteración documentado, sin confundir colas agrupadas con petición individual.
 - **Decisión final aprobada:** ADR-003; usuario acepta provisionalmente indisponibilidad individual de ventanas agrupadas y diff conjunto diferenciado de Last iteration. Sin garantía de atribución. Drag literal DEFERRED a M3 sin eliminar FR-16.
 - **M0 cerrado:** matriz final y acta en `M0.md`; no se reabrió factibilidad ni diseño.
-- **M1 cerrado:** motor efímero acotado, delta por bytes y lifecycle ADR-003 con ventanas individuales/agrupadas/no verificables/parciales explícitas. Gate actual: tsc + 40/40 PASS; lifecycle dirigido 20/20 y snapshots dirigido 9/9. Evidencia y límites al final y en `M1.md`.
+- **M1 cerrado:** motor efímero acotado, delta por bytes y lifecycle ADR-003 con ventanas individuales/agrupadas/no verificables/parciales explícitas. Gate actual: tsc + 42/42 PASS tras auditoría final; gate histórico M1: 40/40, lifecycle dirigido 20/20 y snapshots dirigido 9/9. Evidencia y límites al final y en `M1.md`.
 - **Parada:** sin M2, visor definitivo, hunks, historial ni drag/drop. Sin nuevas pruebas humanas de Pi/Herdr.
 
 ## 2. Entregables documentales (2026-10-22)
@@ -33,7 +33,7 @@
 | Milestone | Estado | Evidencia/criterio pendiente |
 |---|---|---|
 | M0 Factibilidad | **CLOSED / PASS** | 14/14 PASS; H3/H7/H8 confirmados por operador; ADR-003 aprobado; pendientes de producto diferidos explícitamente |
-| M1 Snapshots | **CLOSED / PASS** | 40/40 global; 20/20 lifecycle y 9/9 snapshots dirigidos; delta neto, Git intacto y ambigüedad explícita |
+| M1 Snapshots | **ACCEPTED / PASS** | Auditoría final: 42/42 global + CLI PTY aislado; dos carreras corregidas con regresiones; límites ADR-003 conservados |
 | M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
 | M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
 | M4 Herdr/robustez | **NOT STARTED** | Matriz e2e + cleanup + performance |
@@ -605,6 +605,62 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
 - Commits previos de este bloque: `dffe660 feat(snapshots): define net delta and coverage contracts`; `e3b0bae feat(snapshots): capture bounded workspace content without mutating Git`.
 - Commit final lógico: `feat(lifecycle): capture observed iteration windows with safe attribution`. Status/diff/cached revisados, sólo rutas propias explícitas; `AGENTS.md` previo ajeno preservado y excluido. Sin push, amend ni configuración global.
 
+### 2026-10-23 — M1 / auditoría final de aceptación
 
+**Dictamen: M1 ACCEPTED** para el alcance del motor/ADR-003, tras corregir dos
+carreras demostrables. No autoriza M2 ni cambia requisitos/UI/dependencias.
 
+**Hallazgos y correcciones (red → green)**
+- `src/snapshots/capture.ts`, `tests/snapshot-capture.test.ts`: archivo tracked
+  observado por lstat y eliminado antes del open real. Antes: ENOENT sin omisión,
+  falso borrado completo. Regresión dirigida FAIL; ahora registra omisión y delta
+  parcial, sin inventar borrado. Ausencia desde primera comprobación sigue válida.
+- `src/lifecycle/pi-lifecycle.ts`, `tests/pi-lifecycle-races.test.ts`: shutdown en
+  microtask tras resolver scope, antes de continuar input. Antes: el true obsoleto
+  permitía sobrescribir motivo session-shutdown con input-not-confirmed. Regresión
+  dirigida FAIL; ahora los tres consumidores async comprueban la generación devuelta.
+  Dispatch controlado, no evidencia de fuga de archivos entre sesiones en Pi real.
+- `M1.md`: matriz de los cinco criterios, comandos, alcance real y límites.
+  Controlador y UI sintética no cambian; no se añade infraestructura ni optimización.
+
+**Pruebas ejecutadas — Linux, Node 26.12.0/npm 12.2.1, Pi instalado/npm 1.4.0**
+| Comando / caso | Resultado | Evidencia |
+|---|---|---|
+| `npm run check`, antes de correcciones | PASS | tsc + 40/40, 0 fallos, 5256 ms |
+| Regresión ENOENT dirigida, antes de corregir | FAIL esperado | Archivo ya observado no figuraba como omitido |
+| `npx --no-install tsx --test tests/pi-lifecycle-races.test.ts`, antes de corregir | FAIL esperado | Motivo input-not-confirmed en vez de session-shutdown |
+| `npm run check`, después de correcciones | PASS | tsc + 42/42, 0 fallos, 4557 ms |
+| `python3 tests/pty-smoke.py`, antes y después | PASS ambas | CLI instalado carga src/index.ts, dock manual, append/editor, comandos reload, salida 0 y reset mouse |
+| Medición existente en suite | PASS | 512 × 4 KiB / 2 MiB; 330,5 ms inicial, 443,5 ms final; RSS total 100 155 392 / 101 629 952 bytes, no memoria incremental |
+| LSP activo inicial / recheck | PARCIAL | Inicial 5 inconclusos; cuatro archivos cambiados: 2 clean y 2 inconclusos, sin errores recibidos; tsc PASS |
+
+**Revisión y límites**
+- Arquitecto independiente read-only señaló las dos carreras; sus reproducciones
+  eran hipótesis estáticas. Esta sesión ejecutó ambos FAIL y el gate PASS posterior.
+  Follow-up del arquitecto aprobó los fixes/regresiones sin bloqueantes en las
+  cuatro rutas cambiadas; no reejecutó tests. Cierre: 16:55 UTC−03.
+- La revisión temporal confirma baseline awaited antes de modelo/herramientas,
+  settled como único cierre, retry sin rebaselinar y colas conservadoras. Pi 1.4.0
+  difiere prompt durante emisión de settled hasta completar handlers; no se supone
+  que un turn_end/agent_end sea frontera. Identidad/abort protegen publicación final.
+- Exclusiones .env*, ignores, enlaces/especiales, permisos y límites mantienen sus
+  pruebas; índices por bytes y HEAD de fixtures intactos. Sin persistencia/logs de
+  contenidos. No se cambia Git/config/instalación real para ejecutar la extensión.
+- Deep dive Claude usado sólo para contrastar riesgos; no se copia su arquitectura
+  ni añade otro semáforo/backend: ya hay cola de IO, raíz explícita y guardas.
+- PTY sintética 120×30, TERM=xterm-256color, HERDR_* eliminadas; directorio de agente
+  temporal, sin modelo y fuera de Git. Prueba carga/fallback, no captura e2e completa;
+  SDK/HTTP prueban captura Git por separado. Herdr 0.9.5 instalado, no ejecutado de
+  forma interactiva en esta auditoría. Sin pruebas humanas nuevas.
+- Persisten Linux/procfs, secretos best-effort, metadata sólo cooperativa, no
+  atomicidad/autoría forense y delta individual indisponible para ventanas agrupadas.
+  Sin benchmark de repos masivos ni SLA; no hay evidencia para cambiar los defaults.
+
+**Git / parada**
+- Inicio limpio, base e8edd35. Commit `595ab57`:
+  `fix(snapshots): mark post-stat disappearance as partial` (motor + regresión).
+  Segundo commit lógico: `fix(lifecycle): reject stale synchronized event handlers`,
+  con regresión y evidencia documental de cierre. Rutas explícitas, status/diff/cached
+  revisados antes de cada commit; sin push ni M2.
+- Siguiente paso: esperar autorización explícita del usuario, no comenzar el visor.
 

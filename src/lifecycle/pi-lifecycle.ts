@@ -7,7 +7,7 @@ export function registerCaptureLifecycle(pi: ExtensionAPI, limits: Partial<Captu
   const controller = new IterationCapture(limits);
   let key: string | undefined;
   let generation = 0;
-  let resolving: Promise<boolean> | undefined;
+  let resolving: Promise<number | undefined> | undefined;
   const contextKey = (ctx: ExtensionContext): string => JSON.stringify([ctx.sessionManager.getSessionId(), ctx.cwd]);
   const invalidate = (reason: string): void => {
     generation++;
@@ -15,20 +15,20 @@ export function registerCaptureLifecycle(pi: ExtensionAPI, limits: Partial<Captu
     key = undefined;
     controller.invalidate(reason);
   };
-  const synchronize = async (ctx: ExtensionContext): Promise<boolean> => {
+  const synchronize = async (ctx: ExtensionContext): Promise<number | undefined> => {
     const nextKey = contextKey(ctx);
     if (nextKey !== key) { invalidate("session-or-workspace-changed"); key = nextKey; }
     if (resolving) return resolving;
     const version = generation;
-    const job = (async (): Promise<boolean> => {
+    const job = (async (): Promise<number | undefined> => {
       try {
         const root = await workspaceRoot(ctx.cwd);
-        if (version !== generation || key !== nextKey) return false;
+        if (version !== generation || key !== nextKey) return undefined;
         controller.setScope({ sessionId: ctx.sessionManager.getSessionId(), root });
-        return true;
+        return version;
       } catch {
         if (version === generation) controller.invalidate("workspace-unavailable");
-        return false;
+        return undefined;
       }
     })();
     resolving = job;
@@ -42,10 +42,12 @@ export function registerCaptureLifecycle(pi: ExtensionAPI, limits: Partial<Captu
   });
   pi.on("session_shutdown", () => { invalidate("session-shutdown"); });
   pi.on("input", async (event, ctx) => {
-    if (await synchronize(ctx)) await controller.input(event.text, ctx.isIdle(), event.source, !!event.streamingBehavior, !!event.images?.length);
+    const version = await synchronize(ctx);
+    if (version !== undefined && version === generation) await controller.input(event.text, ctx.isIdle(), event.source, !!event.streamingBehavior, !!event.images?.length);
   });
   pi.on("before_agent_start", async (event, ctx) => {
-    if (await synchronize(ctx)) await controller.beforeStart(event.messageType === "user" ? event.prompt : undefined);
+    const version = await synchronize(ctx);
+    if (version !== undefined && version === generation) await controller.beforeStart(event.messageType === "user" ? event.prompt : undefined);
   });
   pi.on("message_start", (event, ctx) => {
     if (key !== contextKey(ctx)) { invalidate("session-or-workspace-changed"); return; }
@@ -58,7 +60,8 @@ export function registerCaptureLifecycle(pi: ExtensionAPI, limits: Partial<Captu
   pi.on("turn_end", event => { controller.outcome(event.outcome); });
   pi.on("agent_before_settle", event => { controller.outcome(event.outcome); });
   pi.on("agent_settled", async (event, ctx) => {
-    if (await synchronize(ctx)) await controller.settled(event.aborted);
+    const version = await synchronize(ctx);
+    if (version !== undefined && version === generation) await controller.settled(event.aborted);
   });
   return controller;
 }
