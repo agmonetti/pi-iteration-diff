@@ -2,7 +2,7 @@
 
 **Proyecto:** `pi-iteration-diff`  
 **Última actualización:** 2026-10-22  
-**Estado general:** `M0 / SPIKE PARCIAL — GATE ABIERTO`  
+**Estado general:** `M0 / CIERRE DOCUMENTAL PREPARADO — ACEPTACIÓN HUMANA FINAL PENDIENTE`
 **Milestone activo:** M0 — Factibilidad (iniciado; no habilita M1)  
 **Versión del producto:** 0.0.0 privada; prototipo sintético, no producto.
 
@@ -13,7 +13,8 @@
 - **Validado por humano:** Pi directo y pane Herdr con integración oficial: dock, mouse/rangos, foco funcional, anexado sin autosend; H8 cierre/resize/restauración sólo reportados parcialmente.
 - **Corregido:** indicador visual de foco en encabezado con accent del tema, sin modificar editor. Automatizado PASS; nueva validación humana del indicador pendiente.
 - **Lifecycle extendido:** HTTP loopback 429→200, aborto bash real y restore persistente SDK PASS. Contrato de iteración documentado, sin confundir colas agrupadas con petición individual.
-- **Pendiente:** revalidar foco visual humano, subcasos H7/H8 y restauración TUI; fronteras individuales de colas o excepción aprobada; drag literal. M0 abierto; no snapshots/M1.
+- **Decisión final:** ADR-003 confirmado con ventanas agrupadas e indisponibilidad individual explícita; no garantía de atribución ni excepción FR-03. Drag literal DEFERRED a M3, sin más implementación M0.
+- **Pendiente de aceptación M0:** foco visual nuevo, H7 sidebar/split/zoom y H8 resize/reload/new/resume humanos individualizados. Protocolo mínimo y matriz final en `M0.md`. M1 no autorizado.
 
 ## 2. Entregables documentales (2026-10-22)
 
@@ -28,7 +29,7 @@
 
 | Milestone | Estado | Evidencia/criterio pendiente |
 |---|---|---|
-| M0 Factibilidad | **IN PROGRESS / PARTIAL** | H1/H2/H4/H6 humanos PASS reportados; foco visual corregido; matriz restante y lifecycle extendido pendientes |
+| M0 Factibilidad | **CIERRE DOCUMENTAL / ACEPTACIÓN CONDICIONADA** | 14/14 PASS; contrato decidido; sólo validación humana final H3/H7/H8 pendiente, sin gate total PASS |
 | M1 Snapshots | **NOT STARTED** | Delta neto por petición y separación de cambios antiguos |
 | M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
 | M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
@@ -369,4 +370,54 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
 **Próximo paso**
 - Operador revalida H3 y precisa subcasos H8; luego experimento acotado de destino
   drag y frontera de colas. No avanzar a M1.
+
+### 2026-10-22 — M0 / síntesis de cierre y contrato confirmado
+
+**Cambió**
+- `M0.md`: síntesis autoritativa sin borrar histórico; matriz PASS/FAIL/NOT RUN/
+  DEFERRED; instrucciones humanas finales mínimas H3/H7/H8 en Pi y Herdr; distingue
+  restaurar layout de autoabrir/persistir panel, y exige sesión guardada para resume.
+- `RESEARCH.md`: ADR-003 concreto y referencias locales de API/runtime. Corrección:
+  `input.streamingBehavior` existe y distingue steer/followUp; source no lo hace.
+- Sólo documentación. No snapshots, nuevos tests, refactors ni drag literal.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | 2026-10-22 21:06 UTC−03; Linux, Node 26.12.0, npm 12.2.1, Pi/TUI fijado 1.4.0 | PASS | tsc; 14/14, 0 fallos; 1711 ms |
+| H1/H2/H4/H6 | Informe humano previo Pi 1.4.0 / Herdr 0.9.5 | PASS conservado | No repetidos; no nuevo informe/captura |
+| H3 visual nuevo, H7 y H8 individualizados | Operador requerido | NOT RUN | Protocolo mínimo final en M0.md; no ejecutados por agente |
+| PTY / integración Herdr interactiva nueva | No necesaria para cambio documental | NOT RUN | Evidencia anterior conservada, no simular interacción |
+
+**Decisiones / limitaciones**
+- Cierre documental de factibilidad preparado; **no aceptación plena de M0** mientras
+  H3/H7/H8 no tengan resultado humano. No presentar tests verdes como gate total.
+- Candidato/baseline en input idle, confirmación before_agent_start user; fallback
+  tardío explícito; mantener ventana por retry/turnos y cerrar en settled. Colas
+  agrupadas → delta individual indisponible, nunca atribución ficticia ni resultado
+  viejo como Last iteration. ID session/worktree/epoch/sequence y invalidación de scope.
+- ADR-003 queda decidido, no implementado. FR-03 para colas no tiene excepción;
+  M1 deberá probar candidatos consumidos, fallos preflight, errores finales,
+  mensajes no correlacionados y serialización/cancelación de capturas. Aprobación
+  de esa limitación de producto sigue pendiente, no se modificó REQUIREMENTS.md.
+- Seleccionar → a → anexar es alternativa humana validada; drag literal DEFERRED
+  a evaluación M3, no técnicamente imposible. No continuar experimento en M0.
+- Detach/reattach extendido DEFERRED a M4. No se aprueba compatibilidad universal,
+  persistencia de snapshots ni cursor/undo. No cambios a Pi/Herdr/config/índice runtime.
+- Arquitecto local revisó plan: aprobado sin bloqueantes; exigió no confundir
+  agrupación con petición individual ni alternativa con FR-16, y mantener M1 bloqueado.
+  Revisión final del diff documental aprobada sin bloqueantes; no ejecutó pruebas
+  humanas ni agregó evidencia de compatibilidad.
+
+**Próximo paso y límite de parada**
+- Recibir únicamente filas humanas H3/H7/H8 del protocolo final y registrar sus
+  resultados; si fallan, corregir sólo regresión M0 correspondiente. Desarrollo detenido.
+- **No iniciar M1 sin autorización explícita del usuario**, incluso tras esos PASS.
+
+**Git**
+- Estado inicial limpio. Cambio lógico único sobre M0.md, RESEARCH.md y PROGRESS.md;
+  un commit documental atómico, no commits artificiales por archivo. Revisión de
+  status/diff/cached antes de staging por rutas explícitas; sin push ni amend.
+  `git diff --check` inicial señaló hard breaks Markdown y blanco final nuevos;
+  corregidos sólo en las líneas modificadas, sin formateo global.
 

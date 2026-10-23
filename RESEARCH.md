@@ -2,7 +2,7 @@
 
 **Proyecto provisional:** `pi-iteration-diff`  
 **Fecha de investigación:** 2026-10-22  
-**Estado inicial:** investigación documental. Actualización M0 local al final: spike sintético probado; compatibilidad humana y lifecycle aún pendientes.  
+**Estado inicial:** investigación documental. **Estado vigente:** síntesis de cierre M0 al final; factibilidad y contrato decididos, aceptación humana final H3/H7/H8 pendiente. No habilita M1.
 **Objetivo:** panel de diffs a la derecha de la conversación de Pi, invocado manualmente, con selección de líneas/rangos y envío al editor nativo de Pi; compatible con Pi ejecutado dentro de Herdr.
 
 > Esta investigación es contexto para decisiones, **no prueba de compatibilidad** con las versiones instaladas del usuario. Contrastar APIs, versiones y código fuente antes de implementar. Separa observaciones verificadas de hipótesis.
@@ -355,4 +355,74 @@ ni a Herdr. La extensión podría interpretar release como gesto explícito, per
 fiabilidad depende de pruebas humanas de captura/destino y resize aún pendientes.
 No se agregó código de UX M3 ni accesos internos al editor. H5 NOT IMPLEMENTED y
 sin excepción aprobada; seleccionar→a sigue siendo la alternativa validada.
+
+## 13. Síntesis de cierre M0 / ADR-003 confirmado (2026-10-22)
+
+La sección final de `M0.md` es el contrato operativo vigente y la matriz autoritativa;
+las entradas anteriores son histórico de investigación, no instrucciones de ampliar M0.
+No se implementaron snapshots ni nuevos experimentos de drag. Aceptación final humana
+condicionada a H3 visual y H7/H8 individualizados; no declarar gate total PASS.
+
+### Evidencia de API pública y runtime contrastada en este cierre
+
+Releídos `docs/extensions.md` de la instalación Pi 1.4.0 y los siguientes cuerpos y
+declaraciones del paquete fijado localmente (sin depender de documentación web latest):
+
+- `dist/core/extensions/types.d.ts:910`, `InputEvent`: `source` distingue origen,
+  pero **`streamingBehavior?: "steer" | "followUp"` sí distingue entrega en streaming**.
+  Corrige cualquier lectura histórica de que la API no ofrece ese dato; el probe
+  `/m0-events` no lo registra. No es un ID causal ni confirma aceptación/consumo.
+- `dist/core/agent-session.js:1590,1636–1675`: `_runInputHandlers` puede transformar
+  o consumir input; comandos de extensión se resuelven antes de input. Input ocurre
+  antes de expandir templates y antes de encolar por streamingBehavior.
+- `steer`, `followUp`, `_queueUserInput` (1752–1790) pasan por handlers de input;
+  las colas internas no crean por sí mismas un baseline independiente. Steering
+  se entrega tras herramientas del turno, follow-up cuando se agota trabajo anterior.
+- `_prepareRun` (1480): compaction precede `before_agent_start`. `_handlePostAgentRun`
+  y `_runBeforeSettleBoundary` (1530–1589) permiten retry/colas/continuación antes de
+  settled. El grafo de `docs/extensions.md` confirma esa semántica pública y que
+  handlers se ordenan por carga/registro; no existe prioridad absoluta para capturar
+  antes de efectos de otras extensiones.
+
+### Decisión
+
+Abrir candidato/baseline asíncrono acotado en `input` idle; confirmar en
+`before_agent_start` user. Sin candidato correlacionable, baseline allí marcado
+**tardío/no verificable**. Input consumido o preflight fallido no publica iteración.
+Mientras hay ventana activa, entradas adicionales o mensajes user no correlacionados
+marcan agrupación conservadora. No inferir que source extension es persona ni que
+un evento garantiza aceptación. Mantener baseline durante todos los turnos/retries;
+cerrar/capturar after en `agent_settled`, no en agent_end ni agent_before_settle.
+Aborto es cancelada/parcial; error definitivo tampoco equivale a completada exitosa.
+
+ID de ventana: `(sessionId, realpath(worktreeRoot), runtimeEpoch, sequence)`, más
+ordinales de entradas sin contenido en logs. Scope/epoch se verifican al publicar
+trabajos async; shutdown/reload/cambio de scope invalidan capturas y selección.
+Resume de conversación no recupera snapshots efímeros. Si falta correlación, marcar
+ambigua/parcial; no prometer causalidad ni captura atómica frente a escritores externos.
+
+**Varias peticiones, un settled:** sólo existe ventana agrupada observable; no
+fabricar snapshots por petición ni dividir por herramientas/turnos. Declarar delta
+individual indisponible y no mostrar resultado antiguo como Last iteration. Esta
+política es explícita y comprobable, no una excepción FR-03 ni aceptación del producto.
+La decisión arquitectónica queda resuelta; implementar/probar máquina de estados y
+resolver aceptación de esa limitación corresponde a M1 sólo con autorización.
+
+Pruebas existentes sostienen esta decisión: L2/L3 comparten settled, L4 HTTP tiene
+un solo before_agent_start con retry, L5 abort omite before_settle, L6 restaura ID.
+No demuestran una máquina de captura todavía inexistente. M1 deberá probar inputs
+consumidos/transformados, candidatos fallidos, colas tardías, error final, invalidación
+de scope y serialización de capturas; si no puede demostrar individualidad, fail closed.
+
+### Alcance final de UX y aceptación
+
+- Seleccionar → `a` → anexar al editor: **PASS humano** Pi y Herdr, sintético,
+  borrador conservado y sin envío; mantener como alternativa validada.
+- Drag literal: **DEFERRED a evaluación M3**, no imposible ni paridad/excepción
+  aprobada. No continuar implementándolo/investigándolo en M0.
+- H3 visual nuevo, H7 sidebar/split/zoom y H8 resize/reload/new/resume individual:
+  **NOT RUN humano**; protocolo mínimo en M0.md. Detach/reattach extendido: M4.
+- Cierre documental preparado; aceptación humana final pendiente. M1 no autorizado.
+- Gate final ejecutado 2026-10-22 21:06 UTC−03: `npm run check` PASS, tsc y 14/14,
+  Node 26.12.0/npm 12.2.1. No PTY ni pruebas humanas nuevas; sin cambios de runtime.
 
