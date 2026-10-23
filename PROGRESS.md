@@ -3,7 +3,7 @@
 **Proyecto:** `pi-iteration-diff`  
 **Última actualización:** 2026-10-22  
 **Estado general:** `M0 CERRADO — GATE DE FACTIBILIDAD PASS`
-**Milestone activo:** ninguno — M1 no iniciado ni autorizado
+**Milestone activo:** M1 autorizado — implementación incremental; UI congelada
 **Versión del producto:** 0.0.0 privada; prototipo sintético, no producto.
 
 ## 1. Resumen del estado
@@ -30,7 +30,7 @@
 | Milestone | Estado | Evidencia/criterio pendiente |
 |---|---|---|
 | M0 Factibilidad | **CLOSED / PASS** | 14/14 PASS; H3/H7/H8 confirmados por operador; ADR-003 aprobado; pendientes de producto diferidos explícitamente |
-| M1 Snapshots | **NOT STARTED** | Delta neto por petición y separación de cambios antiguos |
+| M1 Snapshots | **IN PROGRESS** | Contratos y comparación neta probados; captura y lifecycle pendientes |
 | M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
 | M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
 | M4 Herdr/robustez | **NOT STARTED** | Matriz e2e + cleanup + performance |
@@ -533,6 +533,21 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
 - **Especificación visual congelada para M1:** La dirección visual, anatomía, tokens y comportamiento de UI quedan fijados. Solo se admitirán modificaciones ante evidencia técnica nueva surgida en los milestones de desarrollo.
 - **M0 cerrado y validado:** Gate de factibilidad en estado PASS (14/14 tests automatizados + validaciones humanas de dock, mouse, foco y resize/reload en Pi y Herdr).
 - **M1 no iniciado:** A la espera de autorización formal antes de codificar la captura de snapshots y cálculo de deltas netos.
+
+### 2026-10-23 — M1.1 / contratos y fixtures (autorización recibida)
+
+**Cambió**
+- `src/snapshots/model.ts`: contratos efímeros por bytes y comparación pura; cobertura de enumeración y omisiones por ruta. Ausencia desconocida nunca se convierte en creación/borrado.
+- `tests/fixtures/workspace.ts`: repositorio mkdtemp con cleanup; `tests/snapshot-model.test.ts`: delta, cambios anteriores, vacío y cobertura parcial.
+- Plan revisado por arquitecto CLI delegado (sólo asesoría, sin herramientas): exige baseline completado antes del modelo, cobertura por ruta, límites de pico e invalidación síncrona. Incorporado; no aprobó evidencia runtime por sí mismo.
+
+**Pruebas ejecutadas**
+- `npm run check` PASS: tsc + 16/16; Linux, Node 26.12.0, Pi npm 1.4.0; suite 2848 ms. No pruebas manuales nuevas.
+- Revisión status/diff/cached: cambio previo ajeno en `AGENTS.md` preservado/excluido, cached vacío. Archivos nuevos leídos íntegros al crearlos.
+
+**Límites / próximo paso**
+- Sólo contratos: captura/lifecycle aún pendientes. Bytes netos, sin modos, detección de renames ni hunks. UI y editor intactos.
+- Commit atómico de las cuatro rutas de este incremento; sin push. Siguiente: captura acotada y política de exclusiones.
 
 
 
