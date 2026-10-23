@@ -21,6 +21,7 @@
 | Archivo | Resultado | Validación |
 |---|---|---|
 | `RESEARCH.md` | Referencias verificadas, hipótesis, riesgos y decisiones provisionales | Redacción completada; pruebas locales NO ejecutadas |
+| `research/CLAUDE_CODE_DIFF.md` | Investigación documental sobre el sistema `/diff` de Claude Code (`mods/diff`) | Redacción completada; fuentes verificables y recomendaciones M1+ |
 | `AGENTS.md` | Instrucciones, arquitectura, límites, comandos futuros, DoD | Redacción completada; comandos de proyecto AÚN no existen |
 | `REQUIREMENTS.md` | FR/NFR, casos BDD, roadmap y gates | Redacción completada; aceptación pendiente |
 | `PROGRESS.md` | Bitácora y plantilla para próximos agentes | Archivo inicial creado |
