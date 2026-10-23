@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix="pi-diff-m0-") as temp:
+    with tempfile.TemporaryDirectory(prefix="pi-diff-m2-") as temp:
         master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 120, 0, 0))
         env = {k: v for k, v in os.environ.items() if not k.startswith("HERDR_")}
@@ -49,20 +49,18 @@ def main():
         try:
             pump(4)
             assert child.poll() is None, "Pi exited during startup"
-            assert b"M0 SYNTHETIC" not in output, "panel auto-opened"
-            send(b"/m0-diff\r")
-            assert b"M0 SYNTHETIC" in output, "sidebar did not render"
-            send(b"DRAFT-M0")
+            assert b"DIFF:" not in output, "panel auto-opened"
+            send(b"/diff\r")
+            assert b"DIFF:" in output, "sidebar did not render"
+            send(b"DRAFT-M2")
             send(b"\x1b[17~")  # F6
-            send(b"a")
             send(b"\x1b")
-            assert b"[M0 synthetic" in output, "append action did not reach native editor"
-            assert b"DRAFT-M0" in output, "native draft did not render"
+            assert b"DRAFT-M2" in output, "native draft did not render"
             send(b"\x03")  # native clear, not send
-            send(b"/m0-diff\r")
-            send(b"/m0-diff\r")
+            send(b"/diff\r")
+            send(b"/iteration-diff\r")
             send(b"/reload\r")
-            send(b"/m0-diff\r")
+            send(b"/diff\r")
             assert b"Failed to load extension" not in output
             assert b"Layout desconocido" not in output
             send(b"\x03")
@@ -70,8 +68,8 @@ def main():
             pump(2)
             assert child.poll() == 0, "Pi did not exit cleanly"
             assert b"\x1b[?1006l" in output, "mouse reset missing"
-            print("PASS: installed Pi PTY startup, explicit dock, append/native draft rendering, reload commands, clean exit/mouse reset")
-            print("LIMIT: ANSI stream assertions; no visual/manual Herdr validation or lifecycle model run")
+            print("PASS: installed Pi PTY startup, manual /diff and fallback, native draft, F6/Esc, reload, clean exit/mouse reset")
+            print("LIMIT: ANSI stream assertions outside Git; no visual/manual Herdr validation or lifecycle model run")
         except Exception:
             # Only synthetic isolated content is printed, never a real session transcript.
             print(output[-6000:].decode(errors="replace"))

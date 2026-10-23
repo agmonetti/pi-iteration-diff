@@ -1,6 +1,6 @@
 # UI Specification: pi-iteration-diff
 
-**Versión:** 1.1  
+**Versión:** 1.2 — decisión M2 aprobada
 **Entorno de ejecución:** Pi Coding Agent (Terminal interactiva fullscreen y dentro de Herdr).  
 **Tipo de interfaz:** Terminal User Interface (TUI) montada como extensión sobre `@earendil-works/pi-tui`.
 
@@ -15,6 +15,25 @@
 5. **Acciones explícitas sin autoenvío:** Las acciones de anexo (`FIX` y `DISCUSS`) añaden el fragmento al borrador existente y devuelven el control al usuario; jamás disparan el envío automático del prompt.
 6. **Declaración honesta de capacidades:** La preservación del editor se limita a lo técnicamente demostrado en M0: **la conservación íntegra del contenido del borrador de texto**. No se promete el posicionamiento del cursor tras anexar fragmentos, selecciones activas ni el árbol de deshacer (`undo`) del editor nativo.
 7. **Diferenciación conceptual del Preview HTML:** Las maquetas HTML/CSS locales son exclusivamente herramientas documentales de apoyo para revisar paletas y proporciones en navegador; **no validan funcionalidad real del producto** ni replican el modelo de eventos, terminales o multiplexores de Pi TUI.
+
+### Explorador M2 — decisión aprobada (2026-10-23)
+
+- Al mostrar una nueva iteración, todos los archivos comienzan **contraídos**.
+- El encabezado muestra ruta, estado creado/modificado/eliminado y estadísticas
+  `+añadidas / -eliminadas` cuando se conocen; no inventar conteos para binarios
+  o contenidos omitidos.
+- `Enter` o clic en el encabezado alternan exclusivamente ese archivo. Pueden
+  permanecer abiertos varios archivos; foco y resize conservan sus expansiones.
+- Una identidad de iteración diferente reinicia expansiones, cursor y scroll.
+- Teclado y mouse navegan el explorador; su scroll es independiente del transcript.
+- Los archivos contraídos no construyen hunks ni renderizan contenido. El cálculo
+  de estadísticas puede comparar contenido con límites explícitos; excederlos
+  muestra indisponibilidad/truncamiento, no un diff pretendidamente completo.
+- M2 incluye unified, estados individuales/agrupados/parciales/indisponibles,
+  apertura manual y fallback estrecho. No incluye selección de rangos,
+  FIX/DISCUSS, transferencia al editor, drag, Current ni History.
+- Las acciones y maquetas de selección de las secciones siguientes describen M3
+  o posteriores, no controles disponibles en M2.
 
 ---
 

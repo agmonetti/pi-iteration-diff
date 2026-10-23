@@ -809,3 +809,20 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 - Las dos omisiones en Windows y una en macOS corresponden a capacidades del sistema operativo explícitamente declaradas (garantía procfs Linux-only y PIDs POSIX del fixture bash-abort de M0); la cancelación nativa del motor y toda la suite de snapshots se ejecutan y pasan al 100%.
 - UI permanece congelada. M2 no iniciado. No se realiza push.
 
+
+### 2026-10-23 — M2 / Visor real de diffs con archivos colapsables
+
+**Estado:** Completado y verificado.
+
+**Cambió**
+- `src/diffs/iteration-diff.ts`: implementación del modelo de diff real unificado, cálculo exacto de estadísticas y lazy evaluation de hunks y filas.
+- `src/ui/diff-panel.ts`: explorador con archivos colapsables por defecto, expansiones independientes por iteración, renderizado virtualizado por viewport y límites visibles.
+- `src/index.ts`: registro de `/diff` (y fallback `/iteration-diff`), conexión con los ciclos de vida de captura y actualización automática.
+- `tests/iteration-diff.test.ts`, `tests/diff-panel.test.ts`, `tests/diff-command.test.ts`, `tests/feasibility.test.ts`: cobertura robusta para 0, 1, 10 y múltiples archivos, expansión independiente, navegación, resize y comandos.
+- `design/ui-spec.md`, `design/mockups.md`, `M2.md`: actualización de especificación visual y documentación del milestone.
+
+**Pruebas ejecutadas**
+
+`npm run check` completado con éxito: **81/81 test suites pass**, 0 fallos, 0 errores de TypeScript.
+
+**Siguiente paso:** Detenerse antes de M3 (selección de rangos, FIX/DISCUSS y transferencia al editor). No push.

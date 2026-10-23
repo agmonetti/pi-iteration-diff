@@ -3,6 +3,36 @@
 Representación gráfica con caracteres de terminal (ancho estándar: 120 columnas).
 
 > **Nota de alcance:** El panel derecho se monta como extensión de Pi preservando la conversación y el editor nativo a la izquierda. Los anchos indicados (ej. 120 cols totales, split 60/40) son parámetros configurables. En el editor nativo solo está demostrada la preservación del contenido del borrador (texto acumulado); no se garantiza el posicionamiento del cursor tras anexar, ni la retención de selecciones internas o historial de deshacer.
+## M2 — Explorador inicial y expansiones independientes
+
+Decisión aprobada: cada nueva iteración se abre con todos los archivos contraídos.
+Los estados de foco y tamaño no reinician expansiones; cambiar la iteración sí.
+Este esquema sustituye el estado inicialmente expandido de las maquetas futuras.
+
+```text
+│ DIFF: LAST ITERATION
+│ Delta neto observado; no atribución de autoría
+│ > ▸ src/balance.ts [modificado] +3 / -2
+│   ▸ src/new.ts [creado] +8 / -0
+│   ▸ old.ts [eliminado] +0 / -4
+│ Enter/clic: expandir · ↑↓: navegar · Esc: editor
+```
+
+Tras abrir dos encabezados, ambos permanecen expandidos; el tercero sigue cerrado:
+
+```text
+│   ▾ src/balance.ts [modificado] +3 / -2
+│     @@ -11,2 +11,3 @@
+│     … contenido unified bajo demanda …
+│ > ▾ src/new.ts [creado] +8 / -0
+│     @@ -0,0 +1,8 @@
+│     … contenido unified bajo demanda …
+│   ▸ old.ts [eliminado] +0 / -4
+```
+
+Scroll propio del dock, límites visibles y sin acciones de feedback en M2.
+Las maquetas de selección, Current/History y anexado siguientes son diseño futuro.
+
 
 ---
 
