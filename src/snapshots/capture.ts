@@ -97,6 +97,7 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
     for (const path of paths.slice(0, limits.maxFiles)) {
       check();
       let handle: Awaited<ReturnType<typeof open>> | undefined;
+      let observed = false;
       try {
         if (!validPath(path)) throw new Error("unsupported-path");
         if (ignored.has(path) || sensitivePath(path) || limits.exclude.some(p => path === p || path.startsWith(`${p}/`))) {
@@ -109,6 +110,7 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
         }
         const absolute = resolve(root, path);
         const metadata = await lstat(absolute);
+        observed = true;
         if (!metadata.isFile() || metadata.nlink > 1) throw new Error("unsupported-file-type");
         if (metadata.size > limits.maxFileBytes) throw new Error("file-size-limit");
         if (bytes + metadata.size > limits.maxBytes) throw new Error("memory-limit");
@@ -138,7 +140,7 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
         files.set(path, content);
         bytes += content.length;
       } catch (error) {
-        if (!handle && (error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        if (!observed && (error as NodeJS.ErrnoException).code === "ENOENT") continue;
         const reason = error instanceof Error && !('code' in error) ? error.message : "file-unavailable";
         omitted.set(path, reason);
         issues.add(reason);

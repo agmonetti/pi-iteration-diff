@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdir, readFile, rm, symlink, link } from "node:fs/promises";
+import fs, { chmod, mkdir, readFile, rm, symlink, link } from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import { promisify } from "node:util";
 import { captureSnapshot, workspaceRoot } from "../src/snapshots/capture.js";
 import { compareSnapshots } from "../src/snapshots/model.js";
@@ -118,6 +119,32 @@ test("unreadable and special files are partial, and disappearing tracked files a
     assert.equal(after.omitted.get("pipe"), "unsupported-file-type");
     assert.deepEqual(compareSnapshots(before, after).changes.map(c => [c.path, c.kind]), [["private", "deleted"]]);
   } finally { await w.close(); }
+});
+
+test("disappearance after lstat is a partial race, not a confirmed deletion", async () => {
+  const w = await workspace();
+  let mocked: ReturnType<typeof mock.method> | undefined;
+  try {
+    await w.write("raced", "baseline");
+    await w.git("add", "--", "raced");
+    const before = await captureSnapshot(w.root);
+    const original = fs.open;
+    mocked = mock.method(fs, "open", async (...args: Parameters<typeof fs.open>) => {
+      if (args[0] === join(w.root, "raced")) await rm(args[0]);
+      return original(...args);
+    });
+    syncBuiltinESMExports();
+    const after = await captureSnapshot(w.root);
+    assert.equal(mocked.mock.callCount(), 1, "file was observed before open raced with deletion");
+    assert.ok(after.omitted.has("raced"));
+    const delta = compareSnapshots(before, after);
+    assert.equal(delta.status, "partial");
+    assert.deepEqual(delta.changes, []);
+  } finally {
+    mocked?.mock.restore();
+    syncBuiltinESMExports();
+    await w.close();
+  }
 });
 
 test("bounded capture measurement: 512 files / 2 MiB", async () => {
