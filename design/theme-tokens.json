@@ -1,0 +1,27 @@
+{
+  "$schema": "https://pi.dev/schemas/theme.schema.json",
+  "name": "pi-iteration-diff-spec",
+  "vars": {
+    "accentColor": "okhsl(210 90% 62%)",
+    "addedBg": "okhsl(145 60% 18%)",
+    "addedText": "okhsl(145 75% 75%)",
+    "removedBg": "okhsl(10 65% 18%)",
+    "removedText": "okhsl(10 80% 75%)",
+    "selectionBg": "okhsl(220 50% 28%)",
+    "borderTone": "okhsl(220 15% 24%)",
+    "gutterDim": "okhsl(220 10% 45%)"
+  },
+  "colors": {
+    "accent": "accentColor",
+    "border": "borderTone",
+    "text": "okhsl(0 0% 92%)",
+    "muted": "okhsl(220 10% 60%)",
+    "dim": "gutterDim",
+    "success": "addedText",
+    "error": "removedText",
+    "warning": "okhsl(45 90% 60%)",
+    "selectedBg": "selectionBg",
+    "toolDiffAdded": "addedText",
+    "toolDiffRemoved": "removedText"
+  }
+}

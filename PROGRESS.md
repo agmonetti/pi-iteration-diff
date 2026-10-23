@@ -459,3 +459,30 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
   previsto: `docs: close M0 after human acceptance`. Revisar status/diff/cached y
   whitespace antes del commit. Sin push ni cambios de configuración.
 
+### 2026-10-23 — UI / especificación de diseño, tokens y prototipo visual
+
+**Cambió**
+- `design/ui-spec.md`: especificación técnica formal de la interfaz TUI (layout adaptativo,
+  umbrales de columnas <90/90-120/>120, jerarquía de componentes, mapeo de tokens del tema Pi,
+  estados de foco con `accent`, navegación por teclado y mouse, y modelo de feedback sin autoenvío).
+- `design/mockups.md`: wireframes exactos en caracteres Unicode a escala terminal (120 cols)
+  mostrando estados con foco, unfocused con anexo a editor, y estado vacío sin modificaciones.
+- `design/theme-tokens.json`: definición estricta de tokens conforme al schema oficial de Pi Themes
+  (`accent`, `toolDiffAdded`, `toolDiffRemoved`, `selectedBg`, `border`, `dim`).
+- `design/preview.html` y `design/preview.css`: prototipo visual local interactivo con soporte de
+  tema Dark/Light, alternancia de foco (F6/Esc) y simulación de anexo de rangos FIX/DISCUSS al editor.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux 7.2.11-arch1-1, Node 26.12.0, Pi/TUI 1.4.0 | PASS | tsc + 14/14 tests PASS, 0 fallos |
+| `htmlhint` / `ast-grep` | Entorno local | PASS | HTML y CSS 100% limpios, sin XSS (evitado innerHTML) |
+
+**Fallos / límites / decisiones**
+- Sesión acotada a UI/diseño sin pruebas manuales de terminal; no se tocó la lógica de runtime ni M1.
+- El prototipo web (`preview.html`) es exclusivamente para previsualización y referencia documental de proporciones y colores; el producto final se mantiene 100% TUI sobre `@earendil-works/pi-tui`.
+
+**Próximo paso**
+- Cuando el usuario lo disponga, autorizar e iniciar M1 (motor de snapshots y captura del filesystem).
+
+

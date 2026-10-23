@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pi-iteration-diff — TUI Design & Theme Preview</title>
+  <link rel="stylesheet" href="preview.css">
+</head>
+<body data-theme="dark">
+
+  <header class="controls">
+    <h1>pi-iteration-diff · Especificación Visual y Prototipo TUI</h1>
+    <div class="btn-group">
+      <button class="btn" id="toggleTheme">Tema: Dark</button>
+      <button class="btn active" id="toggleFocus">Foco: Dock (F6)</button>
+      <button class="btn" id="attachFix">Anexar FIX [a]</button>
+      <button class="btn" id="attachDiscuss">Anexar DISCUSS [d]</button>
+      <button class="btn" id="clearEditor">Limpiar Editor</button>
+    </div>
+  </header>
+
+  <div class="terminal-window">
+    <div class="terminal-titlebar">
+      <div class="title-dots">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+      </div>
+      <span>pi (v1.4.0) — /home/agus-hy/Documentos/pi-diff — 120x35</span>
+    </div>
+
+    <div class="tui-workspace">
+      <!-- Chat Transcript (Left) -->
+      <section class="chat-pane">
+        <div class="transcript">
+          <div class="msg msg-user">
+            <span class="role">&gt; User:</span>
+            <div class="msg-content">Revisá la función de clamp en balance.ts, cuando limit es cero falla por división por cero.</div>
+          </div>
+          <div class="msg msg-agent">
+            <span class="role">&gt; Pi:</span>
+            <div class="msg-content">
+              Entendido. Edité <code>src/balance.ts</code> para validar si <code>limit === 0</code> y retornar el offset inicial directamente, evitando la división. Ejecuté <code>npm test</code> y la suite pasó con éxito.
+            </div>
+          </div>
+        </div>
+
+        <div class="native-editor-pane">
+          <div class="editor-label">PI NATIVE PROMPT EDITOR (Preservación de borrador garantizada)</div>
+          <div class="editor-content" id="editorText">&gt; Verificá también que no existan valores negativos.<span class="cursor"></span></div>
+        </div>
+      </section>
+
+      <!-- Diff Dock (Right) -->
+      <aside class="diff-dock focused" id="diffDock">
+        <div class="dock-header">
+          <span class="dock-title">│ DIFF: LAST ITERATION</span>
+          <span class="focus-badge" id="dockBadge">FOCUSED</span>
+        </div>
+
+        <div class="scope-selector">
+          <span class="scope-item active">[Last Iteration*]</span>
+          <span class="scope-item">Current Working Tree</span>
+          <span class="scope-item">History (T-1)</span>
+        </div>
+
+        <div class="file-header">
+          <span class="file-name">▾ src/balance.ts (1/1)</span>
+          <span class="file-stats"><span class="stat-add">+3</span> <span class="stat-del">-1</span></span>
+        </div>
+
+        <div class="diff-viewport">
+          <div class="hunk-header">@@ -10,7 +10,9 @@ export function calcBalance()</div>
+          <div class="diff-row">
+            <div class="diff-gutter"><span class="gutter-old">10</span><span class="gutter-new">10</span></div>
+            <div class="diff-sign">&nbsp;</div>
+            <div class="diff-code">  const offset = config.initialOffset;</div>
+          </div>
+          <div class="diff-row removed">
+            <div class="diff-gutter"><span class="gutter-old">11</span><span class="gutter-new"></span></div>
+            <div class="diff-sign">-</div>
+            <div class="diff-code">  const ratio = total / limit;</div>
+          </div>
+          <div class="diff-row added selected">
+            <div class="diff-gutter"><span class="gutter-old"></span><span class="gutter-new">11</span></div>
+            <div class="diff-sign">+</div>
+            <div class="diff-code">  if (limit === 0) {</div>
+          </div>
+          <div class="diff-row added selected">
+            <div class="diff-gutter"><span class="gutter-old"></span><span class="gutter-new">12</span></div>
+            <div class="diff-sign">+</div>
+            <div class="diff-code">    return offset;</div>
+          </div>
+          <div class="diff-row added selected">
+            <div class="diff-gutter"><span class="gutter-old"></span><span class="gutter-new">13</span></div>
+            <div class="diff-sign">+</div>
+            <div class="diff-code">  }</div>
+          </div>
+          <div class="diff-row">
+            <div class="diff-gutter"><span class="gutter-old">12</span><span class="gutter-new">14</span></div>
+            <div class="diff-sign">&nbsp;</div>
+            <div class="diff-code">  return (total / limit) + offset;</div>
+          </div>
+          <div class="diff-row">
+            <div class="diff-gutter"><span class="gutter-old">13</span><span class="gutter-new">15</span></div>
+            <div class="diff-sign">&nbsp;</div>
+            <div class="diff-code">}</div>
+          </div>
+        </div>
+
+        <div class="dock-actions">
+          <span class="sel-count">Sel: L11-13 (3 líneas)</span>
+          <div class="action-keys">
+            <span class="key-pill"><kbd>a</kbd> FIX</span>
+            <span class="key-pill"><kbd>d</kbd> DISCUSS</span>
+            <span class="key-pill"><kbd>Esc</kbd> Editor</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const dock = document.getElementById('diffDock');
+    const badge = document.getElementById('dockBadge');
+    const editor = document.getElementById('editorText');
+    const themeBtn = document.getElementById('toggleTheme');
+    const focusBtn = document.getElementById('toggleFocus');
+    const basePrompt = '> Verificá también que no existan valores negativos.';
+
+    let isDark = true;
+    let isFocused = true;
+
+    themeBtn.addEventListener('click', () => {
+      isDark = !isDark;
+      document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      themeBtn.textContent = isDark ? 'Tema: Dark' : 'Tema: Light';
+    });
+
+    focusBtn.addEventListener('click', () => {
+      isFocused = !isFocused;
+      dock.classList.toggle('focused', isFocused);
+      badge.textContent = isFocused ? 'FOCUSED' : 'UNFOCUSED';
+      focusBtn.textContent = isFocused ? 'Foco: Dock (F6)' : 'Foco: Editor (Esc)';
+      focusBtn.classList.toggle('active', isFocused);
+    });
+
+    function appendSnippet(intent) {
+      const snippet = `\n\n[src/balance.ts | new | 11-13 | ${intent}]\nif (limit === 0) {\n  return offset;\n}`;
+      editor.textContent = editor.textContent.replace('<span class="cursor"></span>', '') + snippet;
+      const cur = document.createElement('span');
+      cur.className = 'cursor';
+      editor.append(cur);
+    }
+
+    document.getElementById('attachFix').addEventListener('click', () => appendSnippet('FIX'));
+    document.getElementById('attachDiscuss').addEventListener('click', () => appendSnippet('DISCUSS'));
+    document.getElementById('clearEditor').addEventListener('click', () => {
+      editor.textContent = basePrompt;
+      const cur = document.createElement('span');
+      cur.className = 'cursor';
+      editor.append(cur);
+    });
+  </script>
+</body>
+</html>
