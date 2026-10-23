@@ -3,7 +3,9 @@ name: M1 native portability
 on:
   workflow_dispatch:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
 
 permissions:
   contents: read
@@ -18,6 +20,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '26'
@@ -32,6 +36,7 @@ jobs:
           if(process.env.EXPECTED_OS==='Windows' &&
           (process.platform!=='win32'||process.env.WSL_DISTRO_NAME))
           process.exit(1)"
+      - run: npm --version
       - run: git --version
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Typecheck and full suite (including native snapshot integration)

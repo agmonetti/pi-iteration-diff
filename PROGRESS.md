@@ -751,3 +751,38 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
   registrar run ID/logs/resultados reales; corregir sólo fallos reproducidos. La
   certificación y DoD de portabilidad siguen pendientes. **Detenerse antes de M2.**
 
+### 2026-10-23 — M1 / preparación de certificación GitHub Actions
+
+**Cambió**
+- Revisado `.github/workflows/portability.yml` existente: sin duplicaciones,
+  conserva ubuntu/macos/windows-latest, Node 26, npm ci y check completo.
+  Push/PR limitados a main, dispatch manual conservado; checkout sin credenciales
+  persistentes y versión npm en logs. Permisos mínimos contents: read.
+- `M1.md`: evidencia nueva, separación PTY/condiciones por SO y bloqueo de publicación.
+- Sin cambios de motor, UI, ADR-003, contratos ni dependencias. M2 no iniciado.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `git status --short`, `git remote -v`, `git log -1` iniciales | main, base 9272ec9 | PASS inspección | Checkout limpio; no hay remotos configurados. |
+| `npm ci --ignore-scripts --no-audit --no-fund` | Linux 7.2.11-arch1-1, Node 26.12.0/npm 12.2.1 | PASS | 123 paquetes; aviso node-domexception obsoleto, sin fallo. |
+| `npm run check` | Mismo entorno, no WSL | PASS | tsc + 56/56, 0 fallos/skips/cancelados, 4239 ms; snapshots/identidad/rutas/Git/cancelación ejecutados. |
+| Validación YAML del editor | workflow existente modificado | PASS | YAML clean. |
+| ubuntu-latest / macos-latest / windows-latest | GitHub Actions | NOT RUN los tres | Sin origin, URL exacta no suministrada; push no autorizado. Sin run ID/logs ni fallos reproducidos de matriz. |
+| PTY Unix / pruebas humanas | No requeridas por cambio CI | NOT RUN | Python PTY separado de npm check; no sustituye matriz nativa. |
+
+**Límites / siguiente paso**
+- Windows conserva skip explícito del aborto HTTP con PIDs POSIX; no Linux conserva
+  skip procfs. Cancelación nativa y snapshots no se omiten. SDK bash requiere Git
+  Bash en Windows; ninguna omisión se certifica como prueba aprobada.
+- No se modifican remotos ni se adivina propietario. Comando necesario:
+  `git remote add origin <URL_REAL_DEL_REPOSITORIO>` con la URL exacta de GitHub.
+  Se requiere además autorización explícita antes de publicar commits por push.
+- Luego ejecutar matriz y registrar URL/run ID, OS/Node y resultados por runner;
+  sólo corregir fallos reproducidos en commits separados. Portabilidad no certificada.
+- Arquitecto CLI delegado sin herramientas revisó plan y resumen final: sin
+  bloqueantes; no inspeccionó el diff ni ejecutó pruebas ni aportó evidencia hospedada.
+  Status/diff/cached y `git diff --check` revisados, sin problemas. Commit local de infraestructura
+  previsto: `ci: scope native portability checks to main` con tres rutas explícitas.
+  Sin push, releases, paquetes ni avance a M2.
+
