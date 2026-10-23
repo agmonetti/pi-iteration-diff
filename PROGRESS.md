@@ -857,4 +857,29 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 | `git status --short` | Entorno de desarrollo | PASS | Archivos modificados y nuevos correctos |
 
 **Siguiente paso**
-- Detenerse antes de M3 (selección de rangos, FIX/DISCUSS y transferencia al editor). No push.
+- Implementar la fidelidad visual completa de M2 según `/design`.
+
+### 2026-10-23 — M2 / Implementación visual completa según `/design`
+
+**Cambió**
+- `src/ui/layout-adapter.ts`: proporción del dock adaptativa real (35-40%, `basis: 36, grow: 40, minSize: 34, maxSize: 70`) preservando el ancho mínimo útil de conversación/editor (`minSize: 52, grow: 60`).
+- `src/ui/diff-panel.ts`:
+  - Separador vertical `│` estilizado uniformemente con token `border` sin teñirse del rol de la línea.
+  - Granularidad de estilos de tema Pi: cabecera con badge `[Last*]`, números de línea con `dim`, signos `+`/`-` y código en `toolDiffAdded` y `toolDiffRemoved`, nombres de archivo en `bold` y estadísticas `+X / -Y` con colores diferenciados.
+  - Indicador de foco minimalista: cabecera y cursor `>` con `accent` únicamente bajo foco activo; cursor atenuado `dim` sin foco.
+  - Mecanismos de lectura para líneas largas y rutas: desplazamiento horizontal (`←`/`→`, `h`/`l`) con indicador `«` y reset con `0`/`Home`; truncamiento medio inteligente de rutas (`truncatePath`: `dir/…/file.ts`); modo de inspección bajo demanda (`i`) en pie de página.
+  - Footer responsivo con estado dinámico de pan e inspección.
+- `src/index.ts`: mapeo completo de roles de estilo (`border`, `bold`, `dim`, `accent`, `muted`, `warning`, `text`, `toolDiffAdded`, `toolDiffRemoved`) contra `ctx.ui.theme`.
+- `tests/diff-panel.test.ts`: test añadido para desplazamiento horizontal (pan), indicador `«`, modo de inspección `i` y reseteo.
+- `design/M2_UI_AUDIT.md`, `M2.md`: matriz de cumplimiento actualizada con todos los requisitos en estado `IMPLEMENTED`.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | 83/83 test suites pass, 0 fallos, tsc limpio |
+| Render ANSI real vs mockups | Terminal Linux, Node 26.12.0 | PASS | Estructura de cabecera, gutter, hunks, stats y pan verificados visualmente con tokens de tema |
+| `git status --short` | Entorno de desarrollo | PASS | Solo archivos de UI, tests y documentación modificados |
+
+**Siguiente paso**
+- Presentar la implementación visual al usuario para validación. Mantener snapshots y lifecycle intactos. No push.
+

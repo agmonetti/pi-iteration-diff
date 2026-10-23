@@ -33,8 +33,8 @@ export function mountDock(tui: TUI, panel: Component): DockHandle {
   }
   const previousFocus = internal.getFocusedComponent();
   const root = new HStack([
-    { component: native, basis: 0, grow: 1, shrink: 1, minSize: 1 },
-    { component: panel, basis: 40, minSize: 34, maxSize: 55, grow: 0, shrink: 0,
+    { component: native, basis: 0, grow: 60, shrink: 1, minSize: 52 },
+    { component: panel, basis: 36, minSize: 34, maxSize: 70, grow: 40, shrink: 1,
       visible: ({ width }) => {
         if (width < 90 && internal.getFocusedComponent() === panel) tui.setFocus(previousFocus);
         return width >= 90;

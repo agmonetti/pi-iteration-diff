@@ -293,3 +293,44 @@ test("34-column headers keep status and exact counts when the path is long", () 
   assert.match(header, /\+123\s*\/\s*-45/);
   assert.ok(visibleWidth(header) <= 34);
 });
+
+test("horizontal pan and inspection mode preserve long code and paths without irreversible truncation", () => {
+  const state = panel();
+  const p = state.panel;
+  const longLine = "const deepProperty = object.very.long.chain.of.properties.that.extends.far.beyond.dock.width();";
+  p.setView(view([{
+    path: "src/deep/nested/directory/component.ts", kind: "modified", added: 1, removed: 0,
+    getRows: () => [{ kind: "added", newLine: 1, text: longLine }],
+  }]));
+  // Expand file
+  p.handleInput("\r");
+  p.handleInput("\x1b[B"); // move to added line
+
+  // Initial code without pan
+  const initial = p.render(50).find(line => line.includes("deepProperty"))!;
+  assert.ok(initial.includes("deepProperty"));
+  assert.ok(!initial.includes("«"));
+
+  // Pan right by 8 columns
+  p.handleInput("\x1b[C"); // right arrow
+  const panned = p.render(50).find(line => line.includes("«"))!;
+  assert.ok(panned.includes("«"));
+
+  // Footer reflects pan state
+  interface TestPanel { footer(width: number): string }
+  const tp = p as unknown as TestPanel;
+  assert.ok(tp.footer(60).includes("pan +8"));
+
+  // Toggle inspection mode
+  p.handleInput("i");
+  assert.ok(tp.footer(80).includes("i: const deepProperty"));
+
+  // Toggle off inspection
+  p.handleInput("i");
+  assert.ok(!tp.footer(80).includes("i: const deepProperty"));
+
+  // Reset pan
+  p.handleInput("0");
+  const reset = p.render(50).find(line => line.includes("deepProperty"))!;
+  assert.ok(!reset.includes("«"));
+});

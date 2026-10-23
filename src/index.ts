@@ -68,9 +68,18 @@ export default function iterationDiff(pi: ExtensionAPI): void {
             render: () => tui.requestRender(),
             editor: () => dock?.focusEditor(),
             close: dismiss,
-            style: (role, text) => ctx.ui.theme.fg(
-              role === "added" ? "toolDiffAdded" : role === "removed" ? "toolDiffRemoved" : role,
-              text),
+            style: (role, text) => {
+              if (role === "bold") return ctx.ui.theme.bold(text);
+              if (role === "dim") return ctx.ui.theme.fg("dim", text);
+              if (role === "border") return ctx.ui.theme.fg("border", text);
+              if (role === "accent") return ctx.ui.theme.fg("accent", text);
+              if (role === "muted") return ctx.ui.theme.fg("muted", text);
+              if (role === "warning") return ctx.ui.theme.fg("warning", text);
+              if (role === "text") return ctx.ui.theme.fg("text", text);
+              if (role === "added") return ctx.ui.theme.fg("toolDiffAdded", text);
+              if (role === "removed") return ctx.ui.theme.fg("toolDiffRemoved", text);
+              return ctx.ui.theme.fg(role as any, text);
+            },
           });
           refresh();
           dock = mountDock(tui, panel);

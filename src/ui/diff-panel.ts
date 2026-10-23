@@ -1,5 +1,5 @@
 import {
-  matchesKey, ScrollView, stripTerminalSequences, truncateToWidth, visibleWidth, VStack,
+  matchesKey, ScrollView, sliceByColumn, stripTerminalSequences, truncateToWidth, visibleWidth, VStack,
   type Component, type Focusable, type TuiMouseEvent, type TuiMouseEventResult,
 } from "@earendil-works/pi-tui";
 import type { DiffFile, DiffRow, IterationView } from "../diffs/iteration-diff.js";
@@ -9,8 +9,8 @@ const MAX_FILE_ROWS = 2_000;
 const MAX_CONTENT_ROWS = 12_000;
 const MAX_NOTICES = 32;
 const MAX_TEXT_LENGTH = 16_384;
-type Role = "accent" | "muted" | "added" | "removed";
-type Actions = {
+export type Role = "accent" | "muted" | "added" | "removed" | "dim" | "border" | "text" | "bold" | "warning";
+export type Actions = {
   render(): void;
   editor(): void;
   close(): void;
@@ -29,7 +29,38 @@ interface PanelMouseDispatch extends TuiMouseEventResult {
 function safeText(text: string): string {
   const bounded = text.length > MAX_TEXT_LENGTH ? `${text.slice(0, MAX_TEXT_LENGTH)}… [texto truncado]` : text;
   return stripTerminalSequences(bounded).replaceAll("\t", "    ")
-    .replace(/[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "�");
+    .replace(/[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "");
+}
+
+/** Smart middle truncation for file paths preserving filename and extension. */
+export function truncatePath(path: string, maxLength: number): string {
+  if (path.length <= maxLength) return path;
+  if (maxLength <= 5) return path.slice(-maxLength);
+  const parts = path.split("/");
+  if (parts.length <= 1) {
+    const extIdx = path.lastIndexOf(".");
+    const ext = extIdx > 0 ? path.slice(extIdx) : "";
+    const name = extIdx > 0 ? path.slice(0, extIdx) : path;
+    const avail = maxLength - 1 - ext.length;
+    if (avail > 2) return `${name.slice(0, avail)}…${ext}`;
+    return `…${path.slice(-(maxLength - 1))}`;
+  }
+  const filename = parts[parts.length - 1]!;
+  const firstDir = parts[0]!;
+  const target = `${firstDir}/…/${filename}`;
+  if (target.length <= maxLength) {
+    let current = target;
+    for (let i = 1; i < parts.length - 1; i++) {
+      const candidate = `${parts.slice(0, i + 1).join("/")}/…/${filename}`;
+      if (candidate.length <= maxLength) current = candidate;
+      else break;
+    }
+    return current;
+  }
+  if (maxLength >= filename.length + 2) {
+    return `…/${filename}`;
+  }
+  return `…${filename.slice(-(maxLength - 1))}`;
 }
 
 /** Pi lays out the scroll child before providing its actual allocated viewport.
@@ -75,6 +106,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private hasFocus = false;
   private readonly body: VirtualDiffScroll;
   private pressed = false;
+  private panX = 0;
+  private inspecting = false;
 
   constructor(private readonly actions: Actions) {
     super();
@@ -98,6 +131,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
     if (reset) {
       this.expanded.clear();
       this.cursor = 0;
+      this.panX = 0;
+      this.inspecting = false;
       this.body.scrollToStart();
       this.pressed = false;
     }
@@ -134,51 +169,103 @@ export class DiffPanel extends VStack implements Component, Focusable {
   }
 
   private heading(width: number): string {
-    const text = truncateToWidth(`│ DIFF: ${safeText(this.view.title)}`, width, "…");
+    const rawTitle = safeText(this.view.title);
+    const title = rawTitle.toUpperCase().startsWith("DIFF") ? rawTitle : `DIFF: ${rawTitle}`;
+    const scopeTag = width >= 42 ? " [Last*]" : "";
+    const text = truncateToWidth(`│ ${title}${scopeTag}`, width, "…");
     return this.actions.style(this.focused ? "accent" : "muted", text);
   }
   private footer(width: number): string {
+    const active = this.diffEntries[this.cursor];
+    if (this.inspecting && active) {
+      const detail = active.kind === "file"
+        ? active.file.path
+        : active.kind === "row"
+        ? active.row.text
+        : active.text;
+      const text = truncateToWidth(`│ i: ${safeText(detail)}`, width, "…");
+      return this.actions.style("accent", text);
+    }
     const short = width < 45;
+    const panStr = this.panX > 0 ? ` [pan +${this.panX}]` : "";
     const text = short
-      ? "Enter: abrir · Esc: editor · q: cerrar"
-      : "Enter/clic: abrir · ↑↓: navegar · Esc: editor · q: cerrar";
+      ? `Enter: abrir${panStr} · Esc: editor · q: cerrar`
+      : `Enter/clic: abrir${panStr} · ↑↓: navegar · ←→: pan · Esc: editor · q: cerrar`;
     return this.actions.style("muted", truncateToWidth(`│ ${text}`, width, "…"));
   }
   private entryLine(index: number, width: number): string {
     const entry = this.diffEntries[index];
     if (!entry) return "";
-    const prefix = `│${index === this.cursor ? ">" : " "} `;
-    let text: string;
-    let role: Role | undefined;
+    const active = index === this.cursor;
+    const border = this.actions.style("border", "│");
+    const cursor = active ? (this.focused ? this.actions.style("accent", ">") : this.actions.style("dim", ">")) : " ";
+    const prefix = `${border}${cursor} `;
+
     if (entry.kind === "file") {
       const { file } = entry;
       const kind = { created: "creado", modified: "modificado", deleted: "eliminado" }[file.kind];
+      const chevron = this.expanded.has(file.path) ? "▾" : "▸";
       if (file.added !== undefined && file.removed !== undefined) {
-        const marker = `${prefix}${this.expanded.has(file.path) ? "▾" : "▸"} `;
-        const suffix = ` [${kind}] +${file.added} / -${file.removed}`;
-        const available = Math.max(0, width - visibleWidth(marker) - visibleWidth(suffix));
-        const path = truncateToWidth(safeText(file.path), available, "…");
-        return truncateToWidth(`${marker}${path}${suffix}`, Math.max(0, width), "…");
+        const kindBadge = `[${kind}]`;
+        const kindStyled = this.actions.style("muted", kindBadge);
+        const addStr = this.actions.style("added", `+${file.added}`);
+        const sepStr = this.actions.style("dim", " / ");
+        const delStr = this.actions.style("removed", `-${file.removed}`);
+
+        const markerPlain = `│${active ? ">" : " "} ${chevron} `;
+        const suffixPlain = ` ${kindBadge} +${file.added} / -${file.removed}`;
+        const avail = Math.max(4, width - visibleWidth(markerPlain) - visibleWidth(suffixPlain));
+        const path = truncatePath(safeText(file.path), avail);
+        const nameWithChevron = this.actions.style("bold", `${chevron} ${path}`);
+
+        const line = `${prefix}${nameWithChevron} ${kindStyled} ${addStr}${sepStr}${delStr}`;
+        return truncateToWidth(line, Math.max(0, width), "…");
       }
-      text = `${this.expanded.has(file.path) ? "▾" : "▸"} ${safeText(file.path)} [${kind}] [estadísticas no disponibles]${file.notice ? ` · ${safeText(file.notice)}` : ""}`;
-    } else if (entry.kind === "notice") {
-      text = safeText(entry.text);
-      role = "muted";
-    } else {
-      const { row } = entry;
-      if (row.kind === "hunk" || row.kind === "notice") {
-        text = safeText(row.text);
-        role = "muted";
-      } else {
-        const old = row.oldLine === undefined ? "" : String(row.oldLine);
-        const next = row.newLine === undefined ? "" : String(row.newLine);
-        const mark = row.kind === "added" ? "+" : row.kind === "removed" ? "-" : " ";
-        text = `${old.padStart(4)} ${next.padStart(4)} ${mark} ${safeText(row.text)}`;
-        if (row.kind === "added" || row.kind === "removed") role = row.kind;
-      }
+      const statMsg = "[estadísticas no disponibles]";
+      const kindBadge = `[${kind}]`;
+      const kindStyled = this.actions.style("muted", kindBadge);
+      const nameWithChevron = this.actions.style("bold", `${chevron} ${safeText(file.path)}`);
+      const text = `${nameWithChevron} ${kindStyled} ${this.actions.style("dim", statMsg)}${file.notice ? ` · ${this.actions.style("warning", safeText(file.notice))}` : ""}`;
+      const line = `${prefix}${text}`;
+      return truncateToWidth(line, Math.max(0, width), "…");
     }
-    const line = truncateToWidth(`${prefix}${text}`, Math.max(0, width), "…");
-    return role ? this.actions.style(role, line) : line;
+
+    if (entry.kind === "notice") {
+      const line = `${prefix}${this.actions.style("muted", safeText(entry.text))}`;
+      return truncateToWidth(line, Math.max(0, width), "…");
+    }
+
+    // Row kind
+    const { row } = entry;
+    if (row.kind === "hunk" || row.kind === "notice") {
+      const line = `${prefix}${this.actions.style("muted", safeText(row.text))}`;
+      return truncateToWidth(line, Math.max(0, width), "…");
+    }
+
+    // Code row
+    const old = row.oldLine === undefined ? "" : String(row.oldLine);
+    const next = row.newLine === undefined ? "" : String(row.newLine);
+    const mark = row.kind === "added" ? "+" : row.kind === "removed" ? "-" : " ";
+
+    const numStr = this.actions.style("dim", `${old.padStart(4)} ${next.padStart(4)}`);
+    const markStr = row.kind === "added" ? this.actions.style("added", mark)
+      : row.kind === "removed" ? this.actions.style("removed", mark)
+      : mark;
+
+    const rawCode = safeText(row.text);
+    let codePart = rawCode;
+    let panIndicator = " ";
+    if (this.panX > 0) {
+      codePart = sliceByColumn(rawCode, this.panX, Number.MAX_SAFE_INTEGER);
+      panIndicator = "«";
+    }
+    const panStyled = this.panX > 0 ? this.actions.style("dim", panIndicator) : " ";
+    const codeStyled = row.kind === "added" ? this.actions.style("added", codePart)
+      : row.kind === "removed" ? this.actions.style("removed", codePart)
+      : this.actions.style("text", codePart);
+
+    const line = `${prefix}${numStr} ${markStr}${panStyled}${codeStyled}`;
+    return truncateToWidth(line, Math.max(0, width), "…");
   }
 
   override render(width: number): string[] {
@@ -212,12 +299,15 @@ export class DiffPanel extends VStack implements Component, Focusable {
   handleInput(data: string): void {
     if (matchesKey(data, "escape") || matchesKey(data, "tab")) { this.actions.editor(); return; }
     if (data === "q") { this.actions.close(); return; }
+    if (data === "i") { this.inspecting = !this.inspecting; this.actions.render(); return; }
     if (matchesKey(data, "enter")) this.toggle();
     else if (matchesKey(data, "down")) this.cursor++;
     else if (matchesKey(data, "up")) this.cursor--;
+    else if (matchesKey(data, "right") || data === "l") { this.panX += 8; this.actions.render(); return; }
+    else if (matchesKey(data, "left") || data === "h") { this.panX = Math.max(0, this.panX - 8); this.actions.render(); return; }
     else if (matchesKey(data, "pageDown")) this.cursor += Math.max(1, this.body.viewportHeight - 1);
     else if (matchesKey(data, "pageUp")) this.cursor -= Math.max(1, this.body.viewportHeight - 1);
-    else if (matchesKey(data, "home")) this.cursor = 0;
+    else if (matchesKey(data, "home") || data === "0") { this.cursor = 0; this.panX = 0; }
     else if (matchesKey(data, "end")) this.cursor = this.diffEntries.length - 1;
     else if (data === "]" || data === "[") this.jump(data === "]" ? 1 : -1, "file");
     else if (data === "}" || data === "{") this.jump(data === "}" ? 1 : -1, "hunk");

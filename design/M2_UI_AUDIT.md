@@ -12,19 +12,20 @@
 | Área de UI / Requisito de Diseño | Estado | Referencia de Código (`src/`) | Notas y Hallazgos de Implementación |
 |---|---|---|---|
 | **Apertura y Ocultamiento Exclusivo** | `IMPLEMENTED` | `src/index.ts:44-92` | Se abre/cierra por comando explícito `/diff` o `/iteration-diff`. No se autoabre. |
-| **Colapso Inicial por Defecto (M2)** | `IMPLEMENTED` | `src/ui/diff-panel.ts:72,99` | Todos los archivos inician contraídos en cada iteración nueva. |
-| **Expansiones Independientes** | `IMPLEMENTED` | `src/ui/diff-panel.ts:72,116` | El conjunto `expanded` persiste durante la sesión para la misma iteración; se limpia al cambiar de iteración. |
-| **Ancho Proporcional / Adaptativo** | `CONFLICT` | `src/ui/layout-adapter.ts:37` | **Incumplimiento:** El diseño especifica `DOCK_DEFAULT_BASIS` (34-42) o `DOCK_PROPORTIONAL_RATIO` (0.35-0.40). El código usa un ancho base **fijo estricto de 34 columnas** (`basis: 34`). |
+| **Colapso Inicial por Defecto (M2)** | `IMPLEMENTED` | `src/ui/diff-panel.ts:128` | Todos los archivos inician contraídos en cada iteración nueva. |
+| **Expansiones Independientes** | `IMPLEMENTED` | `src/ui/diff-panel.ts:103,147` | El conjunto `expanded` persiste durante la sesión para la misma iteración; se limpia al cambiar de iteración. |
+| **Ancho Proporcional / Adaptativo** | `IMPLEMENTED` | `src/ui/layout-adapter.ts:36-42` | Ancho responsivo real (35-40%, `basis: 36, grow: 40, minSize: 34, maxSize: 70`) preservando ancho mínimo del chat (`minSize: 52, grow: 60`). |
 | **Ocultamiento Automático (< 90 cols)** | `IMPLEMENTED` | `src/ui/layout-adapter.ts:38-41` | El dock se oculta automáticamente si el ancho total es menor a 90 columnas. |
-| **Separador Vertical / Borde de Dock** | `PARTIAL` | `src/ui/diff-panel.ts:137,146` | **Desviación:** No existe un componente de borde o separador independiente; el carácter vertical `│` está cableado estáticamente en cada línea renderizada (`heading`, `entryLine`). |
-| **Indicador de Foco Minimalista** | `PARTIAL` | `src/ui/diff-panel.ts:138` | El título cambia a `accent` al tener foco. **Falta:** Sin foco usa `muted` en lugar de `dim` / texto por defecto especificado; el cursor `>` se muestra siempre fijo en la línea activa sin importar si hay foco o no. |
-| **Selector de Scope en Cabecera** | `MISSING` | `src/ui/diff-panel.ts:136-139` | **Omitido en M2:** El diseño en mockups muestra `[Last*] Current History` en la cabecera. La implementación actual solo muestra `DIFF: <título>` y delega la selección a estados internos no visibles como pestañas. |
-| **Estilos de Tokens de Tema (`toolDiffAdded` / `toolDiffRemoved`)** | `PARTIAL` | `src/index.ts:71-73`, `src/ui/diff-panel.ts:177` | Se usa `ctx.ui.theme.fg(...)` para adiciones y eliminaciones. **Falta:** No se aplican fondos (`bg`), limitando el contraste visual semántico. |
-| **Gutter de Números de Línea** | `PARTIAL` | `src/ui/diff-panel.ts:169-172` | Formato implementado (`old.padStart(4)` y `next.padStart(4)`), pero con desalineación visual en líneas de contexto (duplicación de números) y celdas rígidas que consumen 11-15 columnas innecesarias. |
-| **Truncamiento Estricto con Elipsis** | `IMPLEMENTED` | `src/ui/diff-panel.ts:31,137,156` | Se utiliza `truncateToWidth` y `safeText` para evitar desbordes ANSI/Unicode. |
-| **Atajos de Teclado y Paginación** | `IMPLEMENTED` | `src/ui/diff-panel.ts:208-224` | `↑↓`, `Enter`, `[]`, `{}`, `PageUp/Down`, `Home/End`, `Esc`/`Tab` (`editor`), `q` (`close`) operan correctamente. |
+| **Separador Vertical / Borde de Dock** | `IMPLEMENTED` | `src/ui/diff-panel.ts:182` | Borde `│` estilizado con token `border` de forma uniforme e independiente del contenido de cada línea. |
+| **Indicador de Foco Minimalista** | `IMPLEMENTED` | `src/ui/diff-panel.ts:168,183` | Cabecera y cursor `>` con token `accent` solo en foco; indicador atenuado `dim`/`muted` sin foco. |
+| **Selector de Scope en Cabecera** | `IMPLEMENTED` | `src/ui/diff-panel.ts:166-169` | Cabecera estructurada con badge de scope contextual `[Last*]` cuando el ancho es >= 42 cols. |
+| **Estilos de Tokens de Tema (`toolDiffAdded` / `toolDiffRemoved`)** | `IMPLEMENTED` | `src/index.ts:71-82`, `src/ui/diff-panel.ts:188-260` | Mapeo completo de tokens (`border`, `bold`, `dim`, `accent`, `muted`, `warning`, `toolDiffAdded`, `toolDiffRemoved`, `text`). |
+| **Gutter de Números de Línea** | `IMPLEMENTED` | `src/ui/diff-panel.ts:246` | Números de línea estilizados con `dim` y signos `+`/`-` con `toolDiffAdded`/`toolDiffRemoved`. |
+| **Lectura de Líneas Largas y Rutas** | `IMPLEMENTED` | `src/ui/diff-panel.ts:36-64,174,250` | Desplazamiento horizontal (`←`/`→`) con indicador `«`, truncamiento medio inteligente de rutas (`truncatePath`) e inspección bajo demanda (`i`). |
+| **Truncamiento Estricto con Elipsis** | `IMPLEMENTED` | `src/ui/diff-panel.ts:30,167,222` | Truncamiento acotado con elipsis sin desbordes de celda en terminal. |
+| **Atajos de Teclado y Paginación** | `IMPLEMENTED` | `src/ui/diff-panel.ts:269-286` | `↑↓`, `Enter`, `[]`, `{}`, `←→` (pan), `0` (reset), `i` (inspect), `PgUp/Down`, `Home/End`, `Esc`/`Tab` (`editor`), `q` (`close`). |
 | **Scroll Independiente del Transcript** | `IMPLEMENTED` | `src/ui/diff-panel.ts:40-67` | `VirtualDiffScroll` con `ScrollView` y rueda de ratón dedicada. |
-| **Gestión de Estados Especiales (ADR-003 / Batch Net / Abort)** | `IMPLEMENTED` | `src/diffs/iteration-diff.ts:206-265` | Se traducen avisos de batch, interrupciones, truncamientos y estado vacío a notificaciones textuales en el panel. |
+| **Gestión de Estados Especiales (ADR-003 / Batch Net / Abort)** | `IMPLEMENTED` | `src/diffs/iteration-diff.ts:206-265` | Mapeo textual fiel de ventanas agrupadas, abortos, truncamiento y estados vacíos. |
 
 ---
 
