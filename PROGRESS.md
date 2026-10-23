@@ -512,5 +512,28 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
 **Decisiones y límites**
 - Alcance estrictamente limitado a la especificación documental y maquetas; M1 se mantiene NO INICIADO y bloqueado a la espera de autorización.
 
+### 2026-10-23 — UI / congelación de especificación visual y distinciones ADR-003
+
+**Cambió**
+- `design/ui-spec.md`:
+  - `Batch Net` diferenciado conceptual y explícitamente de `Current Working Tree`: las ventanas agrupadas muestran el diff neto propio del lote y operan como un estado contextual sin pestañas permanentes ficticias.
+  - Eliminada toda garantía sobre el posicionamiento del cursor tras anexar: la API solo certifica la preservación íntegra del contenido del borrador de texto.
+  - Reglas de selección mixta detalladas para desglosar con precisión las filas `old` y `new` tanto en barra de estado como en metadatos de inserción.
+- `design/mockups.md`:
+  - Wireframe de selección mixta corregido con contabilidad exacta de filas (1 old + 3 new = 4 filas visuales seleccionadas).
+  - Estado 4 corregido para mostrar el diff neto contextual de `Batch Net` sin pestañas permanentes ni confusión con `Current`.
+  - Nota de alcance y mockup de anexo al editor actualizados sin asumir cursor interno.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux 7.2.11-arch1-1, Node 26.12.0, Pi/TUI 1.4.0 | PASS | tsc + 14/14 tests PASS, 0 fallos |
+
+**Estado y congelación de UI**
+- **Especificación visual congelada para M1:** La dirección visual, anatomía, tokens y comportamiento de UI quedan fijados. Solo se admitirán modificaciones ante evidencia técnica nueva surgida en los milestones de desarrollo.
+- **M0 cerrado y validado:** Gate de factibilidad en estado PASS (14/14 tests automatizados + validaciones humanas de dock, mouse, foco y resize/reload en Pi y Herdr).
+- **M1 no iniciado:** A la espera de autorización formal antes de codificar la captura de snapshots y cálculo de deltas netos.
+
+
 
 

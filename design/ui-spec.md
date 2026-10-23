@@ -13,7 +13,7 @@
 3. **Prioridad visual de la selección:** Cuando una línea (añadida, eliminada o de contexto) forma parte de un rango seleccionado, el estilo de selección (`selectedBg` o inversión de video) tiene **prioridad visual absoluta** sobre los fondos de adición y borrado, evitando ambigüedades en cualquier terminal o tema.
 4. **Minimalismo y sobriedad en terminal:** Evitar adornos gráficos innecesarios, badges pesados o barras redundantes que resten espacio vertical u horizontal útil, especialmente en terminales estrechas o paneles divididos de Herdr.
 5. **Acciones explícitas sin autoenvío:** Las acciones de anexo (`FIX` y `DISCUSS`) añaden el fragmento al borrador existente y devuelven el control al usuario; jamás disparan el envío automático del prompt.
-6. **Declaración honesta de capacidades:** La preservación del editor se limita a lo técnicamente demostrado en M0: **la conservación íntegra del contenido del borrador de texto**. No se promete la preservación de cursores internos, selecciones activas ni el árbol de deshacer (`undo`) del editor nativo.
+6. **Declaración honesta de capacidades:** La preservación del editor se limita a lo técnicamente demostrado en M0: **la conservación íntegra del contenido del borrador de texto**. No se promete el posicionamiento del cursor tras anexar fragmentos, selecciones activas ni el árbol de deshacer (`undo`) del editor nativo.
 7. **Diferenciación conceptual del Preview HTML:** Las maquetas HTML/CSS locales son exclusivamente herramientas documentales de apoyo para revisar paletas y proporciones en navegador; **no validan funcionalidad real del producto** ni replican el modelo de eventos, terminales o multiplexores de Pi TUI.
 
 ---
@@ -89,11 +89,14 @@ Todos los estilos se resuelven a través de los tokens estándar de Pi:
 
 El dock debe reflejar fielmente los contratos de ciclo de vida definidos en ADR-003:
 
-### A. Ventanas agrupadas / Peticiones encoladas
+### A. Ventanas agrupadas / Peticiones encoladas (Batch Net)
 Si entraron múltiples mensajes en cola durante la ejecución del agente, **no es posible garantizar causalidad ni aislar la última petición de forma individual**:
-- La UI desactiva la opción `Last iteration` individual y muestra una notificación explícita:  
-  `│ [!] Iteración individual no aislable (múltiples mensajes agrupados) │`  
-  `│ Mostrando diff neto del conjunto de la ejecución.                   │`
+- `Batch` es un **estado contextual** de la ventana de diff, no una pestaña o tab permanente.
+- El panel muestra el **diff neto propio de la ejecución acumulada de ese lote agrupado (`Batch Net`)**, diferenciado explícitamente del árbol de trabajo completo (`Current Working Tree`). Un diff de batch **nunca se etiqueta ni se confunde con Current**.
+- La UI desactiva la opción `Last iteration` individual y presenta el estado contextual:  
+  `│ DIFF: BATCH NET (Ventana agrupada)                                 │`  
+  `│ [!] Iteración individual no aislable (múltiples mensajes en cola).  │`  
+  `│ Mostrando diff neto del lote. Para ver todo el árbol: [w] Current. │`
 
 ### B. Ejecución cancelada o abortada
 Si el usuario presionó `Ctrl+C` o el agente se interrumpió antes de completar la tarea (`agent_settled: aborted=true`):
@@ -117,9 +120,10 @@ Si la petición fue una consulta pura o una respuesta explicativa sin escrituras
 
 1. **Navegación:**  
    `↑` / `↓` mueven el cursor. `Shift + ↑/↓` o arrastre con botón izquierdo del mouse definen el rango.
-2. **Anexado explícito (sin autoenvío):**  
+2. **Anexado explícito (sin autoenvío ni garantía de cursor):**  
    - Al presionar `a`, se anexa el bloque con tag `[FIX]`.
    - Al presionar `d`, se anexa el bloque con tag `[DISCUSS]`.
-   - El texto se incorpora al borrador de entrada de Pi mediante la API del editor (`setEditorText(draft + "\n\n" + excerpt)`). El cursor del usuario se ubica tras la inserción y **no se envía la petición**.
+   - El texto se incorpora al final del borrador de entrada de Pi mediante la API del editor (`setEditorText(draft + "\n\n" + excerpt)`). **No se garantiza ni se controla la posición final del cursor** en el editor nativo tras la inserción, y **jamás se envía la petición**.
+   - En selecciones mixtas (que abarcan tanto líneas eliminadas como añadidas), la barra de estado y los metadatos de inserción desglosan con exactitud los rangos de ambos lados: `old:L_start-L_end, new:L_start-L_end (N filas totales: X old, Y new)`.
 3. **Retorno seguro:**  
    `Esc` o `Tab` devuelven el foco al editor nativo conservando la selección en el diff. `/diff` o `q` cierran el panel y restauran el layout original.

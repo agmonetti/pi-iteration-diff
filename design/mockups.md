@@ -2,13 +2,13 @@
 
 Representación gráfica con caracteres de terminal (ancho estándar: 120 columnas).
 
-> **Nota de alcance:** El panel derecho se monta como extensión de Pi preservando la conversación y el editor nativo a la izquierda. Los anchos indicados (ej. 120 cols totales, split 60/40) son parámetros configurables. En el editor nativo solo está demostrada la preservación del contenido del borrador (texto acumulado), no de cursores internos ni historial de deshacer.
+> **Nota de alcance:** El panel derecho se monta como extensión de Pi preservando la conversación y el editor nativo a la izquierda. Los anchos indicados (ej. 120 cols totales, split 60/40) son parámetros configurables. En el editor nativo solo está demostrada la preservación del contenido del borrador (texto acumulado); no se garantiza el posicionamiento del cursor tras anexar, ni la retención de selecciones internas o historial de deshacer.
 
 ---
 
-## Estado 1: Foco en Diff con Selección Activa y Prioridad Visual (Unified Diff)
+## Estado 1: Foco en Diff con Selección Mixta y Prioridad Visual (Unified Diff)
 
-El foco se indica de forma minimalista aplicando el token `accent` exclusivamente en el título de cabecera (sin badges adicionales tipo `[FOCUSED]`). La selección visual (`███` / resaltado) toma **prioridad absoluta** sobre los fondos de líneas añadidas y eliminadas:
+El foco se indica de forma minimalista aplicando el token `accent` exclusivamente en el título de cabecera. La selección visual (`███` / resaltado) toma **prioridad absoluta** sobre los fondos de líneas añadidas y eliminadas. En selecciones mixtas, la barra inferior desglosa con exactitud los rangos de ambos lados y la contabilidad total de filas visuales (1 old + 3 new = 4 filas):
 
 ```text
 ┌────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────┐
@@ -26,16 +26,16 @@ El foco se indica de forma minimalista aplicando el token `accent` exclusivament
 │                                                            │ │                                                       │
 │                                                            │ │ ▸ tests/balance.test.ts (2/2)              +6  -0     │
 ├────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────┤
-│ PI EDITOR (Borrador intacto)                               │ │ L12-14 (3 lines) · [a] FIX  [d] DISCUSS  [Esc] Editor │
-│ >                                                          │ │                                                       │
+│ PI EDITOR (Borrador intacto)                               │ │ old:12, new:12-14 (4 rows: 1 old, 3 new)              │
+│ >                                                          │ │ [a] FIX  [d] DISCUSS  [Esc] Editor                    │
 └────────────────────────────────────────────────────────────┴─┴───────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Estado 2: Foco devuelto al Editor tras Anexar Fragmento (Sin autoenvío)
+## Estado 2: Foco devuelto al Editor tras Anexar Fragmento Mixto (Sin autoenvío)
 
-El encabezado del dock vuelve al color atenuado (`dim`/`text`). El fragmento se anexa al borrador existente con sus metadatos sin disparar el envío:
+El encabezado del dock vuelve al color atenuado (`dim`/`text`). El fragmento se anexa al borrador existente desglosando los lados sin disparar el envío ni manipular la posición del cursor:
 
 ```text
 ┌────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────┐
@@ -56,10 +56,11 @@ El encabezado del dock vuelve al color atenuado (`dim`/`text`). El fragmento se 
 │ PI EDITOR (Foco activo en escritura)                       │ │ [F6] Focus Diff  [Esc] Dismiss                        │
 │ > Agregá también un warning si limit es menor a 0          │ │                                                       │
 │                                                            │ │                                                       │
-│ [src/balance.ts | new | 12-14 | FIX]                       │ │                                                       │
-│ > if (limit === 0) {                                       │ │                                                       │
-│ >   return offset;                                         │ │                                                       │
-│ > }|                                                       │ │                                                       │
+│ [src/balance.ts | mixed | old:12, new:12-14 | FIX]         │ │                                                       │
+│ > - const ratio = limit ? total / limit : 0;               │ │                                                       │
+│ > + if (limit === 0) {                                     │ │                                                       │
+│ > +   return offset;                                       │ │                                                       │
+│ > + }                                                      │ │                                                       │
 └────────────────────────────────────────────────────────────┴─┴───────────────────────────────────────────────────────┘
 ```
 
@@ -88,22 +89,23 @@ El encabezado del dock vuelve al color atenuado (`dim`/`text`). El fragmento se 
 
 ---
 
-## Estado 4: Ventanas agrupadas / Peticiones encoladas (ADR-003)
+## Estado 4: Ventanas agrupadas / Peticiones encoladas (ADR-003: Batch Net contextual)
 
-Cuando entraron múltiples mensajes en cola durante la ejecución, no se atribuye falsamente una iteración individual:
+Cuando entraron múltiples mensajes en cola durante la ejecución, no se aísla una iteración individual y el diff se presenta en un estado contextual propio de **Batch Net** (nunca etiquetado como `Current Working Tree`):
 
 ```text
 ┌────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────┐
-│ > pi (v1.4.0) — /home/agus-hy/Documentos/pi-diff           │ │ DIFF: BATCH EXECUTION (Agrupada)                      │
-│                                                            │ │ Last (N/A) · [Current*] · History                     │
+│ > pi (v1.4.0) — /home/agus-hy/Documentos/pi-diff           │ │ DIFF: BATCH NET (Ventana agrupada)                    │
+│                                                            │ │ ⚠ Iteración individual no aislable (mensajes en cola) │
 │ User: Arreglá el typo                                      │ ├───────────────────────────────────────────────────────┤
-│ User: Y también agregá el test                             │ │ ⚠ Iteración individual no aislable (mensajes en cola) │
-│ Agent: Realicé ambas correcciones...                       │ │ Mostrando diff conjunto acumulado de la ejecución:    │
-│                                                            │ │                                                       │
+│ User: Y también agregá el test                             │ │ Mostrando diff neto del lote acumulado de ejecuciones:│
+│ Agent: Realicé ambas correcciones...                       │ │                                                       │
 │                                                            │ │ ▾ src/typo.ts                              +1  -1     │
 │                                                            │ │ ▾ tests/typo.test.ts                       +8  -0     │
+│                                                            │ │                                                       │
+│                                                            │ │ (Diferenciado de Current Working Tree)                 │
 ├────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────┤
-│ PI EDITOR                                                  │ │ [c] Ver Working Tree  [Esc] Editor                    │
+│ PI EDITOR                                                  │ │ [w] Ver Working Tree  [Esc] Editor                    │
 │ >                                                          │ │                                                       │
 └────────────────────────────────────────────────────────────┴─┴───────────────────────────────────────────────────────┘
 ```
