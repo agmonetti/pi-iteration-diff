@@ -254,17 +254,13 @@ header.controls {
   color: var(--accent-color);
 }
 
-.focus-badge {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: #2a3441;
-  color: var(--text-dim);
-}
-
-.diff-dock.focused .focus-badge {
-  background: var(--accent-color);
-  color: #fff;
+.preview-notice {
+  background: #1a2332;
+  border-bottom: 1px solid var(--border-color);
+  padding: 6px 14px;
+  font-size: 11px;
+  color: #8c9eb5;
+  text-align: center;
 }
 
 .scope-selector {
@@ -329,12 +325,6 @@ header.controls {
   user-select: none;
 }
 
-.diff-row.selected {
-  background: var(--diff-selected-bg);
-  border-left: 3px solid var(--diff-selected-border);
-  padding-left: 7px;
-}
-
 .diff-row.added {
   background: var(--diff-added-bg);
   color: var(--diff-added-text);
@@ -343,6 +333,15 @@ header.controls {
 .diff-row.removed {
   background: var(--diff-removed-bg);
   color: var(--diff-removed-text);
+}
+
+/* Prioridad visual: la selección sobreescribe fondos de adición y eliminación por especificidad */
+.diff-row.selected,
+.diff-row.added.selected,
+.diff-row.removed.selected {
+  background: var(--diff-selected-bg);
+  border-left: 3px solid var(--diff-selected-border);
+  padding-left: 7px;
 }
 
 .diff-gutter {

@@ -485,4 +485,32 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
 **Próximo paso**
 - Cuando el usuario lo disponga, autorizar e iniciar M1 (motor de snapshots y captura del filesystem).
 
+### 2026-10-23 — UI / ajustes de especificación, precedencia visual y contratos ADR-003
+
+**Cambió**
+- `design/ui-spec.md`:
+  - Proporciones y umbrales de ancho formalizados como parámetros ajustables y calibrables.
+  - Prioridad visual explícita: la selección sobrescribe fondos de adición/eliminación.
+  - Indicadores de foco minimalistas en `accent`, eliminando badges superfluos.
+  - Declaración precisa de preservación del editor (solo demostrado el contenido del borrador).
+  - Integración documental de estados ADR-003: ventanas agrupadas/encoladas, interrupción/aborto y truncamiento.
+  - Consumo dinámico de tokens del tema activo sin imponer temas obligatorios.
+- `design/mockups.md`:
+  - Wireframes actualizados con prioridad de selección visual limpia.
+  - Mockups añadidos para estados de cola/agrupación, interrupción y truncamiento por límites.
+- `design/preview.html` y `design/preview.css`:
+  - Banner de advertencia explícito aclarando que el preview web no valida la TUI real.
+  - Eliminado badge redundante de foco.
+  - Reglas de especificidad CSS para dar prioridad al fondo de selección sobre `added`/`removed`.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux 7.2.11-arch1-1, Node 26.12.0, Pi/TUI 1.4.0 | PASS | tsc + 14/14 tests PASS, 0 fallos |
+| linters (htmlhint, ast-grep, stylelint) | Entorno local | PASS | Sin `!important`, sin XSS, HTML/CSS limpios |
+
+**Decisiones y límites**
+- Alcance estrictamente limitado a la especificación documental y maquetas; M1 se mantiene NO INICIADO y bloqueado a la espera de autorización.
+
+
 

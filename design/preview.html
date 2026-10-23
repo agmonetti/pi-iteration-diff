@@ -12,12 +12,16 @@
     <h1>pi-iteration-diff · Especificación Visual y Prototipo TUI</h1>
     <div class="btn-group">
       <button class="btn" id="toggleTheme">Tema: Dark</button>
-      <button class="btn active" id="toggleFocus">Foco: Dock (F6)</button>
+      <button class="btn active" id="toggleFocus">Alternar Foco (F6/Esc)</button>
       <button class="btn" id="attachFix">Anexar FIX [a]</button>
       <button class="btn" id="attachDiscuss">Anexar DISCUSS [d]</button>
-      <button class="btn" id="clearEditor">Limpiar Editor</button>
+      <button class="btn" id="clearEditor">Restaurar Borrador</button>
     </div>
   </header>
+
+  <div class="preview-notice">
+    Aviso documental: Este preview HTML es una maqueta de referencia de presentación en navegador. No emula ni valida el comportamiento del runtime real de Pi TUI, eventos de terminal ni compatibilidad con Herdr.
+  </div>
 
   <div class="terminal-window">
     <div class="terminal-titlebar">
@@ -46,7 +50,7 @@
         </div>
 
         <div class="native-editor-pane">
-          <div class="editor-label">PI NATIVE PROMPT EDITOR (Preservación de borrador garantizada)</div>
+          <div class="editor-label">PI NATIVE PROMPT EDITOR (Preservación del contenido del borrador demostrada)</div>
           <div class="editor-content" id="editorText">&gt; Verificá también que no existan valores negativos.<span class="cursor"></span></div>
         </div>
       </section>
@@ -55,7 +59,6 @@
       <aside class="diff-dock focused" id="diffDock">
         <div class="dock-header">
           <span class="dock-title">│ DIFF: LAST ITERATION</span>
-          <span class="focus-badge" id="dockBadge">FOCUSED</span>
         </div>
 
         <div class="scope-selector">
@@ -122,7 +125,6 @@
 
   <script>
     const dock = document.getElementById('diffDock');
-    const badge = document.getElementById('dockBadge');
     const editor = document.getElementById('editorText');
     const themeBtn = document.getElementById('toggleTheme');
     const focusBtn = document.getElementById('toggleFocus');
@@ -140,8 +142,6 @@
     focusBtn.addEventListener('click', () => {
       isFocused = !isFocused;
       dock.classList.toggle('focused', isFocused);
-      badge.textContent = isFocused ? 'FOCUSED' : 'UNFOCUSED';
-      focusBtn.textContent = isFocused ? 'Foco: Dock (F6)' : 'Foco: Editor (Esc)';
       focusBtn.classList.toggle('active', isFocused);
     });
 

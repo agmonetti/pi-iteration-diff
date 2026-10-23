@@ -1,115 +1,125 @@
 # UI Specification: pi-iteration-diff
 
-**Versión:** 1.0  
+**Versión:** 1.1  
 **Entorno de ejecución:** Pi Coding Agent (Terminal interactiva fullscreen y dentro de Herdr).  
-**Tipo de interfaz:** Terminal User Interface (TUI) montada sobre `@earendil-works/pi-tui`.
+**Tipo de interfaz:** Terminal User Interface (TUI) montada como extensión sobre `@earendil-works/pi-tui`.
 
 ---
 
 ## 1. Principios de diseño
 
-1. **No intrusión:** El panel lateral nunca se abre automáticamente; se invoca o cierra exclusivamente mediante `/diff` (o `/iteration-diff`).
-2. **Coexistencia transparente:** La conversación de Pi y el editor de entrada inferior se mantienen plenamente operativos y visibles a la izquierda.
-3. **Fidelidad al tema nativo:** Cero paletas hardcodeadas. Toda la UI consume los tokens semánticos del tema activo de Pi (`ctx.ui.theme`).
-4. **Accesibilidad de terminal:** Operación 100% posible sin mouse (vía teclado con combinaciones estándar y atajos de una sola tecla al tener foco) y compatible con ratón cuando la terminal y el multiplexor lo soporten.
-5. **Degradación controlada:** Si el ancho del terminal es inferior a 90 columnas, el dock se oculta automáticamente y el foco regresa al editor sin pérdidas de estado.
+1. **Extensión no intrusiva sobre Pi:** El panel derecho se monta dinámicamente preservando intactos el transcript de la conversación y el editor nativo de Pi a la izquierda. Nunca se abre automáticamente; se abre o cierra exclusivamente por acción explícita mediante `/diff` (o el fallback `/iteration-diff`).
+2. **Consumo estricto del tema activo:** No se introduce ni se exige un tema propio obligatorio. Todos los colores, estilos y contrastes se resuelven dinámicamente desde `ctx.ui.theme` según la configuración del usuario en Pi (`system`, `dark`, `light` o tema personalizado).
+3. **Prioridad visual de la selección:** Cuando una línea (añadida, eliminada o de contexto) forma parte de un rango seleccionado, el estilo de selección (`selectedBg` o inversión de video) tiene **prioridad visual absoluta** sobre los fondos de adición y borrado, evitando ambigüedades en cualquier terminal o tema.
+4. **Minimalismo y sobriedad en terminal:** Evitar adornos gráficos innecesarios, badges pesados o barras redundantes que resten espacio vertical u horizontal útil, especialmente en terminales estrechas o paneles divididos de Herdr.
+5. **Acciones explícitas sin autoenvío:** Las acciones de anexo (`FIX` y `DISCUSS`) añaden el fragmento al borrador existente y devuelven el control al usuario; jamás disparan el envío automático del prompt.
+6. **Declaración honesta de capacidades:** La preservación del editor se limita a lo técnicamente demostrado en M0: **la conservación íntegra del contenido del borrador de texto**. No se promete la preservación de cursores internos, selecciones activas ni el árbol de deshacer (`undo`) del editor nativo.
+7. **Diferenciación conceptual del Preview HTML:** Las maquetas HTML/CSS locales son exclusivamente herramientas documentales de apoyo para revisar paletas y proporciones en navegador; **no validan funcionalidad real del producto** ni replican el modelo de eventos, terminales o multiplexores de Pi TUI.
 
 ---
 
-## 2. Anatomía del Layout y Grilla de Caracteres
+## 2. Parámetros de Layout y Umbrales Adaptativos
 
-El layout se compone sustituyendo temporalmente el `layoutRoot` de Pi mediante un contenedor horizontal `HStack` compuesto por dos columnas:
+Los anchos y umbrales no son constantes fijas rígidas, sino **parámetros configurables y calibrables** en el adaptador de layout según la densidad del terminal y el entorno (Pi directo o panes de Herdr):
 
 ```text
 ┌──────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
 │  PI TRANSCRIPT (Chat Viewport)                           │  DIFF DOCK (Iteration Diff Viewport)     │
 │                                                          │                                          │
-│  User: Arreglá el cálculo de balance                     │  │ [Last*]  Current  T-1                 │
-│  Agent: Modifiqué src/balance.ts aplicando el clamp...   │  │ 2 files (+14 -3)                      │
-│                                                          │  │ ▾ src/balance.ts                      │
-│                                                          │  │ 12   const min = 0;                   │
-│                                                          │  │ 13 - const max = balance;             │
-│                                                          │  │ 13 + const max = Math.max(0, limit);  │
-│                                                          │  │ 14   return clamp(val, min, max);     │
+│  User: Arreglá el cálculo de balance                     │  │ [Last*]  Current  History             │
+│  Agent: Modifiqué src/balance.ts aplicando el clamp...   │  │ ▾ src/balance.ts              +3  -2   │
+│                                                          │  │   11   const offset = init();         │
+│                                                          │  │ > 12 - const max = balance;           │
+│                                                          │  │ > 12 + const max = clamp(limit);      │
+│                                                          │  │   13   return max + offset;           │
 ├──────────────────────────────────────────────────────────┤  │                                       │
 │  PI NATIVE EDITOR                                        │  │                                       │
-│  > Revisá el caso cuando limit es negativo|              │  │ [L13] [a] FIX  [d] DISCUSS  [Esc] Back │
+│  > Revisá el caso cuando limit es negativo|              │  │ L12 (3 lines) · [a] FIX  [d] DISCUSS  │
 └──────────────────────────────────────────────────────────┴──┴───────────────────────────────────────┘
 ```
 
-### Proporciones y umbrales
+### Tabla de umbrales de referencia (calibrables)
 
-| Ancho terminal (`cols`) | Comportamiento del Dock | Ancho Dock | Vista Diff |
-|---|---|---|---|
-| `< 90 cols` | **Oculto**. Devuelve el foco al editor nativo. Notificación o badge de advertencia si se invoca `/diff`. | 0 cols | Ninguna |
-| `90 – 120 cols` | **Visible compacto**. Split fijo o proporcional. | 34 – 38 cols | Unified diff |
-| `121 – 160 cols` | **Visible estándar**. Split 60% chat / 40% dock. | 44 – 56 cols | Unified diff |
-| `> 160 cols` | **Visible extendido**. Permite alternar a modo Side-by-Side (`sbs`). | 60 – 72 cols | Unified o Side-by-Side |
+| Parámetro | Valor por defecto | Comportamiento |
+|---|---|---|
+| `MIN_COLUMNS_THRESHOLD` | `90 cols` | Si el ancho total es menor, el dock se oculta automáticamente y el foco regresa al editor nativo para no romper la legibilidad del chat. |
+| `DOCK_DEFAULT_BASIS` | `34 – 42 cols` | Ancho base para anchos moderados (90 a 120 columnas). |
+| `DOCK_PROPORTIONAL_RATIO` | `0.35 – 0.40` | Proporción de pantalla reservada al dock en terminales anchas (> 120 columnas). |
+| `SIDE_BY_SIDE_MIN_WIDTH` | `140 – 160 cols` | Umbral mínimo para permitir la vista side-by-side sin truncar código de forma excesiva. |
 
 ---
 
-## 3. Jerarquía de Componentes TUI
+## 3. Jerarquía de Componentes TUI y Sobriedad
 
-La estructura modular interna del dock se organiza en componentes de `@earendil-works/pi-tui`:
+Para maximizar el espacio útil en pantalla:
 
 ```text
 DockRoot (HStack child)
- ├── BorderSeparator (Text: línea vertical "│" o doble línea con borde)
+ ├── BorderSeparator (Text: línea "│" usando token `border` o `muted`)
  └── DockContainer (VStack)
-      ├── HeaderBar (Component: título, indicador de foco, selector de scope)
-      ├── FileSummaryBar (Component: selector de archivo actual, contadores +N -M)
-      ├── DiffViewport (ScrollView: navegación de hunks y líneas de código)
-      │    └── DiffContent (Component: líneas renderizadas, gutter, indicadores +/-, cursor)
-      └── ActionBar (Component: ayuda de atajos, rango seleccionado, estado de anexo)
+      ├── HeaderLine (1 línea: título compacto + selector de scope [Last* | Current | Hist])
+      ├── DiffViewport (ScrollView: hunks, números de línea, código con truncado estricto)
+      └── ActionStatusLine (1 línea: rango activo + atajos esenciales [a] FIX [d] DISCUSS [Esc] Editor)
 ```
 
-### Contrato de componentes
-- **`DockContainer`** implementa `Focusable`. Cuando tiene foco, el encabezado o borde se renderiza usando el token `accent` del tema.
-- **`DiffViewport`** encapsula el scroll vertical. Si el usuario usa la rueda del ratón sobre esta zona, `ScrollView` maneja el evento de forma independiente al transcript del chat.
-- **`DiffContent`** renderiza exactamente las líneas que caben en el ancho asignado, truncando con `truncateToWidth` o midiendo con `visibleWidth` de `@earendil-works/pi-tui`.
+### Indicador de foco minimalista
+- **Con foco:** El encabezado del panel se colorea con el token `accent` del tema activo. No se utilizan badges adicionales tipo `[FOCUSED]` ni bordes dobles pesados.
+- **Sin foco:** El encabezado se muestra con el color `dim` o `text` por defecto.
+- Al alternar el foco (vía `F6`, `Esc`, `Tab` o click de ratón), el componente solicita repintado mediante `tui.requestRender()`.
 
 ---
 
-## 4. Mapeo de Tokens de Color y Estilos
+## 4. Prioridad Visual de Estilos y Tokens de Tema
 
-| Elemento de UI | Token de Pi Theme | Rol semántico | Fallback ANSI (16 colores) |
-|---|---|---|---|
-| **Encabezado con foco** | `accent` | Indica que el panel tiene el control del teclado | Cyan / Azul brillante |
-| **Encabezado sin foco** | `dim` / `text` | Estado inactivo mientras el usuario escribe en el editor | Blanco apagado / Gris |
-| **Separador vertical (`│`)** | `border` o `muted` | Delimitador entre la conversación y el dock | Gris oscuro |
-| **Línea añadida (`+`)** | `toolDiffAdded` (o `success`) | Fondo tenue o texto esmeralda | Verde |
-| **Línea eliminada (`-`)** | `toolDiffRemoved` (o `error`) | Fondo tenue o texto carmín | Rojo |
-| **Gutter de números** | `dim` | Números de línea `old` y `new` | Gris |
-| **Selección activa (rango)** | `selectedBg` / `searchMatchBg` | Resalta el bloque de líneas seleccionado | Azul inverso / Magenta |
-| **Marcador de cursor (`>`)** | `accent` | Indica la línea actual del cursor | Amarillo / Cyan |
-| **Badges de estado (`FIX`/`DISCUSS`)** | `warning` / `accent` | Etiquetas de las acciones de retroalimentación | Amarillo / Magenta |
+Todos los estilos se resuelven a través de los tokens estándar de Pi:
+
+| Rol de UI | Token de Pi Theme | Regla de precedencia visual |
+|---|---|---|
+| **Línea seleccionada (Rango activo)** | `selectedBg` / `searchMatchBg` | **Prioridad 1 (Máxima):** El fondo de selección cubre la línea completa. El prefijo `+` o `-` y el texto mantienen su identidad semántica, pero el fondo de adición/eliminación cede ante la selección para certificar qué líneas están marcadas. |
+| **Cursor actual (`>`)** | `accent` | Marca en la columna de control la línea activa del cursor. |
+| **Línea añadida (`+`)** | `toolDiffAdded` (o `success`) | Fondo tenue y/o texto coloreado (solo cuando la línea no está seleccionada). |
+| **Línea eliminada (`-`)** | `toolDiffRemoved` (o `error`) | Fondo tenue y/o texto coloreado (solo cuando la línea no está seleccionada). |
+| **Gutter de números de línea** | `dim` | Números de línea `old:new` atenuados para no distraer del código. |
+| **Línea de contexto** | `text` | Texto ordinario del tema. |
+| **Borde / Separador** | `border` o `muted` | Línea divisoria discreta entre chat y dock. |
 
 ---
 
-## 5. Modelo de Interacción y Atajos de Teclado
+## 5. Estados del Ciclo de Vida y Casos Especiales (ADR-003)
 
-### Estados de foco
+El dock debe reflejar fielmente los contratos de ciclo de vida definidos en ADR-003:
 
-1. **Foco en Editor Nativo (Modo Escritura):**
-   - El editor de Pi recibe todas las teclas de texto ordinarias.
-   - Presionar `F6` transfiere el foco al panel de diff.
-   - Hacer click dentro del dock de diff enfoca automáticamente el dock y posiciona el cursor en la línea clickeada.
+### A. Ventanas agrupadas / Peticiones encoladas
+Si entraron múltiples mensajes en cola durante la ejecución del agente, **no es posible garantizar causalidad ni aislar la última petición de forma individual**:
+- La UI desactiva la opción `Last iteration` individual y muestra una notificación explícita:  
+  `│ [!] Iteración individual no aislable (múltiples mensajes agrupados) │`  
+  `│ Mostrando diff neto del conjunto de la ejecución.                   │`
 
-2. **Foco en Diff Dock (Modo Inspección):**
-   - El encabezado se resalta con el color `accent`.
-   - **Navegación:**
-     - `↑` / `↓`: Mover cursor línea por línea (ajusta el punto de anclaje si no hay selección).
-     - `Shift + ↑` / `Shift + ↓`: Expandir o contraer la selección de rango.
-     - `n` / `p`: Saltar al siguiente (`next`) o previo (`prev`) hunk o archivo modificado.
-     - `PageUp` / `PageDown` o `Home` / `End`: Desplazamiento rápido.
-   - **Acciones sobre el código:**
-     - `a` (Append FIX): Anexa el fragmento seleccionado al editor con la etiqueta `[FIX]`.
-     - `d` (Append DISCUSS): Anexa el fragmento seleccionado con la etiqueta `[DISCUSS]`.
-     - `c` (Copy): Copia las líneas seleccionadas al portapapeles del sistema (si el entorno lo soporta).
-     - `Tab` / `Esc`: Regresa inmediatamente el foco al editor nativo de Pi sin cerrar el dock.
-     - `q` o `/diff`: Cierra el dock lateral y devuelve el layout a pantalla completa normal.
+### B. Ejecución cancelada o abortada
+Si el usuario presionó `Ctrl+C` o el agente se interrumpió antes de completar la tarea (`agent_settled: aborted=true`):
+- El encabezado indica el estado: `│ DIFF: LAST ITERATION (Interrumpida) │`.
+- Se presenta únicamente el delta neto observado hasta el momento del aborto, sin asumir completitud ni consistencia.
 
-### Comportamiento del ratón
-- **Click izquierdo:** Posiciona el cursor en la línea.
-- **Click y arrastre (Drag):** Selecciona el rango continuo de líneas desde el punto de inicio hasta donde se suelta.
-- **Scroll (Wheel):** Desplaza verticalmente el diff sin mover la conversación de la izquierda.
+### C. Captura parcial o truncamiento por límites
+Si se excedieron los límites configurables de tamaño de archivo, líneas o bytes:
+- La cabecera o pie de archivo incluye un aviso visible:  
+  `│ [!] Diff truncado: límite de 1,000 líneas alcanzado.               │`
+
+### D. Iteración sin cambios en el workspace
+Si la petición fue una consulta pura o una respuesta explicativa sin escrituras:
+- Se muestra un estado limpio y directo:  
+  `│ ✓ No se observaron cambios en la última iteración.                │`  
+  `│ [c] Ver cambios acumulados en Current Working Tree                │`
+
+---
+
+## 6. Modelo de Interacción y Acciones Explícitas
+
+1. **Navegación:**  
+   `↑` / `↓` mueven el cursor. `Shift + ↑/↓` o arrastre con botón izquierdo del mouse definen el rango.
+2. **Anexado explícito (sin autoenvío):**  
+   - Al presionar `a`, se anexa el bloque con tag `[FIX]`.
+   - Al presionar `d`, se anexa el bloque con tag `[DISCUSS]`.
+   - El texto se incorpora al borrador de entrada de Pi mediante la API del editor (`setEditorText(draft + "\n\n" + excerpt)`). El cursor del usuario se ubica tras la inserción y **no se envía la petición**.
+3. **Retorno seguro:**  
+   `Esc` o `Tab` devuelven el foco al editor nativo conservando la selección en el diff. `/diff` o `q` cierran el panel y restauran el layout original.
