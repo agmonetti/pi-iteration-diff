@@ -2,19 +2,19 @@
 
 **Proyecto:** `pi-iteration-diff`  
 **Última actualización:** 2026-10-22  
-**Estado general:** `M0 / CIERRE DOCUMENTAL PREPARADO — ACEPTACIÓN HUMANA FINAL PENDIENTE`
-**Milestone activo:** M0 — Factibilidad (iniciado; no habilita M1)  
+**Estado general:** `M0 CERRADO — GATE DE FACTIBILIDAD PASS`
+**Milestone activo:** ninguno — M1 no iniciado ni autorizado
 **Versión del producto:** 0.0.0 privada; prototipo sintético, no producto.
 
 ## 1. Resumen del estado
 
 - **Completado en este bloque:** investigación local de APIs; scaffold mínimo; dock sintético manual `/m0-diff`, selección teclado/mouse normalizado, append al editor y cleanup.
 - **Tests ejecutados:** `npm run check` PASS (14 tests: 6 UI + 5 stream SDK + 3 HTTP SDK). Sin PTY nueva; pruebas humanas recibidas por informe del operador, no simuladas.
-- **Validado por humano:** Pi directo y pane Herdr con integración oficial: dock, mouse/rangos, foco funcional, anexado sin autosend; H8 cierre/resize/restauración sólo reportados parcialmente.
-- **Corregido:** indicador visual de foco en encabezado con accent del tema, sin modificar editor. Automatizado PASS; nueva validación humana del indicador pendiente.
+- **Validado por humano:** dock, mouse/rangos, foco funcional/visual y anexado sin autosend en Pi directo y Herdr; H7 sidebar/split/zoom y H8 resize/reload/new/resume confirmados PASS por el operador.
+- **Corregido y revalidado:** indicador visual accent del tema, sin modificar editor; test y confirmación humana PASS.
 - **Lifecycle extendido:** HTTP loopback 429→200, aborto bash real y restore persistente SDK PASS. Contrato de iteración documentado, sin confundir colas agrupadas con petición individual.
-- **Decisión final:** ADR-003 confirmado con ventanas agrupadas e indisponibilidad individual explícita; no garantía de atribución ni excepción FR-03. Drag literal DEFERRED a M3, sin más implementación M0.
-- **Pendiente de aceptación M0:** foco visual nuevo, H7 sidebar/split/zoom y H8 resize/reload/new/resume humanos individualizados. Protocolo mínimo y matriz final en `M0.md`. M1 no autorizado.
+- **Decisión final aprobada:** ADR-003; usuario acepta provisionalmente indisponibilidad individual de ventanas agrupadas y diff conjunto diferenciado de Last iteration. Sin garantía de atribución. Drag literal DEFERRED a M3 sin eliminar FR-16.
+- **Cierre definitivo:** matriz final y acta en `M0.md`; no más investigación M0 ni ampliación de infraestructura. M1 no autorizado.
 
 ## 2. Entregables documentales (2026-10-22)
 
@@ -29,7 +29,7 @@
 
 | Milestone | Estado | Evidencia/criterio pendiente |
 |---|---|---|
-| M0 Factibilidad | **CIERRE DOCUMENTAL / ACEPTACIÓN CONDICIONADA** | 14/14 PASS; contrato decidido; sólo validación humana final H3/H7/H8 pendiente, sin gate total PASS |
+| M0 Factibilidad | **CLOSED / PASS** | 14/14 PASS; H3/H7/H8 confirmados por operador; ADR-003 aprobado; pendientes de producto diferidos explícitamente |
 | M1 Snapshots | **NOT STARTED** | Delta neto por petición y separación de cambios antiguos |
 | M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
 | M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
@@ -420,4 +420,42 @@ No reemplazar la evidencia histórica con frases generales del tipo «tests OK»
   status/diff/cached antes de staging por rutas explícitas; sin push ni amend.
   `git diff --check` inicial señaló hard breaks Markdown y blanco final nuevos;
   corregidos sólo en las líneas modificadas, sin formateo global.
+
+### 2026-10-22 — M0 / cierre definitivo tras confirmación humana
+
+**Cambió**
+- `M0.md`: matriz final H3 visual/H7/H8 PASS por reporte del operador y gate M0
+  PASS; acta con límites de evidencia y autorización de alcance.
+- `RESEARCH.md`, `PROGRESS.md`: estado vigente cerrado y aceptación provisional
+  del usuario de la política de ventanas agrupadas. Histórico conservado.
+- No cambios de código, infraestructura, dependencias ni instalación Pi/Herdr.
+
+**Pruebas / evidencia**
+| Caso | Resultado | Evidencia / alcance |
+|---|---|---|
+| H3 visual Pi y Herdr | PASS humano reportado | «focos funcionan segun lo esperado» y «asi es» al confirmar ambos entornos |
+| H7 sidebar/split/zoom y H8 resize/reload/new/resume | PASS humano reportado | «ambos pasaron la prueba» en respuesta a enumeración de H7/H8; no ejecución del agente |
+| `npm run check` | PASS | Gate precommit 2026-10-22, Node 26.12.0/npm 12.2.1; tsc + 14/14, 0 fallos, 1768 ms |
+
+**Decisiones y límites**
+- M0 cerrado: factibilidad, no producto completo. No pruebas humanas repetidas ni
+  investigación adicional; sólo check existente obligatorio antes del commit.
+- Reporte humano sin capturas, hora de ejecución, tema/tamaños ni terminal cliente
+  nuevos. Entorno previamente declarado Arch/Pi 1.4.0/Herdr 0.9.5, no otro inferido.
+- ADR-003 aprobado por usuario; indisponibilidad individual en ventanas agrupadas
+  aceptada provisionalmente para M1. Diff conjunto puede existir separado, nunca
+  Last iteration. No elimina FR-03 ni certifica causalidad o captura ya implementada.
+- Evaluación drag literal diferida a M3 con aceptación del usuario, FR-16 intacto;
+  alternativa seleccionar → a sigue validada. Detach/reattach extendido sigue M4.
+- Riesgos siguientes: correlación y serialización de capturas, límites/exclusiones,
+  cambios concurrentes e internals de layout. No resueltos por aprobar el spike.
+
+**Parada**
+- M1 NOT STARTED y no autorizado. Esperar autorización explícita, sin más tareas M0.
+- Revisión final del arquitecto: aprobada sin bloqueantes; no ejecutó pruebas humanas.
+
+**Git**
+- Estado inicial limpio, base 967a9ca; sólo tres documentos propios. Commit atómico
+  previsto: `docs: close M0 after human acceptance`. Revisar status/diff/cached y
+  whitespace antes del commit. Sin push ni cambios de configuración.
 

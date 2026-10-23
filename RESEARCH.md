@@ -2,7 +2,7 @@
 
 **Proyecto provisional:** `pi-iteration-diff`  
 **Fecha de investigación:** 2026-10-22  
-**Estado inicial:** investigación documental. **Estado vigente:** síntesis de cierre M0 al final; factibilidad y contrato decididos, aceptación humana final H3/H7/H8 pendiente. No habilita M1.
+**Estado inicial:** investigación documental. **Estado vigente:** M0 cerrado, gate de factibilidad PASS; H3/H7/H8 confirmados por humano y ADR-003 aprobado. Acta al final. M1 no autorizado.
 **Objetivo:** panel de diffs a la derecha de la conversación de Pi, invocado manualmente, con selección de líneas/rangos y envío al editor nativo de Pi; compatible con Pi ejecutado dentro de Herdr.
 
 > Esta investigación es contexto para decisiones, **no prueba de compatibilidad** con las versiones instaladas del usuario. Contrastar APIs, versiones y código fuente antes de implementar. Separa observaciones verificadas de hipótesis.
@@ -425,4 +425,25 @@ de scope y serialización de capturas; si no puede demostrar individualidad, fai
 - Cierre documental preparado; aceptación humana final pendiente. M1 no autorizado.
 - Gate final ejecutado 2026-10-22 21:06 UTC−03: `npm run check` PASS, tsc y 14/14,
   Node 26.12.0/npm 12.2.1. No PTY ni pruebas humanas nuevas; sin cambios de runtime.
+
+## 14. Acta de cierre definitivo M0 (2026-10-22)
+
+Actualización de aceptación, **sin investigación adicional**. El operador confirma
+foco visual esperado en Pi directo y Herdr y después H7/H8 completos («ambos pasaron
+la prueba»), tras enumerar sidebar/split/zoom y resize/reload/new/resume. Se acepta
+como informe humano PASS; el agente no ejecutó esas pruebas ni recibió capturas o
+metadatos nuevos de terminal/tamaños/hora de ejecución. Entorno reportado previamente:
+Arch Linux, Pi 1.4.0, Herdr 0.9.5. No extrapolar a otros entornos.
+
+El usuario aprueba ADR-003: ventana observable sin atribución ficticia. Acepta
+provisionalmente indisponibilidad individual para ventanas agrupadas en M1 y
+conservación opcional del diff conjunto como entidad diferente de Last iteration.
+No elimina FR-03 ni equivale a implementar/probar el motor de captura.
+También acepta diferir evaluación de drag literal a M3, manteniendo FR-16 y la
+alternativa seleccionar → a ya validada. Detach/reattach extendido sigue en M4.
+
+**Gate M0 PASS, cerrado.** La matriz final de M0.md sustituye pendientes históricos.
+No se amplían pruebas ni se reabre investigación. M1 no iniciado ni autorizado;
+riesgos de correlación, límites/seguridad de snapshots e internals del layout se
+trasladan documentados, no se consideran resueltos por el cierre de factibilidad.
 
