@@ -34,8 +34,8 @@
 |---|---|---|
 | M0 Factibilidad | **CLOSED / PASS** | 14/14 PASS; H3/H7/H8 confirmados por operador; ADR-003 aprobado; pendientes de producto diferidos explícitamente |
 | M1 Snapshots | **CLOSED / PASS (CROSS-PLATFORM CI PASS)** | Run 40018853023 (commit 116b6a8): ubuntu 56/56, macos 55/56 (1 skip procfs), windows 54/56 (2 skips procfs + bash-abort); tsc + checkout limpio. Motor y ADR-003 certificados |
-| M2 Visor | **NOT STARTED** | Dock manual, navegación y fallbacks |
-| M3 Feedback | **NOT STARTED** | Rango, FIX/DISCUSS, editor, drag/drop |
+| M2 Visor | **CLOSED / PASS** | Dock 45%, redimensionamiento interactivo, explorador inline de dos líneas, hunks unified, header/footer compactos (91/91 tests pass) |
+| M3 Selección y Contexto | **CLOSED / PASS** | Selección por teclado/mouse, selección de hunk, formato [path \| diff \| old:X \| new:Y], anexado con 'a' al editor nativo sin autoenvío (91/91 tests pass) |
 | M4 Herdr/robustez | **NOT STARTED** | Matriz e2e + cleanup + performance |
 | M5 Distribución | **NOT STARTED** | Paquete instalable, README, CI, release |
 
@@ -881,5 +881,39 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 | `git status --short` | Entorno de desarrollo | PASS | Solo archivos de UI, tests y documentación modificados |
 
 **Siguiente paso**
-- Presentar la implementación visual al usuario para validación. Mantener snapshots y lifecycle intactos. No push.
+- Implementación integral de UI y selección de contexto (Etapa A y B).
+
+### 2026-10-23 — M2 / M3: Implementación integral de UI definitiva y selección de contexto
+
+**Estado:** Completado y verificado.
+
+**Cambió**
+- `design/ui-spec.md` y `design/mockups.md`: especificación visual actualizada con las decisiones aprobadas (dock al 45%, redimensionamiento interactivo, encabezado de archivo de dos líneas, eliminación de pestañas ficticias Current/History, acción única `a` de anexado al editor, formato de contexto en texto plano).
+- `src/ui/layout-adapter.ts`:
+  - `ResizableDockRoot` con ancho objetivo del 45% del terminal (`Math.round(W * 0.45)`).
+  - Garantía de ancho mínimo para conversación y editor (46 columnas) y dock (34 columnas).
+  - Métodos `resizeBy`, `setDockWidth` y `getDockWidth` con persistencia de ratio en la sesión y adaptación a resize.
+- `src/ui/diff-panel.ts`:
+  - Explorador de archivos inline con encabezado de dos líneas: Línea 1 (nombre destacado en negrita, indicador `▾`/`▸`, estado y estadísticas) y Línea 2 (ruta relativa sangrada 4 espacios en color tenue `dim`).
+  - Expansión independiente con `Enter` o clic en cualquiera de las dos líneas del encabezado.
+  - Hunks discretos (`@@ ... @@`) y gutter fijo con referencias `old` y `new` en `dim`.
+  - Mecánica de selección completa: teclado (`Shift+↑/↓`), clic para línea individual, arrastre para rangos, selección de hunk completo desde su encabezado `@@`.
+  - Prioridad visual absoluta de selección (`selectedBg` o vídeo inverso) sobre colores de adición y eliminación.
+  - Transferencia de contexto con `a`: formatea bloque en texto plano `[path | diff | old:X-Y | new:A-B]`, anexa al borrador nativo sin reemplazar ni enviar automáticamente, y devuelve automáticamente el foco al editor nativo.
+  - Cabecera compacta con estados concisos (`DIFF · Last iteration · N files (+X / -Y)`, Batch Net, interrumpida, parcial, vacía) sin tabs ficticios.
+  - Footer adaptable con resumen de selección y atajos concisos.
+- `src/index.ts`: cableado de `appendContext` (usando `owner.ui.getEditorText()` y `setEditorText()`), `resize`, `setDockWidth` y estilos de selección.
+- `M2.md`, `M3.md`: documentación de cierre de Etapa A y creación de M3 con protocolo de validación humana.
+- `tests/diff-panel.test.ts`: 8 nuevos tests cubriendo layout a 90, 120, 160 y 200 columnas, redimensionamiento interactivo por teclado y ratón, encabezados de dos líneas, expansiones independientes, selección de rangos y hunks, transferencia con `a`, preservación de borrador, y formateo de estados en cabecera/footer.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | 91/91 test suites pass, 0 fallos, tsc limpio |
+| `tests/diff-panel.test.ts` | Linux 7.2.11-arch1-1, Node 26.12.0 | PASS | Cobertura para layout 90/120/160/200, resize, 2-line headers, selection, multi-append, states |
+| `git status --short` | Entorno de desarrollo | PASS | Solo archivos modificados del proyecto; sin archivos extraños |
+
+**Siguiente paso**
+- Validación humana en Pi directo y Pi dentro de Herdr según el protocolo documentado en `M3.md`. No avanzar a M4 ni M5 sin autorización. No push.
+
 

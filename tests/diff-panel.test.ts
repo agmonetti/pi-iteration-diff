@@ -143,7 +143,7 @@ test("header press/click toggles once, direct click toggles independently and wh
   p.handleMouse(mouse("release", 1));
   p.handleMouse(mouse("click", 1));
   assert.ok(p.render(100).some(line => line.includes("▾ file-0")));
-  p.handleMouse(mouse("click", 5));
+  p.handleMouse(mouse("click", 6));
   assert.ok(p.render(100).some(line => line.includes("▾ file-1")));
   p.handleMouse(mouse("wheel", 3, 8));
   assert.ok(!p.render(100).some(line => line.includes("file-0.ts")));
@@ -304,7 +304,8 @@ test("horizontal pan and inspection mode preserve long code and paths without ir
   }]));
   // Expand file
   p.handleInput("\r");
-  p.handleInput("\x1b[B"); // move to added line
+  p.handleInput("\x1b[B"); // move to path line
+  p.handleInput("\x1b[B"); // move to added code line
 
   // Initial code without pan
   const initial = p.render(50).find(line => line.includes("deepProperty"))!;
@@ -334,3 +335,250 @@ test("horizontal pan and inspection mode preserve long code and paths without ir
   const reset = p.render(50).find(line => line.includes("deepProperty"))!;
   assert.ok(!reset.includes("«"));
 });
+
+test("layout scales to 45% ratio on 90, 120, 160 and 200 columns preserving chat minimum size", () => {
+  const terminal = new TestTerminal();
+  const tui = new TuiAltScreen(terminal);
+  const components = Array.from({ length: 4 }, () => new Container());
+  components.forEach(child => tui.addChild(child));
+  const native = new VStack([
+    { component: new ScrollView(components[0]!, { primary: true, follow: "end" }), basis: 0, grow: 1 },
+    new VStack(components.slice(1)),
+  ]);
+  tui.setLayoutRoot(native);
+  const p = panel().panel;
+  p.setView(view([{ path: "src/calc.ts", kind: "modified", added: 1, removed: 1, getRows: () => [] }]));
+  const dock = mountDock(tui, p);
+  tui.start();
+  try {
+    for (const cols of [90, 120, 160, 200]) {
+      terminal.columns = cols;
+      terminal.resize();
+      tui.renderNow(true);
+      const dockWidth = dock.getDockWidth();
+      const expectedDock = Math.max(34, Math.min(cols - 46, Math.round(cols * 0.45)));
+      assert.equal(dockWidth, expectedDock, `dock width at ${cols} columns`);
+      assert.ok(cols - dockWidth >= 46, "chat preserves minimum size");
+    }
+  } finally { dock.close(); tui.stop(); }
+});
+
+test("keyboard shortcuts and mouse separator drag dynamically resize the dock and preserve ratio", () => {
+  let resizedDelta = 0;
+  let setCols = 0;
+  const p = new DiffPanel({
+    render() {},
+    editor() {},
+    close() {},
+    style: (_r, t) => t,
+    resize: (d) => { resizedDelta += d; },
+    setDockWidth: (c) => { setCols = c; },
+  });
+  p.setView(view([{ path: "src/calc.ts", kind: "modified", added: 1, removed: 1, getRows: () => [] }]));
+
+  // Keyboard resize shortcuts: < / > or Ctrl+Left / Ctrl+Right
+  p.handleInput(">");
+  assert.equal(resizedDelta, 4);
+  p.handleInput("<");
+  assert.equal(resizedDelta, 0);
+  p.handleInput("\x1b[1;5C"); // Ctrl+Right
+  assert.equal(resizedDelta, 4);
+  p.handleInput("\x1b[1;5D"); // Ctrl+Left
+  assert.equal(resizedDelta, 0);
+
+  // Mouse drag on separator (x = 0)
+  p.handleMouse({
+    type: "press", button: "left", x: 0, y: 5, screenX: 66, screenY: 5, width: 54, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  p.handleMouse({
+    type: "drag", button: "left", x: -6, y: 5, screenX: 60, screenY: 5, width: 54, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  assert.equal(setCols, 60);
+  p.handleMouse({
+    type: "release", button: "left", x: -6, y: 5, screenX: 60, screenY: 5, width: 54, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+});
+
+test("two-line file headers display bold basename, status, stats and indented secondary relative path", () => {
+  const p = panel().panel;
+  p.setView(view([{
+    path: "src/utils/calculator.ts", kind: "modified", added: 12, removed: 5,
+    getRows: () => [],
+  }]));
+  const lines = p.render(60);
+  // Line 1: Header with basename, chevron, status and stats
+  const headerLine = lines[1]!;
+  assert.ok(headerLine.includes("▸ calculator.ts"));
+  assert.ok(headerLine.includes("[modificado]"));
+  assert.match(headerLine, /\+12\s*\/\s*-5/);
+  // Line 2: Secondary line with indented relative path
+  const pathLine = lines[2]!;
+  assert.ok(pathLine.includes("    src/utils/calculator.ts"));
+});
+
+test("independent file expansion works via Enter and click on either line 1 or line 2", () => {
+  const p = panel().panel;
+  p.setView(view([
+    { path: "src/one.ts", kind: "modified", added: 1, removed: 1, getRows: () => [{ kind: "added", newLine: 1, text: "one" }] },
+    { path: "src/two.ts", kind: "modified", added: 2, removed: 0, getRows: () => [{ kind: "added", newLine: 1, text: "two" }] },
+  ]));
+
+  // Expand file 1 via Enter on header (line 0)
+  p.handleInput("\r");
+  assert.ok(p.render(60).some(line => line.includes("▾ one.ts")));
+  assert.ok(p.render(60).some(line => line.includes("▸ two.ts")));
+
+  // Collapse file 1 via Enter on secondary path (line 1)
+  p.handleInput("\x1b[B"); // Move down to path line
+  p.handleInput("\r");
+  assert.ok(p.render(60).some(line => line.includes("▸ one.ts")));
+
+  // Expand via mouse click on path line of file 1
+  p.handleMouse({
+    type: "press", button: "left", x: 5, y: 2, screenX: 5, screenY: 2, width: 60, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  p.handleMouse({
+    type: "click", button: "left", x: 5, y: 2, screenX: 5, screenY: 2, width: 60, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  assert.ok(p.render(60).some(line => line.includes("▾ one.ts")));
+});
+
+test("keyboard range selection with Shift+Up and Shift+Down selects contiguous rows and reflects old/new lines in footer", () => {
+  const p = panel().panel;
+  p.setView(view([{
+    path: "src/calc.ts", kind: "modified", added: 2, removed: 1,
+    getRows: () => [
+      { kind: "hunk", text: "@@ -10,3 +10,4 @@" },
+      { kind: "context", oldLine: 10, newLine: 10, text: "function calc() {" },
+      { kind: "removed", oldLine: 11, text: "  return old;" },
+      { kind: "added", newLine: 11, text: "  const a = 1;" },
+      { kind: "added", newLine: 12, text: "  return a;" },
+      { kind: "context", oldLine: 12, newLine: 13, text: "}" },
+    ],
+  }]));
+  // Expand file
+  p.handleInput("\r");
+  // Move down to removed line
+  p.handleInput("\x1b[B"); // path
+  p.handleInput("\x1b[B"); // hunk
+  p.handleInput("\x1b[B"); // context line 10
+  p.handleInput("\x1b[B"); // removed line 11
+
+  // Shift+Down to extend selection across added line 11 and added line 12
+  p.handleInput("\x1b[1;2B"); // select removed 11 and added 11
+  p.handleInput("\x1b[1;2B"); // select added 12
+
+  interface TestPanel { footer(width: number): string }
+  const footer = (p as unknown as TestPanel).footer(80);
+  assert.ok(footer.includes("old:11"));
+  assert.ok(footer.includes("new:11-12"));
+  assert.ok(footer.includes("3 líneas"));
+  assert.ok(footer.includes("a: anexa al editor"));
+});
+
+test("hunk selection selects all rows in the hunk from hunk header", () => {
+  const p = panel().panel;
+  p.setView(view([{
+    path: "src/calc.ts", kind: "modified", added: 1, removed: 1,
+    getRows: () => [
+      { kind: "hunk", text: "@@ -1,2 +1,2 @@" },
+      { kind: "removed", oldLine: 1, text: "const a = 1;" },
+      { kind: "added", newLine: 1, text: "const a = 2;" },
+    ],
+  }]));
+  p.handleInput("\r"); // expand
+  p.handleInput("\x1b[B"); // path
+  p.handleInput("\x1b[B"); // hunk header
+  p.handleInput("\r"); // select hunk
+
+  assert.equal(p.hasSelection(), true);
+  const formatted = p.formatSelectedContext();
+  assert.ok(formatted);
+  assert.ok(formatted.includes("[src/calc.ts | diff | old:1 | new:1]"));
+  assert.ok(formatted.includes("@@ -1,2 +1,2 @@"));
+  assert.ok(formatted.includes("-const a = 1;"));
+  assert.ok(formatted.includes("+const a = 2;"));
+});
+
+test("context transfer via 'a' formats selected snippet, appends to draft without replacement or auto-send, and focuses editor", () => {
+  let draft = "User original instruction";
+  let editorFocused = false;
+  const p = new DiffPanel({
+    render() {},
+    editor() { editorFocused = true; },
+    close() {},
+    style: (_r, t) => t,
+    appendContext: (snippet) => {
+      draft = draft ? `${draft}\n\n${snippet}` : snippet;
+    },
+  });
+  p.setView(view([{
+    path: "src/utils/calculator.ts", kind: "modified", added: 2, removed: 1,
+    getRows: () => [
+      { kind: "hunk", text: "@@ -12,3 +12,4 @@" },
+      { kind: "context", oldLine: 11, newLine: 11, text: "function calculateTotal(items) {" },
+      { kind: "removed", oldLine: 12, text: "  return items.reduce(sum, 0);" },
+      { kind: "added", newLine: 12, text: "  const valid = items.filter(Boolean);" },
+      { kind: "added", newLine: 13, text: "  return valid.reduce(sum, 0);" },
+      { kind: "context", oldLine: 13, newLine: 14, text: "}" },
+    ],
+  }]));
+  p.handleInput("\r"); // expand
+  p.handleInput("\x1b[B"); // path
+  p.handleInput("\x1b[B"); // hunk
+  p.handleInput("\x1b[B"); // context
+  p.handleInput("\x1b[B"); // removed 12
+  p.handleInput("\x1b[1;2B"); // select removed 12 and added 12
+  p.handleInput("\x1b[1;2B"); // select added 13
+
+  // Press 'a' to transfer
+  p.handleInput("a");
+
+  assert.equal(editorFocused, true, "focus returned to editor");
+  assert.ok(draft.startsWith("User original instruction\n\n"), "draft preserved and appended");
+  assert.ok(draft.includes("[src/utils/calculator.ts | diff | old:12 | new:12-13]"));
+  assert.ok(draft.includes("-  return items.reduce(sum, 0);"));
+  assert.ok(draft.includes("+  const valid = items.filter(Boolean);"));
+  assert.ok(draft.includes("+  return valid.reduce(sum, 0);"));
+  assert.ok(!draft.includes("FIX"), "no FIX prompt injected");
+  assert.ok(!draft.includes("DISCUSS"), "no DISCUSS prompt injected");
+});
+
+test("compact header formats concise status for Batch Net, cancelled, partial, and empty iterations without fake tabs", () => {
+  const p = panel().panel;
+
+  // Normal iteration with files
+  p.setView({ key: "k1", title: "Última iteración", notices: [], files: [
+    { path: "a.ts", kind: "modified", added: 3, removed: 1, getRows: () => [] },
+    { path: "b.ts", kind: "created", added: 5, removed: 0, getRows: () => [] },
+  ] });
+  let header = p.render(80)[0]!;
+  assert.ok(header.includes("DIFF · Last iteration · 2 files (+8 / -1)"));
+  assert.ok(!header.includes("Current"));
+  assert.ok(!header.includes("History"));
+
+  // Batch net
+  p.setView({ key: "k2", title: "Ventana agrupada · diff neto", notices: [], files: [
+    { path: "a.ts", kind: "modified", added: 2, removed: 0, getRows: () => [] },
+  ] });
+  header = p.render(80)[0]!;
+  assert.ok(header.includes("DIFF · Batch Net · 1 file (+2 / -0)"));
+
+  // Cancelled
+  p.setView({ key: "k3", title: "Ejecución cancelada", notices: [], files: [
+    { path: "a.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] },
+  ] });
+  header = p.render(80)[0]!;
+  assert.ok(header.includes("DIFF · Last iteration (interrumpida) · 1 file (+1 / -0)"));
+
+  // Empty iteration
+  p.setView({ key: "k4", title: "Última iteración", notices: [], files: [] });
+  header = p.render(80)[0]!;
+  assert.ok(header.includes("DIFF · Last iteration · Sin cambios netos"));
+});
+

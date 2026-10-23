@@ -68,6 +68,14 @@ export default function iterationDiff(pi: ExtensionAPI): void {
             render: () => tui.requestRender(),
             editor: () => dock?.focusEditor(),
             close: dismiss,
+            resize: (delta) => dock?.resizeBy(delta),
+            setDockWidth: (cols) => dock?.setDockWidth(cols),
+            appendContext: (snippet) => {
+              if (!owner) return;
+              const prev = owner.ui.getEditorText();
+              const next = prev ? `${prev}\n\n${snippet}` : snippet;
+              owner.ui.setEditorText(next);
+            },
             style: (role, text) => {
               if (role === "bold") return ctx.ui.theme.bold(text);
               if (role === "dim") return ctx.ui.theme.fg("dim", text);
@@ -78,6 +86,14 @@ export default function iterationDiff(pi: ExtensionAPI): void {
               if (role === "text") return ctx.ui.theme.fg("text", text);
               if (role === "added") return ctx.ui.theme.fg("toolDiffAdded", text);
               if (role === "removed") return ctx.ui.theme.fg("toolDiffRemoved", text);
+              if (role === "selectedBg") {
+                try {
+                  const styled = ctx.ui.theme.bg("selectedBg", text);
+                  if (styled && styled !== text) return styled;
+                } catch {}
+                return `\x1b[7m${text}\x1b[27m`;
+              }
+              if (role === "selected") return `\x1b[7m${text}\x1b[27m`;
               return ctx.ui.theme.fg(role as any, text);
             },
           });
