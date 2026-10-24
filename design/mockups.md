@@ -33,7 +33,7 @@ Al abrir una nueva iteración mediante `/diff`, todos los archivos inician contr
 ## 2. Archivos Expandidos Independientemente y Selección de Líneas (Unified Diff)
 
 Al presionar `Enter` o hacer clic sobre un encabezado, se expande su contenido unified. Múltiples archivos pueden permanecer abiertos.
-El gutter muestra números antiguos y nuevos fijos. El código seleccionado tiene **prioridad visual absoluta** (`selectedBg` / resaltado):
+Desde M4.1 el gutter muestra un único número contextual fijo: antiguo en eliminaciones, nuevo en adiciones y contexto. Las referencias old/new completas se conservan en el modelo y al anexar. El código seleccionado tiene **prioridad visual absoluta** (`selectedBg` / resaltado):
 
 ```text
 ┌────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────┐

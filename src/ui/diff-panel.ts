@@ -52,7 +52,7 @@ export type Entry =
   | { kind: "file_header"; file: DiffFile }
   | { kind: "file_path"; file: DiffFile }
   | { kind: "hunk"; file: DiffFile; row: DiffRow; hunkIndex: number }
-  | { kind: "row"; file: DiffFile; row: DiffRow; hunkIndex: number; rowIndex: number; gutterMode: "new_only" | "old_only" | "dual" }
+  | { kind: "row"; file: DiffFile; row: DiffRow; hunkIndex: number; rowIndex: number }
   | { kind: "notice"; text: string; file?: DiffFile };
 
 // Pi exposes this shape through VStack, not through the package entry exports.
@@ -335,12 +335,6 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const rows = file.getRows();
       const count = Math.min(rows.length, MAX_FILE_ROWS, remaining);
       let currentHunk = 0;
-      const hasOld = rows.some(r => r.oldLine !== undefined);
-      const hasNew = rows.some(r => r.newLine !== undefined);
-      const gutterMode: "new_only" | "old_only" | "dual" =
-        file.kind === "created" && !hasOld ? "new_only"
-        : file.kind === "deleted" && !hasNew ? "old_only"
-        : "dual";
 
       for (let index = 0; index < count; index++) {
         const row = rows[index]!;
@@ -348,7 +342,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
           currentHunk++;
           entries.push({ kind: "hunk", file, row, hunkIndex: currentHunk });
         } else {
-          entries.push({ kind: "row", file, row, hunkIndex: currentHunk, rowIndex: index, gutterMode });
+          entries.push({ kind: "row", file, row, hunkIndex: currentHunk, rowIndex: index });
         }
       }
       remaining -= count;
@@ -707,19 +701,12 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
     // 5. Code Row
     const { row } = entry;
-    const old = row.oldLine === undefined ? "" : String(row.oldLine);
-    const next = row.newLine === undefined ? "" : String(row.newLine);
+    const lineNumber = row.kind === "removed" ? row.oldLine : row.newLine;
     const mark = row.kind === "added" ? "+" : row.kind === "removed" ? "-" : " ";
 
     let numStr = "";
     if (this.preferences.lineNumbers) {
-      if (entry.gutterMode === "new_only") {
-        numStr = `${this.actions.style("dim", next.padStart(4))} `;
-      } else if (entry.gutterMode === "old_only") {
-        numStr = `${this.actions.style("dim", old.padStart(4))} `;
-      } else {
-        numStr = `${this.actions.style("dim", `${old.padStart(4)} ${next.padStart(4)}`)} `;
-      }
+      numStr = `${this.actions.style("dim", String(lineNumber ?? "").padStart(4))} `;
     }
 
     const markStr = row.kind === "added" ? this.actions.style("added", mark)

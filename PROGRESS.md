@@ -1198,3 +1198,20 @@ nueva/CI nativa nueva NOT RUN; no declaración de DoD global ni avance a M4.
 - No se crearon dependencias nuevas ni se modificó el motor de snapshots.
 - Listo para validación física final por el usuario en terminal interactivo / Herdr.
 - No avanzar a M4 hasta conformidad explícita.
+
+### 2026-10-24 — M4.1 / fase 1: gutter contextual compacto
+
+**Cambió**
+- `src/ui/diff-panel.ts`: un número contextual (old al eliminar, new en adición/contexto), sin modos de gutter; `DiffRow` y formato de contexto intactos. On/Off conservado.
+- `tests/diff-horizontal.test.ts`, `tests/diff-panel.test.ts`: números divergentes/multidígito, Unicode/ANSI, tabs, anchos 1–34, selección mouse/teclado y anexado exacto con borrador preservado.
+- `design/mockups.md`: contrato vigente contextual; esquemas históricos no son renderer literal.
+- Recuperación medida: overhead de fila modificada 15→10 columnas con números de hasta cuatro dígitos: **5 columnas**. Creados/eliminados ya tenían overhead 10, no se atribuye ganancia nueva allí. Sangría original intacta.
+
+**Pruebas ejecutadas**
+- `npm run check`: PASS, tsc + 133/133, cero fallos/skips (6648 ms), Linux, Node v26.12.0, Pi/TUI 1.4.0.
+- Primera ejecución: FAIL en expectativa de espacios del test nuevo (se contaron tres espacios extra); renderer verificado y expectativa corregida. No se alteró código para acomodar el test.
+- Arquitecto CLI delegado revisó plan completo sin herramientas: aprobado con recomendaciones de clamp/Unicode/layout real incorporadas para fase 2. No pruebas físicas nuevas.
+
+**Git / límites / siguiente paso**
+- Inicio sin modificaciones tracked; `scripts/lab-horizontal-diff.ts` preexistente untracked leído y excluido. No existe documentación M4 específica en checkout: roadmap REQUIREMENTS/PROGRESS y laboratorio son las referencias disponibles; se creará protocolo M4.1.
+- Status/diff/cached revisados; commit separado `refactor(ui): compact diff line gutter`. Sin push. Continúa sólo fase 2 de M4.1; M4.2 fuera de alcance.

@@ -215,7 +215,7 @@ test("ANSI and control injection is removed from title, notices, paths and code;
   assert.ok(text.includes("café🙂 e\u0301    "));
   assert.match(text, /\s+1 \+ café/);
   assert.match(text, /1\s+- café/);
-  assert.match(text, /2\s+2\s+café/);
+  assert.match(text, /2\s+café/);
   assert.ok(state.roles.includes("added"));
   assert.ok(state.roles.includes("removed"));
   assert.deepEqual(p.render(0), []);
@@ -674,8 +674,8 @@ test("compact gutter differentiates created, deleted, and modified files with ma
   // 2. Deleted file has single old column
   assert.match(rendered, /\s+1 - export const deprecated/);
 
-  // 3. Modified file preserves dual columns for old and new references
-  assert.match(rendered, /\s+5\s+5\s+function compute/);
+  // 3. Modified files use the contextual number too.
+  assert.match(rendered, /\s+5\s+function compute/);
   assert.match(rendered, /\s+6\s+-\s+return oldSum/);
   assert.match(rendered, /\s+6\s+\+\s+return newSum/);
 });
