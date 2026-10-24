@@ -1,6 +1,6 @@
 import {
   HStack, ScrollView, VStack, TuiAltScreen, isViewportTUI,
-  type Component, type TUI,
+  type Component, type TUI, type TuiMouseEvent,
 } from "@earendil-works/pi-tui";
 
 // Pi 1.4.0: layoutRoot and getFocusedComponent are not part of the public TUI interface.
@@ -23,9 +23,18 @@ let persistentDockRatio = 0.45;
 export class ResizableDockRoot extends HStack {
   private ratio: number;
 
-  constructor(children: any[], initialRatio = 0.45) {
+  constructor(children: any[], initialRatio = 0.45, private readonly focusNative?: () => void) {
     super(children);
     this.ratio = initialRatio;
+  }
+
+  override handleMouse(event: TuiMouseEvent): undefined {
+    if (event.type === "press" && event.button === "left" && event.width >= 90 &&
+        event.x >= 0 && event.x < event.width - this.getDockWidth(event.width)) {
+      this.focusNative?.();
+    }
+    // Observe only: a dispatch result would capture the press and clear native text selection.
+    return undefined;
   }
 
   get dockRatio(): number { return this.ratio; }
@@ -81,7 +90,9 @@ export function mountDock(tui: TUI, panel: Component): DockHandle {
         if (width < 90 && internal.getFocusedComponent() === panel) tui.setFocus(previousFocus);
         return width >= 90;
       } },
-  ], persistentDockRatio);
+  ], persistentDockRatio, () => {
+    if (ownsRoot()) tui.setFocus(previousFocus);
+  });
   tui.setLayoutRoot(root);
   // Pi 1.4.0 consumes page/line shortcuts before extension input listeners.
   // Route the public fullscreen scroll method by focus, leaving mouse routing

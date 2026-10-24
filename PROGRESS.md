@@ -1004,3 +1004,46 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 
 
 
+
+### 2026-10-23 — UI / retorno al editor desde el panel nativo
+
+**Cambió**
+- `src/ui/layout-adapter.ts`: observer local al root del dock para press izquierdo
+  no consumido en el lado Pi; restaura foco guardado sin retornar resultado de mouse.
+  No modifica componentes nativos ni captura/reenvía eventos. Ownership y cierre
+  existentes delimitan el callback; no monkey-patching global.
+- `tests/native-pane-focus.test.ts`: cuatro regresiones con TUI real y SGR sintético:
+  transcript/mensaje/vacío/editor/Diff, selección del diff conservada, selección/copia
+  nativa y enlace OSC 8, rueda/motion/drag huérfano/release/botones secundarios,
+  resize y selección capturados cruzando al lado izquierdo. Borrador intacto y cero envíos.
+- `M3.md`: mecanismo, limitaciones y protocolo físico Pi/Herdr pendiente.
+
+**Pruebas ejecutadas**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npx --no-install tsx --test tests/native-pane-focus.test.ts` | Linux, Node v26.12.0, Pi/TUI 1.4.0 | PASS | 4/4, 0 fallos |
+| `npm run check` | Mismo entorno | PASS | tsc + 103/103, 0 fallos/skips; 5119 ms |
+| LSP activo en adaptador/test nuevo | source=lsp, scope=paths | PARCIAL | 0 errores recibidos; 1 clean, 1 inconcluso; tsc PASS |
+| Arquitecto delegado read-only, sin herramientas | Fuentes y contrato de dispatch suministrados | PASS revisión | Sin bloqueantes; distingue SGR sintético de evidencia física |
+| Mouse físico Pi directo / Herdr | Pi 1.4.0, Herdr 0.9.5 instalados; NO_TTY | NOT RUN | No se manipuló el pane activo ni instalación/configuración |
+
+**Fallos / límites / decisiones**
+- Sin fallos runtime de regresiones; durante escritura del test se corrigieron firmas
+  consultando declaraciones (opciones del constructor, copySelection y selección pública).
+- Pi 1.4.0 recorre hit-path de hijos a root; un resultado de mouse consumiría el press
+  y limpiaría selección. Retornar undefined conserva el fallback. Los listeners de
+  input públicos llegan después del listener viewport que consume mouse.
+- Controles que consumen eventos, scrollbars, buscador y overlays no llegan al observer;
+  se prioriza su interacción nativa. Alternativa menos invasiva: Esc desde Diff o clic
+  en editor. No se declara cobertura literal de cualquier control ni DoD físico PASS.
+- Sin APIs de Herdr, IO de editor ni envío de prompts añadidos. Sin nuevas dependencias.
+
+**Git / próximo paso**
+- Cambios previos en `src/ui/diff-panel.ts`, sus tests, `tests/feasibility.test.ts` y
+  otras entradas de PROGRESS preservados y excluidos del commit. Staging explícito
+  de adaptador, test nuevo, M3 y sólo esta entrada de bitácora, aislable por hunk.
+- Commit atómico previsto: `fix(ui): restore editor focus on native pane clicks`.
+  Sin push. Próximo paso: operador ejecuta el protocolo físico de M3 en Pi y Herdr.
+
+
+
