@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Container, ScrollView, TuiAltScreen, VStack, visibleWidth, type Component, type Terminal, type TuiMouseEvent } from "@earendil-works/pi-tui";
+import { Container, ScrollView, TuiAltScreen, VStack, stripTerminalSequences, visibleWidth, type Component, type Terminal, type TuiMouseEvent } from "@earendil-works/pi-tui";
 import type { DiffFile, DiffRow, IterationView } from "../src/diffs/iteration-diff.js";
 import { DiffPanel } from "../src/ui/diff-panel.js";
 import { mountDock, type DockHandle } from "../src/ui/layout-adapter.js";
@@ -59,11 +59,11 @@ for (const count of [0, 1, 10, 2_500]) {
     const p = panel().panel;
     p.setView(view(f.files));
     const lines = p.render(100);
-    assert.ok(lines.length <= 25);
+    assert.ok(lines.length <= 26);
     assert.ok(!lines.some(line => line.includes("@@")));
     assert.equal(f.calls.reduce((sum, n) => sum + n, 0), 0);
     if (count === 0) assert.ok(lines.some(line => line.includes("No changes observed")));
-    else assert.ok(lines.some(line => line.includes("▸ file-0.ts [modified]") && /\+1\s*\/\s*-1/.test(line)));
+    else assert.ok(lines.some(line => line.includes("▸ M file-0.ts") && /\+1\s*\/\s*-1/.test(line)));
     if (count > 2_000) {
       p.handleInput("\x1b[F");
       assert.ok(p.render(100).some(line => line.includes("List truncated: 2000/2500")));
@@ -80,10 +80,31 @@ test("created/deleted kinds, exact zero statistics and unavailable notices stay 
     { path: "binary.dat", kind: "modified", notice: "Diff no disponible: archivo binario.", getRows: noRows },
   ]));
   const text = p.render(140).join("\n");
-  assert.match(text, /new\.ts \[created\] \+2\s*\/\s*-0/);
-  assert.match(text, /old\.ts \[deleted\] \+0\s*\/\s*-4/);
-  assert.ok(text.includes("binary.dat [modified] [stats unavailable]"));
+  assert.match(text, /A new\.ts \+2\s*\/\s*-0/);
+  assert.match(text, /D old\.ts \+0\s*\/\s*-4/);
+  assert.ok(text.includes("M binary.dat [stats unavailable]"));
   assert.ok(text.includes("Diff unavailable: binary file."));
+  assert.ok(!/\[(?:created|modified|deleted)\]|\b(?:staged|unstaged|renamed|copied)\b|\?/.test(text));
+});
+
+test("up/down skip secondary path rows while file jumps target the three basename headers", () => {
+  const p = panel().panel;
+  p.setView(view([
+    { path: "src/one.ts", kind: "modified", added: 1, removed: 0, getRows: () => [{ kind: "added", newLine: 1, text: "one" }] },
+    { path: "src/two.ts", kind: "modified", added: 1, removed: 0, getRows: () => [{ kind: "added", newLine: 1, text: "two" }] },
+    { path: "src/three.ts", kind: "modified", added: 1, removed: 0, getRows: () => [{ kind: "added", newLine: 1, text: "three" }] },
+  ]));
+  const active = (path: string): void => assert.ok(p.render(100).some(line => stripTerminalSequences(line).startsWith("▏> ▸ ") && line.includes(path)));
+  p.handleInput("\x1b[B"); active("two.ts");
+  p.handleInput("\x1b[B"); active("three.ts");
+  p.handleInput("\x1b[B"); active("three.ts");
+  p.handleInput("["); active("two.ts");
+  p.handleInput("["); active("one.ts");
+  p.handleInput("["); active("one.ts");
+  p.handleInput("\r");
+  p.handleInput("\x1b[B");
+  p.handleInput("\x1b[B");
+  assert.ok(p.render(100).some(line => stripTerminalSequences(line).startsWith("▏> ") && line.includes("+")), "expanded diff code remains navigable");
 });
 
 test("independent expansions preserve state across same key, focus, invalidate and width changes", () => {
@@ -93,23 +114,23 @@ test("independent expansions preserve state across same key, focus, invalidate a
   p.handleInput("\r");
   p.handleInput("]");
   p.handleInput("\r");
-  assert.ok(p.render(100).some(line => line.includes("▾ file-0")));
-  assert.ok(p.render(100).some(line => line.includes("▾ file-1")));
-  assert.ok(p.render(100).some(line => line.includes("▸ file-2")));
+  assert.ok(p.render(100).some(line => line.includes("▾ M file-0")));
+  assert.ok(p.render(100).some(line => line.includes("▾ M file-1")));
+  assert.ok(p.render(100).some(line => line.includes("▸ M file-2")));
   assert.equal(f.calls[2], 0);
   p.focused = true;
   p.focused = false;
   p.invalidate();
   p.render(8);
   p.setView(view(f.files));
-  assert.equal(p.render(100).filter(line => line.includes("▾ file-")).length, 2);
+  assert.equal(p.render(100).filter(line => line.includes("▾ M file-")).length, 2);
   p.handleInput("[");
   p.handleInput("\r");
-  assert.ok(p.render(100).some(line => line.includes("▸ file-0")));
-  assert.ok(p.render(100).some(line => line.includes("▾ file-1")));
+  assert.ok(p.render(100).some(line => line.includes("▸ M file-0")));
+  assert.ok(p.render(100).some(line => line.includes("▾ M file-1")));
   p.setView(view(f.files, "iteration-2"));
-  assert.equal(p.render(100).filter(line => line.includes("▸ file-")).length, 3);
-  assert.ok(p.render(100)[2]!.startsWith("│>"));
+  assert.equal(p.render(100).filter(line => line.includes("▸ M file-")).length, 3);
+  assert.ok(stripTerminalSequences(p.render(100)[3]!).startsWith("▏>"));
 });
 
 test("keyboard file/hunk navigation and Enter; only editor/close controls, no feedback", () => {
@@ -119,14 +140,15 @@ test("keyboard file/hunk navigation and Enter; only editor/close controls, no fe
   p.setView(view(f.files));
   p.handleInput("\r");
   p.handleInput("}");
-  assert.ok(p.render(100).some(line => line.startsWith("│>") && line.includes("@@")));
+  assert.ok(p.render(100).some(line => stripTerminalSequences(line).startsWith("▏>") && line.includes("@@")));
   p.handleInput("{"); // No earlier hunk: remains stable.
   p.handleInput("\x1b[A");
   p.handleInput("\r");
-  assert.ok(p.render(100).some(line => line.includes("▸ file-0")));
-  p.handleInput("\x1b[B");
+  assert.ok(p.render(100).some(line => line.includes("▸ M file-0")));
+  p.handleInput("\x1b[B"); // Skip file 0's secondary path row.
+  assert.ok(p.render(100).some(line => stripTerminalSequences(line).startsWith("▏> ▸ M file-1")));
   p.handleInput("\r");
-  assert.ok(p.render(100).some(line => line.includes("▾ file-1")));
+  assert.ok(p.render(100).some(line => line.includes("▾ M file-1")));
   p.handleInput("a"); p.handleInput("d"); p.handleInput("c");
   assert.equal(state.editor(), 0);
   assert.equal(state.closed(), 0);
@@ -139,16 +161,16 @@ test("header press/click toggles once, direct click toggles independently and wh
   const f = files(40);
   const p = panel().panel;
   p.setView(view(f.files));
-  assert.equal(p.handleMouse(mouse("press", 2))?.focus, true);
-  p.handleMouse(mouse("release", 2));
-  p.handleMouse(mouse("click", 2));
-  assert.ok(p.render(100).some(line => line.includes("▾ file-0")));
-  p.handleMouse(mouse("click", 7));
-  assert.ok(p.render(100).some(line => line.includes("▾ file-1")));
+  assert.equal(p.handleMouse(mouse("press", 3))?.focus, true);
+  p.handleMouse(mouse("release", 3));
+  p.handleMouse(mouse("click", 3));
+  assert.ok(p.render(100).some(line => line.includes("▾ M file-0")));
+  p.handleMouse(mouse("click", 8));
+  assert.ok(p.render(100).some(line => line.includes("▾ M file-1")));
   p.handleMouse(mouse("wheel", 3, 8));
   assert.ok(!p.render(100).some(line => line.includes("file-0.ts")));
   p.handleMouse(mouse("wheel", 3, -8));
-  assert.ok(p.render(100).some(line => line.includes("▾ file-0")));
+  assert.ok(p.render(100).some(line => line.includes("▾ M file-0")));
 });
 
 test("large expanded content is visibly bounded and only viewport text is read", () => {
@@ -186,7 +208,7 @@ test("ANSI and control injection is removed from title, notices, paths and code;
     const lines = p.render(width);
     assert.ok(lines.every(line => visibleWidth(line) <= width));
     // Pi's trusted truncation helper emits SGR resets even for plain text.
-    assert.ok(lines.every(line => !/[\x00-\x1f\x7f-\x9f\u202e]/.test(line.replaceAll("\x1b[0m", ""))));
+    assert.ok(lines.every(line => !/[\x00-\x1f\x7f-\x9f\u202e]/.test(line.replaceAll(/\x1b\[[0-?]*[ -/]*[@-~]/g, ""))));
     assert.ok(!lines.some(line => line.includes("https://evil")));
   }
   const text = p.render(100).join("\n");
@@ -225,7 +247,7 @@ test("real Pi viewport routes page navigation, wheel and resize independently of
     dock.focusPanel();
     terminal.input("\x1b[6~");
     tui.renderNow(true);
-    assert.ok(tui.getScreenLines().some(line => /│> ▸ file-[1-9]\d*\.ts/.test(line)), "Pi's global PageDown is routed to the dock cursor");
+    assert.ok(tui.getScreenLines().some(line => /▏> ▸ M file-[1-9]\d*\.ts/.test(stripTerminalSequences(line))), "Pi's global PageDown is routed to the dock cursor");
     terminal.input("\x1b[6~"); tui.renderNow(true);
     assert.equal(nativeScroll.scrollTop, nativeTop);
     terminal.input("\x1b[H"); tui.renderNow(true);
@@ -233,15 +255,15 @@ test("real Pi viewport routes page navigation, wheel and resize independently of
     assert.ok(!tui.getScreenLines().some(line => line.includes("file-0.ts")));
     assert.equal(nativeScroll.scrollTop, nativeTop);
     terminal.input("\x1b[5~"); terminal.input("\x1b[H"); tui.renderNow(true);
-    terminal.input("\x1b[<0;140;3M"); terminal.input("\x1b[<0;140;3m"); tui.renderNow(true);
-    assert.ok(tui.getScreenLines().some(line => line.includes("▾ file-0.ts")));
+    terminal.input("\x1b[<0;140;5M"); terminal.input("\x1b[<0;140;5m"); tui.renderNow(true);
+    assert.ok(tui.getScreenLines().some(line => line.includes("▾ M file-0.ts")));
     for (const height of [1, 2, 3]) {
       terminal.rows = height; terminal.resize(); tui.renderNow(true);
       assert.equal(tui.getScreenLines().length, height);
       assert.ok(tui.getScreenLines().every(line => visibleWidth(line) <= terminal.columns));
     }
     terminal.rows = 15; terminal.resize(); tui.renderNow(true);
-    assert.ok(tui.getScreenLines().some(line => line.includes("▾ file-0.ts")));
+    assert.ok(tui.getScreenLines().some(line => line.includes("▾ M file-0.ts")));
     terminal.input("\x1b"); terminal.input("!");
     assert.equal(draft, "native draft!");
   } finally { dock.close(); tui.stop(); }
@@ -288,8 +310,8 @@ test("34-column headers keep status and exact counts when the path is long", () 
     path: "src/a-very-long-directory/long-name.ts", kind: "modified", added: 123, removed: 45,
     getRows: () => { throw new Error("collapsed file content was requested"); },
   }]));
-  const header = p.render(34)[2]!;
-  assert.ok(header.includes("[modified]"));
+  const header = p.render(34)[3]!;
+  assert.ok(header.includes("M"));
   assert.match(header, /\+123\s*\/\s*-45/);
   assert.ok(visibleWidth(header) <= 34);
 });
@@ -410,12 +432,12 @@ test("two-line file headers display bold basename, status, stats and indented se
   }]));
   const lines = p.render(60);
   // Line 1: Header with basename, chevron, status and stats
-  const headerLine = lines[2]!;
-  assert.ok(headerLine.includes("▸ calculator.ts"));
-  assert.ok(headerLine.includes("[modified]"));
+  const headerLine = lines[3]!;
+  assert.ok(headerLine.includes("▸ M calculator.ts"));
+  assert.ok(headerLine.includes(" M "));
   assert.match(headerLine, /\+12\s*\/\s*-5/);
   // Line 2: Secondary line with indented relative path
-  const pathLine = lines[3]!;
+  const pathLine = lines[4]!;
   assert.ok(pathLine.includes("    src/utils/calculator.ts"));
 });
 
@@ -426,15 +448,20 @@ test("independent file expansion works via Enter and click on either line 1 or l
     { path: "src/two.ts", kind: "modified", added: 2, removed: 0, getRows: () => [{ kind: "added", newLine: 1, text: "two" }] },
   ]));
 
-  // Expand file 1 via Enter on header (line 0)
+  // Expand file 1 via Enter on header; vertical navigation skips its path row.
   p.handleInput("\r");
-  assert.ok(p.render(60).some(line => line.includes("▾ one.ts")));
-  assert.ok(p.render(60).some(line => line.includes("▸ two.ts")));
+  assert.ok(p.render(60).some(line => line.includes("▾ M one.ts")));
+  assert.ok(p.render(60).some(line => line.includes("▸ M two.ts")));
 
-  // Collapse file 1 via Enter on secondary path (line 1)
-  p.handleInput("\x1b[B"); // Move down to path line
+  // Navigate through its visible diff rows, then collapse back to the header.
+  p.handleInput("\x1b[B");
+  p.handleInput("\x1b[B");
+  p.handleInput("\x1b[B");
+  p.handleInput("\x1b[A");
+  p.handleInput("\x1b[A");
+  p.handleInput("\x1b[A");
   p.handleInput("\r");
-  assert.ok(p.render(60).some(line => line.includes("▸ one.ts")));
+  assert.ok(p.render(60).some(line => line.includes("▸ M one.ts")));
 
   // Expand via mouse click on path line of file 1
   p.handleMouse({
@@ -445,7 +472,7 @@ test("independent file expansion works via Enter and click on either line 1 or l
     type: "click", button: "left", x: 5, y: 3, screenX: 5, screenY: 3, width: 60, height: 24,
     shift: false, alt: false, ctrl: false,
   });
-  assert.ok(p.render(60).some(line => line.includes("▾ one.ts")));
+  assert.ok(p.render(60).some(line => line.includes("▾ M one.ts")));
 });
 
 test("keyboard range selection with Shift+Up and Shift+Down selects contiguous rows and reflects old/new lines in footer", () => {
@@ -463,8 +490,7 @@ test("keyboard range selection with Shift+Up and Shift+Down selects contiguous r
   }]));
   // Expand file
   p.handleInput("\r");
-  // Move down to removed line
-  p.handleInput("\x1b[B"); // path
+  // Ordinary navigation skips path; Shift navigation extends through diff rows.
   p.handleInput("\x1b[B"); // hunk
   p.handleInput("\x1b[B"); // context line 10
   p.handleInput("\x1b[B"); // removed line 11
@@ -492,7 +518,6 @@ test("hunk selection selects all rows in the hunk from hunk header", () => {
     ],
   }]));
   p.handleInput("\r"); // expand
-  p.handleInput("\x1b[B"); // path
   p.handleInput("\x1b[B"); // hunk header
   p.handleInput("\r"); // select hunk
 
@@ -529,7 +554,6 @@ test("context transfer via 'a' formats selected snippet, appends to draft withou
     ],
   }]));
   p.handleInput("\r"); // expand
-  p.handleInput("\x1b[B"); // path
   p.handleInput("\x1b[B"); // hunk
   p.handleInput("\x1b[B"); // context
   p.handleInput("\x1b[B"); // removed 12
@@ -558,36 +582,37 @@ test("compact header formats concise status for Batch Net, cancelled, partial, a
     { path: "b.ts", kind: "created", added: 5, removed: 0, getRows: () => [] },
   ] });
   let lines = p.render(80);
-  assert.ok(lines[0]!.includes("DIFF · Last iteration"));
-  assert.ok(lines[0]!.includes("2 files"));
-  assert.ok(lines[1]!.includes("+8 / -1"));
-  assert.ok(!lines[0]!.includes("Current"));
-  assert.ok(!lines[0]!.includes("History"));
+  assert.match(stripTerminalSequences(lines[0]!), /^🭽▔*$/);
+  assert.ok(lines[1]!.includes("DIFF · Last iteration"));
+  assert.ok(lines[1]!.includes("2 files"));
+  assert.ok(lines[2]!.includes("+8 / -1"));
+  assert.ok(!lines[1]!.includes("Current"));
+  assert.ok(!lines[1]!.includes("History"));
 
   // Batch net
   p.setView({ key: "k2", title: "Ventana agrupada · diff neto", notices: [], files: [
     { path: "a.ts", kind: "modified", added: 2, removed: 0, getRows: () => [] },
   ] });
   lines = p.render(80);
-  assert.ok(lines[0]!.includes("DIFF · Batch Net"));
-  assert.ok(lines[0]!.includes("1 file"));
-  assert.ok(lines[1]!.includes("+2 / -0"));
+  assert.ok(lines[1]!.includes("DIFF · Batch Net"));
+  assert.ok(lines[1]!.includes("1 file"));
+  assert.ok(lines[2]!.includes("+2 / -0"));
 
   // Cancelled
   p.setView({ key: "k3", title: "Ejecución cancelada", notices: [], files: [
     { path: "a.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] },
   ] });
   lines = p.render(80);
-  assert.ok(lines[0]!.includes("DIFF · Cancelled"));
-  assert.ok(lines[0]!.includes("1 file"));
-  assert.ok(lines[1]!.includes("+1 / -0"));
+  assert.ok(lines[1]!.includes("DIFF · Cancelled"));
+  assert.ok(lines[1]!.includes("1 file"));
+  assert.ok(lines[2]!.includes("+1 / -0"));
 
   // Empty iteration
   p.setView({ key: "k4", title: "Última iteración", notices: [], files: [] });
   lines = p.render(80);
-  assert.ok(lines[0]!.includes("DIFF · Last iteration"));
-  assert.ok(lines[0]!.includes("0 files"));
-  assert.ok(lines[1]!.includes("No changes"));
+  assert.ok(lines[1]!.includes("DIFF · Last iteration"));
+  assert.ok(lines[1]!.includes("0 files"));
+  assert.ok(lines[2]!.includes("No changes"));
 });
 
 test("compact gutter differentiates created, deleted, and modified files with maximum usable code space", () => {
@@ -717,8 +742,8 @@ test("technical notices are omitted in normal view and toggled under demand via 
   let lines = p.render(100);
   assert.ok(!lines.some(l => l.includes("Net diff between")));
   assert.ok(!lines.some(l => l.includes("Viewer limits")));
-  // File header appears immediately at index 2 (line 0 and 1 are 2-line header)
-  assert.ok(lines[2]!.includes("app.ts"));
+  // File header follows the top border and two title rows.
+  assert.ok(lines[3]!.includes("app.ts"));
 
   // 2. Press 'd': details view is enabled and technical notices are rendered
   p.handleInput("d");
@@ -731,9 +756,9 @@ test("technical notices are omitted in normal view and toggled under demand via 
   lines = p.render(100);
   assert.ok(!lines.some(l => l.includes("Net diff between")));
 
-  // 4. Mouse click on header (y = 0): toggles details view on demand
+  // 4. Mouse click on the title row (y = 1): toggles details view on demand
   p.handleMouse({
-    type: "click", button: "left", x: 10, y: 0, screenX: 10, screenY: 0, width: 100, height: 24,
+    type: "click", button: "left", x: 10, y: 1, screenX: 10, screenY: 1, width: 100, height: 24,
     shift: false, alt: false, ctrl: false,
   });
   lines = p.render(100);
@@ -751,9 +776,9 @@ test("differentiates intentional path omissions from partial captures in header 
     files: [{ path: "src/worker.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] }],
   });
   const omissionLines = p.render(100);
-  assert.ok(omissionLines[0]!.includes("DIFF · Last iteration"));
-  assert.ok(!omissionLines[0]!.includes("[omisiones]"));
-  assert.ok(!omissionLines[0]!.includes("[omissions]"));
+  assert.ok(omissionLines[1]!.includes("DIFF · Last iteration"));
+  assert.ok(!omissionLines[1]!.includes("[omisiones]"));
+  assert.ok(!omissionLines[1]!.includes("[omissions]"));
 
   // Incomplete / partial window: displays Partial scope badge
   p.setView({
@@ -763,7 +788,31 @@ test("differentiates intentional path omissions from partial captures in header 
     files: [{ path: "src/worker.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] }],
   });
   const partialLines = p.render(100);
-  assert.ok(partialLines[0]!.includes("DIFF · Partial"));
+  assert.ok(partialLines[1]!.includes("DIFF · Partial"));
+});
+
+test("panel focus uses a real top border and matching left corner without changing dimensions", () => {
+  const roles: string[] = [];
+  const p = new DiffPanel({ render() {}, editor() {}, close() {}, style(role, text) {
+    roles.push(role);
+    return role === "accent" ? `\x1b[35m${text}\x1b[39m` : text;
+  } });
+  p.setView(view([{ path: "src/a.ts", kind: "modified", added: 1, removed: 0, getRows: () => [] }]));
+  const unfocused = p.render(60);
+  p.focused = true;
+  const focused = p.render(60);
+  assert.equal(focused.length, unfocused.length);
+  assert.match(stripTerminalSequences(focused[0]!), /^🭽▔*$/);
+  assert.ok(focused.slice(1).every(line => stripTerminalSequences(line).startsWith("▏")), "focused dock border is thin");
+  assert.match(stripTerminalSequences(unfocused[0]!), /^🭽▔*$/);
+  assert.ok(unfocused.slice(1).every(line => stripTerminalSequences(line).startsWith("▏")), "unfocused border uses dim line");
+  assert.equal(visibleWidth(focused[0]!), visibleWidth(unfocused[0]!));
+  assert.ok(!focused.join("").includes("\x1b[53m"));
+  assert.ok(!focused.join("").includes("\x1b[55m"));
+  assert.ok(roles.includes("accent"));
+  assert.ok(roles.includes("dim"));
+  assert.ok(roles.includes("border"));
+  assert.equal(stripTerminalSequences(focused[1]!).slice(0, 1), "▏");
 });
 
 test("selected lines preserve continuous dock border and apply selectedBg to content", () => {
@@ -797,7 +846,7 @@ test("selected lines preserve continuous dock border and apply selectedBg to con
   const lines = p.render(80);
   // Selected line has border '│' at column 0 and uses selectedBg
   const selectedLine = lines.find(l => l.includes("first line"))!;
-  assert.ok(selectedLine.startsWith("│"));
+  assert.ok(stripTerminalSequences(selectedLine).startsWith("▏"));
   assert.ok(state.roles.includes("selectedBg"));
   assert.ok(state.roles.includes("border"));
 });
@@ -875,9 +924,12 @@ test("two-line header across widths 34, 45, 60, 100, dark/light themes, all stat
 
     for (const w of [34, 45, 60, 100]) {
       const rendered = p.render(w);
-      const line0 = rendered[0]!;
-      const line1 = rendered[1]!;
+      const border = rendered[0]!;
+      const line0 = rendered[1]!;
+      const line1 = rendered[2]!;
 
+      assert.match(stripTerminalSequences(border), /^🭽▔*$/);
+      assert.ok(visibleWidth(border) <= w, `border width ${visibleWidth(border)} exceeds ${w}`);
       assert.ok(visibleWidth(line0) <= w, `line 0 width ${visibleWidth(line0)} exceeds ${w}`);
       assert.ok(visibleWidth(line1) <= w, `line 1 width ${visibleWidth(line1)} exceeds ${w}`);
 

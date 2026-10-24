@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Container, ScrollView, TuiAltScreen, TuiMainScreen, VStack, visibleWidth, matchesKey,
+import { Container, ScrollView, TuiAltScreen, TuiMainScreen, VStack, stripTerminalSequences, visibleWidth, matchesKey,
   type Terminal, type Component } from "@earendil-works/pi-tui";
 import { mountDock, type DockHandle } from "../src/ui/layout-adapter.js";
 import { DiffPanel } from "../src/ui/diff-panel.js";
@@ -74,7 +74,7 @@ test("real TUI dock preserves native rendering, focus and draft; restore is idem
     dock.focusPanel();
     f.terminal.input("\r");
     f.tui.renderNow(true);
-    assert.ok(f.tui.getScreenLines().some(line => line.includes("▾ fixture.ts")));
+    assert.ok(f.tui.getScreenLines().some(line => stripTerminalSequences(line).includes("▾ M fixture.ts")));
     f.terminal.input("a"); f.terminal.input("d");
     assert.equal(f.draft(), "existing draft!");
     f.terminal.input("\x1b");
@@ -92,16 +92,16 @@ test("real fullscreen SGR header click expands exactly once without selection or
   f.tui.start();
   try {
     f.tui.renderNow(true);
-    f.terminal.input("\x1b[<0;90;3M");
-    f.terminal.input("\x1b[<0;90;3m");
+    f.terminal.input("\x1b[<0;90;4M");
+    f.terminal.input("\x1b[<0;90;4m");
     f.tui.renderNow(true);
-    assert.ok(f.tui.getScreenLines().some(line => line.includes("▾ fixture.ts")));
+    assert.ok(f.tui.getScreenLines().some(line => stripTerminalSequences(line).includes("▾ M fixture.ts")));
     assert.equal(f.tui.getFocusedComponent(), f.panel);
     assert.equal(f.draft(), "existing draft");
-    f.terminal.input("\x1b[<0;90;3M");
-    f.terminal.input("\x1b[<0;90;3m");
+    f.terminal.input("\x1b[<0;90;4M");
+    f.terminal.input("\x1b[<0;90;4m");
     f.tui.renderNow(true);
-    assert.ok(f.tui.getScreenLines().some(line => line.includes("▸ fixture.ts")));
+    assert.ok(f.tui.getScreenLines().some(line => stripTerminalSequences(line).includes("▸ M fixture.ts")));
   } finally { dock.close(); f.tui.stop(); }
   assert.ok(f.terminal.output.includes("\x1b[?1006l"));
 });
@@ -121,7 +121,7 @@ test("resize hides narrow dock, restores editor focus and keeps expansions and U
     for (const width of [1, 8, 34]) assert.ok(f.panel.render(width).every(line => visibleWidth(line) <= width));
     f.terminal.columns = 120;
     f.terminal.resize(); f.tui.renderNow(true);
-    assert.ok(f.tui.getScreenLines().some(line => line.includes("▾ fixture.ts")));
+    assert.ok(f.tui.getScreenLines().some(line => stripTerminalSequences(line).includes("▾ M fixture.ts")));
     assert.equal(f.draft(), "existing draft");
   } finally { dock.close(); f.tui.stop(); }
 });
@@ -137,7 +137,7 @@ test("focus heading follows F6, Esc, header and editor mouse clicks without rese
   const highlighted = (): boolean => {
     f.tui.renderNow(true);
     assert.equal(f.panel.focused, f.tui.getFocusedComponent() === f.panel);
-    return f.tui.getScreenLines().some(line => line.includes("\x1b[36m│ DIFF"));
+    return f.tui.getScreenLines().some(line => line.includes("\x1b[36m▏ DIFF"));
   };
   f.tui.start();
   try {
@@ -161,7 +161,7 @@ test("focus heading follows F6, Esc, header and editor mouse clicks without rese
     f.terminal.columns = 120;
     f.terminal.resize();
     assert.equal(highlighted(), false);
-    assert.ok(f.tui.getScreenLines().some(line => line.includes("▾ fixture.ts")));
+    assert.ok(f.tui.getScreenLines().some(line => stripTerminalSequences(line).includes("▾ M fixture.ts")));
     assert.equal(f.draft(), "existing draft");
     dock.close();
     assert.equal(f.panel.focused, false);

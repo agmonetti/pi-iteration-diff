@@ -1047,3 +1047,23 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 
 
 
+
+### 2026-10-24 — UI / integración de foco, navegación e indicadores del dock
+
+**Recuperación documental**
+- `PROGRESS.md` había sido truncado accidentalmente: `HEAD` conserva 1.049 líneas y la versión de trabajo tenía 23. Ambas versiones y el diff quedaron preservados fuera del repositorio en `/tmp/pi-diff-recovery-5df2db5/` antes de restaurar el historial.
+- Se recuperó íntegramente el historial de `HEAD` y se conserva esta entrada nueva de la versión truncada, ampliada con los cambios integrados y la evidencia actual. No se reconstruyeron entradas históricas ausentes.
+
+**Cambió**
+- `src/ui/diff-panel.ts`: navegación vertical omite las filas de ruta secundaria; saltos entre archivos usan encabezados; colapsar un archivo vuelve su cursor al encabezado. Borde del dock `🭽▔`/`▏` con color de foco; estados compactos `A/M/D`.
+- Tests de panel, foco/layout y PTY actualizados para esos comportamientos. `design/ui-spec.md`, `M2.md` y `M3.md` sincronizan el contrato visible y la navegación.
+
+**Pruebas / evidencia**
+| Comando / caso | Entorno | Resultado | Evidencia |
+|---|---|---|---|
+| `npm run check` | Linux, Node v26.12.0 | PASS | Typecheck y 105/105 tests, 0 fallos, 0 skips; ejecutado en esta sesión antes del commit. |
+| Validación visual en Kitty | Reporte del usuario | PASS reportado | El usuario indica que `🭽▔▏` fue validado visualmente; no se repitió la prueba física en esta sesión. |
+
+**Límites / estado Git**
+- No incluye fixtures/experimentos `focus-border*` ni archivos `fake*`.
+- Las pruebas automatizadas verifican render, geometría, navegación, foco, resize y remount; no sustituyen la validación manual en otros terminales.

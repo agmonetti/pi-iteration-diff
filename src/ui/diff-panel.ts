@@ -217,7 +217,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
   constructor(private readonly actions: Actions) {
     super();
     this.body = new VirtualDiffScroll(() => this.diffEntries.length, (index, width) => this.entryLine(index, width));
-    this.addChild({ invalidate() {}, render: width => this.heading(width) }, { basis: 2, shrink: 0, minSize: 2 });
+    this.addChild({ invalidate() {}, render: width => this.heading(width) }, { basis: 3, shrink: 0, minSize: 3 });
     this.addChild(this.body, { basis: 0, grow: 1, shrink: 1, minSize: 0 });
     this.addChild({ invalidate() {}, render: width => [this.footer(width)] }, { basis: 1, shrink: 0, minSize: 1 });
     this.rebuild();
@@ -245,9 +245,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
       this.resizingSeparator = false;
     }
     this.rebuild();
-    if (reset && view.files.length) {
-      this.cursor = Math.max(0, this.diffEntries.findIndex(entry => entry.kind === "file_header"));
-    }
+    if (reset && view.files.length) this.cursor = this.fileHeaderIndex(0);
+    this.normalizeCursor();
     this.actions.render();
   }
 
@@ -314,7 +313,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       entries.push({ kind: "notice", text: "No changes observed in this iteration." });
     }
     this.diffEntries = entries;
-    this.cursor = Math.max(0, Math.min(this.cursor, entries.length - 1));
+    this.normalizeCursor();
     this.body.updateLayout(entries.length, this.body.viewportHeight, () => this.actions.render());
   }
 
@@ -482,7 +481,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
     const rawTitle = safeText(this.view.title);
     const scope = rawTitle.toUpperCase().startsWith("DIFF:") ? rawTitle : this.getScope();
     const leftText = scope.startsWith("DIFF") ? scope : `DIFF · ${scope}`;
-    const leftPrefix = `│ ${leftText}`;
+    const leftPrefix = `▏ ${leftText}`;
     const fileCount = this.view.files.length;
     const rightText = `${fileCount} ${fileCount === 1 ? "file" : "files"}`;
 
@@ -494,7 +493,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const rightStyled = this.actions.style("muted", rightText);
       line1 = `${leftStyled}${" ".repeat(spacesCount)}${rightStyled}`;
     } else {
-      if (width - visibleWidth(rightText) - 1 >= visibleWidth("│ DIFF")) {
+      if (width - visibleWidth(rightText) - 1 >= visibleWidth("▏ DIFF")) {
         const availLeft = width - visibleWidth(rightText) - 1;
         const leftTrunc = truncateToWidth(leftPrefix, availLeft, "…");
         line1 = `${this.actions.style(titleStyle, leftTrunc)} ${this.actions.style("muted", rightText)}`;
@@ -503,7 +502,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       }
     }
 
-    const border = this.actions.style("border", "│");
+    const border = this.actions.style("border", "▏");
     let line2Content: string;
     if (fileCount === 0) {
       line2Content = this.actions.style("dim", "No changes");
@@ -522,7 +521,10 @@ export class DiffPanel extends VStack implements Component, Focusable {
       }
     }
     const line2 = truncateToWidth(`${border} ${line2Content}`, width, "…");
-    return [line1, line2];
+    const focused = this.focused;
+    const horizontalChar = width > 1 ? `🭽${"▔".repeat(width - 1)}` : (width === 1 ? "🭽" : "");
+    const horizontal = this.actions.style(focused ? "accent" : "dim", horizontalChar);
+    return [horizontal, line1, line2];
   }
 
   private footer(width: number): string {
@@ -533,7 +535,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
         : active.kind === "row" || active.kind === "hunk"
         ? active.row.text
         : active.text;
-      const text = truncateToWidth(`│ i: ${safeText(detail)}`, width, "…");
+      const text = truncateToWidth(`▏ i: ${safeText(detail)}`, width, "…");
       return this.actions.style("accent", text);
     }
 
@@ -545,19 +547,19 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const lineWord = count === 1 ? "line" : "lines";
       const short = width < 55;
       const text = short
-        ? `│ ${count} ${lineWord} selected · a: append`
-        : `│ Sel: ${summary} · a: append to editor`;
+        ? `▏ ${count} ${lineWord} selected · a: append`
+        : `▏ Sel: ${summary} · a: append to editor`;
       return this.actions.style("accent", truncateToWidth(text, width, "…"));
     }
 
     const panStr = this.panX > 0 ? ` [pan +${this.panX}]` : "";
     let text: string;
     if (width < 50) {
-      text = `│ Enter: expand${panStr} · a: append · Esc: editor`;
+      text = `▏ Enter: expand${panStr} · a: append · Esc: editor`;
     } else if (width < 75) {
-      text = `│ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor`;
+      text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor`;
     } else {
-      text = `│ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor · d: details`;
+      text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor · d: details`;
     }
     return this.actions.style("muted", truncateToWidth(text, width, "…"));
   }
@@ -567,41 +569,42 @@ export class DiffPanel extends VStack implements Component, Focusable {
     if (!entry) return "";
     const active = index === this.cursor;
     const selected = this.isIndexSelected(index);
-    const border = this.actions.style("border", "│");
+    const border = this.actions.style("border", "▏");
     const cursor = active ? (this.focused ? this.actions.style("accent", ">") : this.actions.style("dim", ">")) : " ";
     const prefix = `${border}${cursor} `;
 
     // 1. File Header (Line 1 of 2: Name, chevron, status badge, statistics)
     if (entry.kind === "file_header") {
       const { file } = entry;
-      const kind = { created: "created", modified: "modified", deleted: "deleted" }[file.kind];
+      const kind = { created: "A", modified: "M", deleted: "D" }[file.kind];
+      const kindRole = ({ created: "added", modified: "accent", deleted: "removed" } as const)[file.kind];
       const chevron = this.expanded.has(file.path) ? "▾" : "▸";
       const parts = file.path.split("/");
       const basename = parts[parts.length - 1] || file.path;
 
       let content: string;
       if (file.added !== undefined && file.removed !== undefined) {
-        const kindBadge = `[${kind}]`;
-        const kindStyled = this.actions.style("muted", kindBadge);
+        const kindBadge = kind;
+        const kindStyled = this.actions.style(kindRole, kindBadge);
         const addStr = this.actions.style("added", `+${file.added}`);
         const sepStr = this.actions.style("dim", " / ");
         const delStr = this.actions.style("removed", `-${file.removed}`);
 
-        const markerPlain = `│${active ? ">" : " "} ${chevron} `;
+        const markerPlain = `▏${active ? ">" : " "} `;
         const suffixPlain = ` ${kindBadge} +${file.added} / -${file.removed}`;
-        const avail = Math.max(4, width - visibleWidth(markerPlain) - visibleWidth(suffixPlain));
+        const avail = Math.max(4, width - visibleWidth(markerPlain) - visibleWidth(chevron) - 2 - visibleWidth(suffixPlain));
         const displayName = truncatePath(safeText(basename), avail);
-        const nameWithChevron = this.actions.style("bold", `${chevron} ${displayName}`);
+        const name = this.actions.style("bold", displayName);
 
-        content = `${nameWithChevron} ${kindStyled} ${addStr}${sepStr}${delStr}`;
+        content = `${chevron} ${kindStyled} ${name} ${addStr}${sepStr}${delStr}`;
       } else {
         const statMsg = "[stats unavailable]";
-        const kindBadge = `[${kind}]`;
-        const kindStyled = this.actions.style("muted", kindBadge);
-        const nameWithChevron = this.actions.style("bold", `${chevron} ${safeText(basename)}`);
-        content = `${nameWithChevron} ${kindStyled} ${this.actions.style("dim", statMsg)}${file.notice ? ` · ${this.actions.style("warning", safeText(localizeNotice(file.notice)))}` : ""}`;
+        const kindBadge = kind;
+        const kindStyled = this.actions.style(kindRole, kindBadge);
+        const name = this.actions.style("bold", safeText(basename));
+        content = `${chevron} ${kindStyled} ${name} ${this.actions.style("dim", statMsg)}${file.notice ? ` · ${this.actions.style("warning", safeText(localizeNotice(file.notice)))}` : ""}`;
       }
-      if (selected) {
+      if (active) {
         const lineContent = `${cursor} ${content}`;
         const styledContent = this.actions.style("selectedBg", truncateToWidth(lineContent, Math.max(0, width - 1), "…"));
         return `${border}${styledContent}`;
@@ -681,7 +684,16 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   override render(width: number): string[] {
     if (width <= 0) return [];
-    return [...this.heading(width), ...this.body.visible(width), this.footer(width)];
+    const lines = [...this.heading(width), ...this.body.visible(width), this.footer(width)];
+    const verticalBorder = this.actions.style(this.focused ? "accent" : "dim", "▏");
+    lines.forEach((line, index) => {
+      const prefix = line.match(/^(?:\x1b\[[0-?]*[ -/]*[@-~])*/)?.[0] ?? "";
+      if (line.slice(prefix.length).startsWith("▏") || line.slice(prefix.length).startsWith("│") || line.slice(prefix.length).startsWith("┃")) {
+        lines[index] = `${prefix}${verticalBorder}${line.slice(prefix.length + 1)}`;
+      }
+    });
+
+    return lines;
   }
 
   private reveal(): void {
@@ -695,8 +707,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
     if (!entry) return;
     if (entry.kind === "file_header" || entry.kind === "file_path") {
       const path = entry.file.path;
-      if (!this.expanded.delete(path)) this.expanded.add(path);
+      const wasExpanded = this.expanded.delete(path);
+      if (!wasExpanded) this.expanded.add(path);
       this.rebuild();
+      if (wasExpanded) this.cursor = this.fileHeaderIndex(this.view.files.findIndex(file => file.path === path));
+      this.normalizeCursor();
       this.reveal();
       return;
     }
@@ -715,13 +730,41 @@ export class DiffPanel extends VStack implements Component, Focusable {
     }
   }
 
+  private fileHeaderIndex(fileIndex: number): number {
+    const file = this.view.files[fileIndex];
+    return file ? this.diffEntries.findIndex(entry => entry.kind === "file_header" && entry.file.path === file.path) : -1;
+  }
+
+  private normalizeCursor(): void {
+    this.cursor = Math.max(0, Math.min(this.cursor, this.diffEntries.length - 1));
+    if (!this.diffEntries[this.cursor]) this.cursor = 0;
+    const entry = this.diffEntries[this.cursor];
+    if (entry?.kind === "file_path") {
+      const header = this.fileHeaderIndex(this.view.files.findIndex(file => file.path === entry.file.path));
+      if (header >= 0) this.cursor = header;
+    }
+  }
+
+  private moveCursor(direction: number, skipPaths = true): void {
+    let next = this.cursor + direction;
+    while (skipPaths && next >= 0 && next < this.diffEntries.length && this.diffEntries[next]?.kind === "file_path") next += direction;
+    this.cursor = Math.max(0, Math.min(this.diffEntries.length - 1, next));
+    this.normalizeCursor();
+  }
+
   private jump(direction: number, kind: "file" | "hunk"): void {
+    if (kind === "file") {
+      const entry = this.diffEntries[this.cursor];
+      const activeFile = entry && "file" in entry ? entry.file : undefined;
+      let fileIndex = activeFile ? this.view.files.findIndex(file => file.path === activeFile.path) : -1;
+      if (fileIndex < 0) fileIndex = direction > 0 ? -1 : this.view.files.length;
+      const target = Math.max(0, Math.min(this.view.files.length - 1, fileIndex + direction));
+      const index = this.fileHeaderIndex(target);
+      if (index >= 0) this.cursor = index;
+      return;
+    }
     for (let index = this.cursor + direction; index >= 0 && index < this.diffEntries.length; index += direction) {
-      const entry = this.diffEntries[index]!;
-      if ((kind === "file" && entry.kind === "file_header") || (kind === "hunk" && entry.kind === "hunk")) {
-        this.cursor = index;
-        return;
-      }
+      if (this.diffEntries[index]!.kind === "hunk") { this.cursor = index; return; }
     }
   }
 
@@ -745,7 +788,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
     // Shift + Up / Shift + Down for range selection
     if (data === "\x1b[1;2A" || matchesKey(data, "shift+up")) {
       if (this.selectionAnchor === null) this.selectionAnchor = this.cursor;
-      this.cursor = Math.max(0, this.cursor - 1);
+      this.moveCursor(-1, false);
       this.selectionFocus = this.cursor;
       this.reveal();
       this.actions.render();
@@ -753,7 +796,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
     }
     if (data === "\x1b[1;2B" || matchesKey(data, "shift+down")) {
       if (this.selectionAnchor === null) this.selectionAnchor = this.cursor;
-      this.cursor = Math.min(this.diffEntries.length - 1, this.cursor + 1);
+      this.moveCursor(1, false);
       this.selectionFocus = this.cursor;
       this.reveal();
       this.actions.render();
@@ -763,11 +806,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
     if (matchesKey(data, "enter")) this.toggle();
     else if (matchesKey(data, "down")) {
       if (this.hasSelection()) this.clearSelection();
-      this.cursor++;
+      this.moveCursor(1);
     }
     else if (matchesKey(data, "up")) {
       if (this.hasSelection()) this.clearSelection();
-      this.cursor--;
+      this.moveCursor(-1);
     }
     else if (matchesKey(data, "right") || data === "l") { this.panX += 8; this.actions.render(); return; }
     else if (matchesKey(data, "left") || data === "h") { this.panX = Math.max(0, this.panX - 8); this.actions.render(); return; }
@@ -830,8 +873,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
       return { ...result, render: true };
     }
 
-    // Header click focuses panel and toggles details on demand
-    if (event.y === 0 || event.y === 1) {
+    // The top border focuses the dock; title rows toggle details.
+    if (event.y === 0) return { ...result, focus: true, render: true };
+    if (event.y === 1 || event.y === 2) {
       if (event.type === "click" || (event.type === "press" && this.focused)) {
         this.showDetails = !this.showDetails;
         this.rebuild();
@@ -866,8 +910,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
     if (event.button !== "left") return;
 
     // Line click and range dragging
-    if (event.y >= 2 && event.y < event.height - 1) {
-      const targetIndex = Math.max(0, Math.min(this.diffEntries.length - 1, this.body.scrollTop + event.y - 2));
+    if (event.y >= 3 && event.y < event.height - 1) {
+      const targetIndex = Math.max(0, Math.min(this.diffEntries.length - 1, this.body.scrollTop + event.y - 3));
       if (event.type === "press") {
         this.pressed = true;
         this.cursor = targetIndex;

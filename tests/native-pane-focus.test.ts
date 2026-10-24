@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Container, ScrollView, TuiAltScreen, VStack, type Component, type Terminal } from "@earendil-works/pi-tui";
+import { Container, ScrollView, stripTerminalSequences, TuiAltScreen, VStack, type Component, type Terminal } from "@earendil-works/pi-tui";
 import { mountDock, type DockHandle } from "../src/ui/layout-adapter.js";
 import { DiffPanel } from "../src/ui/diff-panel.js";
 
@@ -79,6 +79,41 @@ function fixture() {
     draft: () => draft, submissions: () => submissions, editorPresses: () => editorPresses,
     close() { dock.close(); tui.stop(); } };
 }
+
+test("dock border and native pane share screen row zero across focus, scroll, resize and remount", () => {
+  const f = fixture();
+  try {
+    for (const [width, height] of [[90, 12], [120, 24], [160, 40]]) {
+      f.terminal.columns = width!;
+      f.terminal.rows = height!;
+      for (const focused of [false, true, false]) {
+        if (focused) f.dock.focusPanel(); else f.dock.focusEditor();
+        for (const scroll of [0, 10]) {
+          f.transcript.scrollTo(scroll);
+          f.tui.renderNow(true);
+          const screen = f.tui.getScreenLines().map(stripTerminalSequences);
+          const nativeY = screen.findIndex(line => /^(native conversation|message \d+)/.test(line));
+          const borderY = screen.findIndex(line => line.includes("▔▔"));
+          assert.equal(nativeY, 0, `native origin at ${width}x${height}`);
+          assert.equal(borderY, nativeY, `dock origin at ${width}x${height}, focused=${focused}, scroll=${scroll}`);
+          assert.equal(screen.length, height);
+          assert.ok(screen[height! - 1]!.startsWith("existing draft"));
+        }
+      }
+    }
+    f.dock.close();
+    f.tui.renderNow(true);
+    assert.ok(f.tui.getScreenLines().every(line => !stripTerminalSequences(line).includes("▔")));
+    const reopened = mountDock(f.tui, f.panel);
+    try {
+      reopened.focusPanel();
+      f.tui.renderNow(true);
+      assert.ok(stripTerminalSequences(f.tui.getScreenLines()[0]!).includes("▔▔"));
+    } finally { reopened.close(); }
+    assert.equal(f.draft(), "existing draft");
+    assert.equal(f.submissions(), 0);
+  } finally { f.close(); }
+});
 
 test("native transcript, message, blank space and editor clicks return focus without changing draft or diff selection", () => {
   const f = fixture();

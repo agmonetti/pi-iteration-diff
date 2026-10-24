@@ -51,7 +51,7 @@ def main():
             assert child.poll() is None, "Pi exited during startup"
             assert b"DIFF:" not in output, "panel auto-opened"
             send(b"/diff\r")
-            assert b"DIFF:" in output, "sidebar did not render"
+            assert b"DIFF" in output, "sidebar did not render"
             send(b"DRAFT-M2")
             send(b"\x1b[17~")  # F6
             send(b"\x1b")

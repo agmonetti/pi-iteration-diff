@@ -28,13 +28,13 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 │  User: Refactorizá el cálculo de tasas                     │  │ DIFF · Last iteration                        2 files │
 │  Agent: Apliqué la normalización en calculator.ts...       │  │ +12 / -4                                             │
 │                                                            │  │                                                      │
-│                                                            │  │ ▾ calculator.ts [modified] +3 / -2                   │
+│                                                            │  │ ▾ calculator.ts M +3 / -2                   │
 │                                                            │  │     src/utils/calculator.ts                          │
 │                                                            │  │   11   11   const offset = init();                   │
 │                                                            │  │   12   12 - const max = balance;                     │
 │                                                            │  │   12   12 + const max = clamp(limit);                │
 │                                                            │  │                                                      │
-├────────────────────────────────────────────────────────────┤  │ ▸ rate.ts [created] +9 / -0                          │
+├────────────────────────────────────────────────────────────┤  │ ▸ rate.ts A +9 / -0                          │
 │  PI NATIVE EDITOR                                          │  │     src/core/rate.ts                                 │
 │  > Revisá también las excepciones|                         │  │                                                      │
 │                                                            │  │ Enter: expand · a: append · ↑↓: navigate · Esc: edit │
@@ -64,7 +64,7 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 - **Colapso inicial:** Al recibir una nueva iteración, todos los archivos inician contraídos.
 - **Expansiones independientes:** `Enter` o clic en el encabezado alternan únicamente ese archivo. Múltiples archivos pueden permanecer abiertos a la vez.
 - **Encabezado de dos líneas:**
-  - **Línea 1 (Principal):** Indicador de expansión (`▾`/`▸`), nombre del archivo destacado (`bold`), estado (`[created]`, `[modified]`, `[deleted]`) y estadísticas de cambios (`+3 / -2`).
+  - **Línea 1 (Principal):** Indicador de expansión (`▾`/`▸`), estado compacto (`A`, `M`, `D`) antes del nombre destacado (`bold`) y estadísticas (`+3 / -2`). Los estados describen sólo el delta observado; no consultan staging ni renames de Git.
   - **Línea 2 (Secundaria):** Ruta relativa atenuada (`dim`/`muted`), sangrada discretamente (`    src/path/to/file.ts`).
 - **Inspección de ruta completa:** La ruta nunca se pierde; ante anchos reducidos se trunca con `truncatePath` y el modo de inspección `i` o la barra inferior permiten ver la ruta completa sin cortes.
 - **Diferenciación visual:** Distingue el archivo activo (cursor `>`), el archivo expandido (`▾`) y el estado de foco del panel (`accent`).
@@ -89,6 +89,7 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 ## 5. Cabecera y Footer Compactos y Responsivos (English-only)
 
 ### Cabecera de Dos Líneas (`basis: 2`)
+- El dock añade una fila superior real fuera del scroll: `🭽` + `▔` hasta el ancho visible, en accent con foco y en dim sin foco. Los laterales y prefijos usan `▏`; el área de contenido/mouse empieza debajo del borde superior. No se usa SGR overline.
 - **Línea 1 (Título y alcance):** `│ DIFF · <Scope>` a la izquierda y cantidad de archivos alineada a la derecha (`N files` o `1 file`).
   - **Alcances contextuales (ADR-003):**
     - `Last iteration`: Iteración individual completa normal.
