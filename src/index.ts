@@ -162,20 +162,19 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     if (!dock) await open(ctx);
     dock?.focusPanel();
   } });
-  pi.registerCommand("diff-settings", {
+  const settingsCommand = {
     description: "Configure diff presentation and opt-in automatic opening",
-    handler: async (_args, ctx) => {
+    handler: async (_args: string, ctx: ExtensionContext): Promise<void> => {
       const version = settingsGeneration;
       await showDiffSettings(ctx, settings, next => {
         if (version !== settingsGeneration) return;
-        generation++;
         settings = next;
         panel?.setPreferences(settings);
         dock?.setDockRatio(settings.dockWidth / 100);
         persist(ctx);
       });
     },
-  });
+  };
   const restore = (ctx: ExtensionContext): void => {
     settingsGeneration++;
     dismiss();
@@ -189,15 +188,16 @@ export default function iterationDiff(pi: ExtensionAPI): void {
   });
   // getCommands is public but unavailable during extension loading. Resolve only
   // after all extensions loaded; never register over a foreign /diff.
-  let registeredDiff = false;
+  let registeredCommands = false;
   pi.on("session_start", (_event, ctx) => {
     restore(ctx);
-    if (registeredDiff) return;
+    if (registeredCommands) return;
     if (pi.getCommands().some(entry => entry.name === "diff" || entry.name.startsWith("diff:"))) {
       ctx.ui.notify("/diff is occupied; use F6 to open the diff dock", "info");
     } else {
       pi.registerCommand("diff", command);
-      registeredDiff = true;
     }
+    pi.registerCommand("diff-settings", settingsCommand);
+    registeredCommands = true;
   });
 }

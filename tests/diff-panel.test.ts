@@ -1211,3 +1211,62 @@ test("Actions.resizeEnd is invoked on separator release, not on selection drag r
   assert.equal(resizeEndCalls, 1); // Still 1, no resizeEnd on selection drag!
 });
 
+test("setPreferences applies visual settings in-place on open dock preserving state", () => {
+  let renders = 0;
+  const p = new DiffPanel({
+    render() { renders++; },
+    editor() {},
+    close() {},
+    style: (_r, t) => t,
+  });
+
+  const f: DiffFile = {
+    path: "src/deep/nested/component.tsx",
+    kind: "modified",
+    added: 1,
+    removed: 1,
+    getRows: () => [
+      { kind: "hunk", text: "@@ -1,1 +1,1 @@" },
+      { kind: "removed", oldLine: 1, text: "const old = 1;" },
+      { kind: "added", newLine: 1, text: "const new = 2;" },
+    ],
+  };
+  p.setView({ key: "v1", title: "DIFF", notices: [], files: [f] });
+  p.handleInput("\r"); // Expand file
+
+  // Initially: lineNumbers = true, filePaths = "Smart"
+  let lines = p.render(80);
+  assert.ok(lines.some(l => l.includes("▾ M component.tsx")));
+  assert.ok(lines.some(l => l.includes("1") && l.includes("- const old = 1;")));
+
+  // 1. Hot update lineNumbers: false hides gutter numbers immediately
+  p.setPreferences({ lineNumbers: false });
+  lines = p.render(80);
+  assert.ok(lines.some(l => l.includes("▾ M component.tsx")));
+  const removedRow = lines.find(l => l.includes("- const old = 1;"))!;
+  assert.ok(!removedRow.includes("   1 -"));
+
+  // 2. Hot update filePaths: "Filename" shows basename immediately
+  p.setPreferences({ filePaths: "Filename" });
+  lines = p.render(80);
+  assert.ok(lines[4]!.includes("component.tsx"));
+  assert.ok(!lines[4]!.includes("src/deep/nested"));
+
+  // 3. Hot update filePaths: "Full" shows full path immediately
+  p.setPreferences({ filePaths: "Full" });
+  lines = p.render(80);
+  assert.ok(lines[4]!.includes("src/deep/nested/component.tsx"));
+
+  // 4. Hot update collapseFiles: true does NOT collapse already expanded files
+  p.setPreferences({ collapseFiles: true });
+  lines = p.render(80);
+  assert.ok(lines.some(l => l.includes("▾ M component.tsx")));
+  assert.ok(lines.some(l => l.includes("const new = 2;")));
+
+  // Next iteration with collapseFiles: true WILL collapse files
+  p.setView({ key: "v2", title: "DIFF", notices: [], files: [f] });
+  lines = p.render(80);
+  assert.ok(lines.some(l => l.includes("▸ M component.tsx")));
+  assert.ok(renders > 0);
+});
+

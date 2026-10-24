@@ -219,3 +219,33 @@ test("Remember width persists resize only when On; branch restoration resets def
     assert.equal(f.writes(), 0);
   } finally { await f.close(); }
 });
+
+test("layout updates dock width on hot settings change without altering editor draft", async () => {
+  const f = await fixture(false);
+  try {
+    await f.begin();
+    await f.finish();
+    await f.shortcuts.get("f6")!(f.ctx);
+    assert.equal(f.opens(), 1);
+
+    const inspectedTui = f.tui as unknown as { layoutRoot: ResizableDockRoot };
+    const root = inspectedTui.layoutRoot;
+    assert.equal(root.dockRatio, 0.45);
+
+    const initialDraft = f.draft();
+    const initialWrites = f.writes();
+
+    // Enter settings: item 0 is dockWidth. Enter edit mode (\r), left arrow twice (45% -> 43%), Enter (\r) confirms.
+    await f.settings(["\r", "\x1b[D", "\x1b[D", "\r"]);
+
+    // 1. Layout updated in-place
+    assert.equal(root.dockRatio, 0.43);
+    // 2. Editor draft completely unchanged
+    assert.equal(f.draft(), initialDraft);
+    assert.equal(f.writes(), initialWrites);
+    // 3. Persisted to session branch
+    assert.equal(f.entries().at(-1)!.data.dockWidth, 43);
+  } finally {
+    await f.close();
+  }
+});

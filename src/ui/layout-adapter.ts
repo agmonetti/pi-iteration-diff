@@ -1,6 +1,6 @@
 import {
   HStack, ScrollView, VStack, TuiAltScreen, isViewportTUI,
-  type Component, type TUI, type TuiMouseEvent,
+  type Component, type StackChild, type TUI, type TuiMouseEvent,
 } from "@earendil-works/pi-tui";
 
 // Pi 1.4.0: layoutRoot and getFocusedComponent are not part of the public TUI interface.
@@ -22,8 +22,9 @@ export interface DockHandle {
 
 export class ResizableDockRoot extends HStack {
   private ratio: number;
+  private lastTerminalWidth?: number;
 
-  constructor(children: any[], initialRatio = 0.45, private readonly focusNative?: () => void) {
+  constructor(children: StackChild[], initialRatio = 0.45, private readonly focusNative?: () => void) {
     super(children);
     this.ratio = 0.45;
     this.dockRatio = initialRatio;
@@ -40,29 +41,37 @@ export class ResizableDockRoot extends HStack {
 
   get dockRatio(): number { return this.ratio; }
   set dockRatio(value: number) {
-    if (Number.isFinite(value)) this.ratio = Math.max(0.3, Math.min(0.6, value));
+    if (Number.isFinite(value)) {
+      this.ratio = Math.max(0.3, Math.min(0.6, value));
+      if (this.lastTerminalWidth !== undefined) {
+        this.updateDockBasis(this.lastTerminalWidth);
+      }
+    }
   }
-
   getDockWidth(width: number): number {
     return Math.max(34, Math.min(Math.max(34, width - 46), Math.round(width * this.ratio)));
+  }
+
+  updateDockBasis(totalWidth: number): void {
+    this.lastTerminalWidth = totalWidth;
+    if (this.entries[1]) {
+      this.entries[1].basis = this.getDockWidth(totalWidth);
+    }
   }
 
   resizeBy(deltaCols: number, totalWidth: number): void {
     const currentCols = this.getDockWidth(totalWidth);
     const newCols = Math.max(34, Math.min(totalWidth - 46, currentCols + deltaCols));
     this.dockRatio = newCols / Math.max(1, totalWidth);
+    this.updateDockBasis(totalWidth);
   }
-
   setDockWidth(cols: number, totalWidth: number): void {
     const clamped = Math.max(34, Math.min(totalWidth - 46, cols));
     this.dockRatio = clamped / Math.max(1, totalWidth);
+    this.updateDockBasis(totalWidth);
   }
-
   override render(width: number): string[] {
-    const dockW = this.getDockWidth(width);
-    if (this.entries[1]) {
-      this.entries[1].basis = dockW;
-    }
+    this.updateDockBasis(width);
     return super.render(width);
   }
 }
@@ -86,7 +95,7 @@ export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45): Dock
   const previousFocus = internal.getFocusedComponent();
   const root = new ResizableDockRoot([
     { component: native, basis: 0, grow: 1, shrink: 1, minSize: 46 },
-    { component: panel, basis: Math.round(120 * initialRatio), minSize: 34, grow: 0, shrink: 1,
+    { component: panel, basis: Math.max(34, Math.min(tui.terminal.columns - 46, Math.round(tui.terminal.columns * initialRatio))), minSize: 34, grow: 0, shrink: 1,
       visible: ({ width }: { width: number }) => {
         if (width < 90 && internal.getFocusedComponent() === panel) tui.setFocus(previousFocus);
         return width >= 90;
@@ -94,6 +103,7 @@ export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45): Dock
   ], initialRatio, () => {
     if (ownsRoot()) tui.setFocus(previousFocus);
   });
+  root.updateDockBasis(tui.terminal.columns);
   tui.setLayoutRoot(root);
   // Pi 1.4.0 consumes page/line shortcuts before extension input listeners.
   // Route the public fullscreen scroll method by focus, leaving mouse routing
@@ -117,17 +127,23 @@ export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45): Dock
     resizeBy(deltaCols: number) {
       if (!ownsRoot()) return;
       root.resizeBy(deltaCols, tui.terminal.columns);
+      root.updateDockBasis(tui.terminal.columns);
+      root.invalidate();
       tui.requestRender();
     },
     setDockWidth(cols: number) {
       if (!ownsRoot()) return;
       root.setDockWidth(cols, tui.terminal.columns);
+      root.updateDockBasis(tui.terminal.columns);
+      root.invalidate();
       tui.requestRender();
     },
     getDockRatio() { return root.dockRatio; },
     setDockRatio(ratio) {
       if (!ownsRoot()) return;
       root.dockRatio = ratio;
+      root.updateDockBasis(tui.terminal.columns);
+      root.invalidate();
       tui.requestRender();
     },
     getDockWidth() {

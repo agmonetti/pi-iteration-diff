@@ -1155,3 +1155,46 @@ nueva/CI nativa nueva NOT RUN; no declaración de DoD global ni avance a M4.
   instalación/config global ni artefactos. Whitespace nuevo al final de test
   corregido sin reformateo general.
 - Commit lógico previsto: `feat(ui): add diff settings and remove legacy command alias`.
+
+### 2026-10-24 — UI: Ajustes de interfaz en /diff-settings y actualización en caliente
+
+**Estado vigente:** correcciones de interfaz M3.5 aplicadas. 131/131 tests PASS y `tests/pty-smoke.py` PASS. Sin funcionalidades nuevas, sin dependencias, sin push ni avance a M4.
+
+**Cambió**
+- `src/ui/diff-settings.ts`:
+  - Se eliminó la opción `{ overlay: true }`, adoptando el patrón inline nativo de Pi en `ctx.ui.custom` (`pushExtensionDialog`).
+  - Se implementó `DiffSettingsComponent`: renderizado directo en el slot del editor, integrado con el scroll y layout nativo de Pi, respetando el tema activo y sin cajas flotantes ni superposición sobre mensajes anteriores.
+  - Navegación con flechas `↑`/`↓` entre las seis preferencias.
+  - `Enter` sobre "Dock width" entra al modo edición; `←`/`→` disminuye/aumenta en pasos de 1%, restringido entre 30% y 60%.
+  - Indicador discreto `◀ 45% ▶` durante la edición con línea de ayuda contextual.
+  - `Enter` confirma el valor y sale del modo edición; `Esc` cancela y restaura el valor previo.
+  - `Esc` fuera de edición cierra los ajustes restaurando el borrador del editor nativo.
+  - Controles On/Off y selector `Smart`/`Full`/`Filename` conservados y operativos con `Enter` y flechas.
+- `src/ui/layout-adapter.ts`:
+  - `ResizableDockRoot`: soporte de `updateDockBasis(totalWidth)` para sincronizar `entries[1].basis` con el ancho de terminal antes de la resolución del layout en Pi.
+  - `setDockRatio`, `resizeBy` y `setDockWidth` actualizan la base, invalidan el root y solicitan re-render inmediato en caliente.
+- `src/ui/diff-panel.ts`:
+  - `setPreferences`: aplica cambios visuales en caliente invocando `this.rebuild()`, `this.invalidate()` y `this.actions.render()`.
+  - `VirtualDiffScroll.invalidate()` y `DiffPanel.invalidate()` limpian el buffer virtual para re-renderizar líneas de código sin números de línea o con formato de ruta actualizado (`Smart`/`Full`/`Filename`).
+  - Se preservan intactos: selección de rango, cursor, foco, expansiones de archivos (`this.expanded`) y posición de scroll.
+- `src/index.ts`:
+  - Secuenciación de registro: `/diff` se registra antes de `/diff-settings` en `session_start`. Al tener idéntico score fuzzy para el prefijo `/dif` (-24.7), el orden de registro garantiza que `/diff` aparezca primero en el autocompletado sin hacks ni APIs privadas.
+  - Se eliminó el incremento `generation++` dentro del callback de cambio de settings, evitando invalidaciones o marcados de staleness innecesarios en la iteración abierta.
+- Pruebas agregadas (131 tests totales):
+  - `tests/diff-settings.test.ts`: navegación con flechas, edición y límites de Dock width (30%–60%), confirmación con Enter, cancelación con Esc en ambos modos, toggles booleanos, selector de rutas, clics de mouse y presentación inline.
+  - `tests/diff-panel.test.ts`: ajustes visuales en caliente con el dock ya abierto (lineNumbers ocultando gutter, filePaths alternando Smart/Full/Filename, collapseFiles conservando expansiones actuales).
+  - `tests/diff-auto-open.test.ts`: actualización de layout con el dock abierto sin alterar el borrador del editor, y persistencia de branch.
+  - `tests/diff-command.test.ts`: orden de registro de `/diff` antes de `/diff-settings` y verificación con `fuzzyFilter` para coincidencia parcial `/dif`.
+
+**Validación ejecutada**
+| Comando / caso | Resultado | Evidencia |
+|---|---|---|
+| `npm run check` (`tsc --noEmit` + `tsx --test`) | PASS | 131/131 tests unitarios e integrados aprobados en Linux x64 (4184 ms). Cero fallos, cancelados ni skips. |
+| `python3 tests/pty-smoke.py` | PASS | Validación PTY con Pi 1.4.0 real: arranque, `/diff`, F6, `/diff-settings` inline con 6 opciones, cierre con Esc, persistencia de borrador `DRAFT-M2`, reload y salida limpia. |
+| Autocompletado `/dif` | PASS | Verificado en test de integración con el motor `fuzzyFilter` de Pi TUI: `['diff', 'diff-settings']`. |
+| Validación física en Herdr / macOS / Windows nativo | NOT RUN | Entorno local es Arch Linux headless. Validación física en Herdr y runners nativos en macOS/Windows no ejecutados en este paso. |
+
+**Límites / próximo paso**
+- No se crearon dependencias nuevas ni se modificó el motor de snapshots.
+- Listo para validación física final por el usuario en terminal interactivo / Herdr.
+- No avanzar a M4 hasta conformidad explícita.

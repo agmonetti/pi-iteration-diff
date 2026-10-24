@@ -199,6 +199,9 @@ class VirtualDiffScroll extends ScrollView {
     this.lines = new Array<string>(this.count());
     return this.lines;
   }
+  override invalidate(): void {
+    this.lines = [];
+  }
   override updateLayout(contentHeight: number, viewportHeight: number, requestRender: () => void): void {
     super.updateLayout(contentHeight, viewportHeight, requestRender);
     const end = Math.min(this.lines.length, this.scrollTop + this.viewportHeight);
@@ -256,7 +259,13 @@ export class DiffPanel extends VStack implements Component, Focusable {
       collapseFiles: preferences.collapseFiles ?? this.preferences.collapseFiles,
     };
     this.rebuild();
+    this.invalidate();
     this.actions.render();
+  }
+
+  override invalidate(): void {
+    super.invalidate();
+    this.body?.invalidate();
   }
 
   get focused(): boolean { return this.hasFocus; }
