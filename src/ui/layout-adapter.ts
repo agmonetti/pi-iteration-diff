@@ -16,16 +16,17 @@ export interface DockHandle {
   resizeBy(deltaCols: number): void;
   setDockWidth(cols: number): void;
   getDockWidth(): number;
+  getDockRatio(): number;
+  setDockRatio(ratio: number): void;
 }
-
-let persistentDockRatio = 0.45;
 
 export class ResizableDockRoot extends HStack {
   private ratio: number;
 
   constructor(children: any[], initialRatio = 0.45, private readonly focusNative?: () => void) {
     super(children);
-    this.ratio = initialRatio;
+    this.ratio = 0.45;
+    this.dockRatio = initialRatio;
   }
 
   override handleMouse(event: TuiMouseEvent): undefined {
@@ -39,7 +40,7 @@ export class ResizableDockRoot extends HStack {
 
   get dockRatio(): number { return this.ratio; }
   set dockRatio(value: number) {
-    this.ratio = Math.max(0.2, Math.min(0.75, value));
+    if (Number.isFinite(value)) this.ratio = Math.max(0.3, Math.min(0.6, value));
   }
 
   getDockWidth(width: number): number {
@@ -49,12 +50,12 @@ export class ResizableDockRoot extends HStack {
   resizeBy(deltaCols: number, totalWidth: number): void {
     const currentCols = this.getDockWidth(totalWidth);
     const newCols = Math.max(34, Math.min(totalWidth - 46, currentCols + deltaCols));
-    this.ratio = newCols / Math.max(1, totalWidth);
+    this.dockRatio = newCols / Math.max(1, totalWidth);
   }
 
   setDockWidth(cols: number, totalWidth: number): void {
     const clamped = Math.max(34, Math.min(totalWidth - 46, cols));
-    this.ratio = clamped / Math.max(1, totalWidth);
+    this.dockRatio = clamped / Math.max(1, totalWidth);
   }
 
   override render(width: number): string[] {
@@ -66,7 +67,7 @@ export class ResizableDockRoot extends HStack {
   }
 }
 
-export function mountDock(tui: TUI, panel: Component): DockHandle {
+export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45): DockHandle {
   if (!isViewportTUI(tui) || !("layoutRoot" in tui) ||
       !("getFocusedComponent" in tui) || typeof tui.getFocusedComponent !== "function") {
     throw new Error("El diff requiere Pi fullscreen con layout compatible (probado en 1.4.0)");
@@ -85,12 +86,12 @@ export function mountDock(tui: TUI, panel: Component): DockHandle {
   const previousFocus = internal.getFocusedComponent();
   const root = new ResizableDockRoot([
     { component: native, basis: 0, grow: 1, shrink: 1, minSize: 46 },
-    { component: panel, basis: Math.round(120 * persistentDockRatio), minSize: 34, grow: 0, shrink: 1,
+    { component: panel, basis: Math.round(120 * initialRatio), minSize: 34, grow: 0, shrink: 1,
       visible: ({ width }: { width: number }) => {
         if (width < 90 && internal.getFocusedComponent() === panel) tui.setFocus(previousFocus);
         return width >= 90;
       } },
-  ], persistentDockRatio, () => {
+  ], initialRatio, () => {
     if (ownsRoot()) tui.setFocus(previousFocus);
   });
   tui.setLayoutRoot(root);
@@ -116,13 +117,17 @@ export function mountDock(tui: TUI, panel: Component): DockHandle {
     resizeBy(deltaCols: number) {
       if (!ownsRoot()) return;
       root.resizeBy(deltaCols, tui.terminal.columns);
-      persistentDockRatio = root.dockRatio;
       tui.requestRender();
     },
     setDockWidth(cols: number) {
       if (!ownsRoot()) return;
       root.setDockWidth(cols, tui.terminal.columns);
-      persistentDockRatio = root.dockRatio;
+      tui.requestRender();
+    },
+    getDockRatio() { return root.dockRatio; },
+    setDockRatio(ratio) {
+      if (!ownsRoot()) return;
+      root.dockRatio = ratio;
       tui.requestRender();
     },
     getDockWidth() {

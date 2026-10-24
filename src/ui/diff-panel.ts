@@ -23,6 +23,20 @@ export type Role =
   | "selected"
   | "selectedBg";
 
+export type DiffFilePathMode = "Smart" | "Full" | "Filename";
+
+export interface DiffPanelPreferences {
+  lineNumbers: boolean;
+  filePaths: DiffFilePathMode;
+  collapseFiles: boolean;
+}
+
+export const DEFAULT_DIFF_PREFERENCES: Readonly<DiffPanelPreferences> = {
+  lineNumbers: true,
+  filePaths: "Smart",
+  collapseFiles: true,
+};
+
 export type Actions = {
   render(): void;
   editor(): void;
@@ -30,6 +44,7 @@ export type Actions = {
   style(role: Role, text: string): string;
   resize?(deltaCols: number): void;
   setDockWidth?(cols: number): void;
+  resizeEnd?(): void;
   appendContext?(snippet: string): void;
 };
 
@@ -134,35 +149,36 @@ function safeText(text: string): string {
     .replace(/[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "");
 }
 
-/** Smart middle truncation for file paths preserving filename and extension. */
+/** Smart middle truncation for file paths preserving filename and extension, respecting visible columns. */
 export function truncatePath(path: string, maxLength: number): string {
-  if (path.length <= maxLength) return path;
-  if (maxLength <= 5) return path.slice(-maxLength);
+  if (visibleWidth(path) <= maxLength) return path;
+  if (maxLength <= 5) return sliceByColumn(path, Math.max(0, visibleWidth(path) - maxLength), visibleWidth(path));
   const parts = path.split("/");
   if (parts.length <= 1) {
     const extIdx = path.lastIndexOf(".");
     const ext = extIdx > 0 ? path.slice(extIdx) : "";
     const name = extIdx > 0 ? path.slice(0, extIdx) : path;
-    const avail = maxLength - 1 - ext.length;
-    if (avail > 2) return `${name.slice(0, avail)}…${ext}`;
-    return `…${path.slice(-(maxLength - 1))}`;
+    const avail = maxLength - 1 - visibleWidth(ext);
+    if (avail > 2) return `${truncateToWidth(name, avail, "")}…${ext}`;
+    return `…${sliceByColumn(path, Math.max(0, visibleWidth(path) - (maxLength - 1)), visibleWidth(path))}`;
   }
   const filename = parts[parts.length - 1]!;
   const firstDir = parts[0]!;
   const target = `${firstDir}/…/${filename}`;
-  if (target.length <= maxLength) {
+  if (visibleWidth(target) <= maxLength) {
     let current = target;
     for (let i = 1; i < parts.length - 1; i++) {
       const candidate = `${parts.slice(0, i + 1).join("/")}/…/${filename}`;
-      if (candidate.length <= maxLength) current = candidate;
+      if (visibleWidth(candidate) <= maxLength) current = candidate;
       else break;
     }
     return current;
   }
-  if (maxLength >= filename.length + 2) {
+  if (maxLength >= visibleWidth(filename) + 2) {
     return `…/${filename}`;
   }
-  return `…${filename.slice(-(maxLength - 1))}`;
+  const availName = maxLength - 1;
+  return `…${sliceByColumn(filename, Math.max(0, visibleWidth(filename) - availName), visibleWidth(filename))}`;
 }
 
 /** Virtualized scroll rendering lines on demand. */
@@ -207,6 +223,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private panX = 0;
   private inspecting = false;
   private showDetails = false;
+  private preferences: DiffPanelPreferences;
 
   // Selection state
   private selectionAnchor: number | null = null;
@@ -214,13 +231,32 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private isDraggingSelection = false;
   private resizingSeparator = false;
 
-  constructor(private readonly actions: Actions) {
+  constructor(private readonly actions: Actions, preferences?: Partial<DiffPanelPreferences>) {
     super();
+    this.preferences = {
+      lineNumbers: preferences?.lineNumbers ?? DEFAULT_DIFF_PREFERENCES.lineNumbers,
+      filePaths: preferences?.filePaths ?? DEFAULT_DIFF_PREFERENCES.filePaths,
+      collapseFiles: preferences?.collapseFiles ?? DEFAULT_DIFF_PREFERENCES.collapseFiles,
+    };
     this.body = new VirtualDiffScroll(() => this.diffEntries.length, (index, width) => this.entryLine(index, width));
     this.addChild({ invalidate() {}, render: width => this.heading(width) }, { basis: 3, shrink: 0, minSize: 3 });
     this.addChild(this.body, { basis: 0, grow: 1, shrink: 1, minSize: 0 });
     this.addChild({ invalidate() {}, render: width => [this.footer(width)] }, { basis: 1, shrink: 0, minSize: 1 });
     this.rebuild();
+  }
+
+  getPreferences(): Readonly<DiffPanelPreferences> {
+    return { ...this.preferences };
+  }
+
+  setPreferences(preferences: Partial<DiffPanelPreferences>): void {
+    this.preferences = {
+      lineNumbers: preferences.lineNumbers ?? this.preferences.lineNumbers,
+      filePaths: preferences.filePaths ?? this.preferences.filePaths,
+      collapseFiles: preferences.collapseFiles ?? this.preferences.collapseFiles,
+    };
+    this.rebuild();
+    this.actions.render();
   }
 
   get focused(): boolean { return this.hasFocus; }
@@ -235,6 +271,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
     this.view = view;
     if (reset) {
       this.expanded.clear();
+      if (!this.preferences.collapseFiles) {
+        for (const file of view.files) {
+          this.expanded.add(file.path);
+        }
+      }
       this.cursor = 0;
       this.panX = 0;
       this.inspecting = false;
@@ -617,7 +658,18 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const { file } = entry;
       const indent = "    ";
       const avail = Math.max(4, width - visibleWidth(prefix) - visibleWidth(indent));
-      const displayPath = truncatePath(safeText(file.path), avail);
+      const parts = file.path.split("/");
+      const basename = parts[parts.length - 1] || file.path;
+
+      let displayPath: string;
+      if (this.preferences.filePaths === "Filename") {
+        displayPath = truncateToWidth(safeText(basename), avail, "…");
+      } else if (this.preferences.filePaths === "Full") {
+        displayPath = truncateToWidth(safeText(file.path), avail, "…");
+      } else {
+        displayPath = truncatePath(safeText(file.path), avail);
+      }
+
       const content = `${indent}${this.actions.style("dim", displayPath)}`;
       if (selected) {
         const lineContent = `${cursor} ${content}`;
@@ -650,13 +702,15 @@ export class DiffPanel extends VStack implements Component, Focusable {
     const next = row.newLine === undefined ? "" : String(row.newLine);
     const mark = row.kind === "added" ? "+" : row.kind === "removed" ? "-" : " ";
 
-    let numStr: string;
-    if (entry.gutterMode === "new_only") {
-      numStr = this.actions.style("dim", next.padStart(4));
-    } else if (entry.gutterMode === "old_only") {
-      numStr = this.actions.style("dim", old.padStart(4));
-    } else {
-      numStr = this.actions.style("dim", `${old.padStart(4)} ${next.padStart(4)}`);
+    let numStr = "";
+    if (this.preferences.lineNumbers) {
+      if (entry.gutterMode === "new_only") {
+        numStr = `${this.actions.style("dim", next.padStart(4))} `;
+      } else if (entry.gutterMode === "old_only") {
+        numStr = `${this.actions.style("dim", old.padStart(4))} `;
+      } else {
+        numStr = `${this.actions.style("dim", `${old.padStart(4)} ${next.padStart(4)}`)} `;
+      }
     }
 
     const markStr = row.kind === "added" ? this.actions.style("added", mark)
@@ -673,7 +727,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       : row.kind === "removed" ? this.actions.style("removed", codePart)
       : this.actions.style("text", codePart);
 
-    const content = `${numStr} ${markStr}${sep}${codeStyled}`;
+    const content = `${numStr}${markStr}${sep}${codeStyled}`;
     if (selected) {
       const lineContent = `${cursor} ${content}`;
       const styledContent = this.actions.style("selectedBg", truncateToWidth(lineContent, Math.max(0, width - 1), "…"));
@@ -897,7 +951,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
         return { ...result, capture: true, render: true };
       }
       if (event.type === "release") {
+        const wasResizing = this.resizingSeparator;
         this.resizingSeparator = false;
+        if (wasResizing) {
+          this.actions.resizeEnd?.();
+        }
         return { ...result, render: true };
       }
     }

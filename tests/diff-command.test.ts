@@ -23,7 +23,8 @@ for (const conflict of [false, true]) {
       ({ session } = await createAgentSession({ cwd: w.root, agentDir: w.root, resourceLoader, settingsManager,
         modelRuntime, sessionManager: SessionManager.inMemory(w.root), tools: [] }));
       await session.bindExtensions({ mode: "print", onError: error => assert.fail(JSON.stringify(error)) });
-      assert.ok(session.extensionRunner.getCommand("iteration-diff"));
+      assert.equal(session.extensionRunner.getCommand("iteration-diff"), undefined);
+      assert.ok(session.extensionRunner.getCommand("diff-settings"));
       assert.ok(session.extensionRunner.getCommand("diff"));
       assert.equal(session.extensionRunner.getCommand("diff:1"), undefined, "no ambiguous aliases created");
       await session.prompt("/diff");

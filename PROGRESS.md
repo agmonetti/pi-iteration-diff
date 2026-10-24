@@ -1096,3 +1096,62 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 **Límite / próximo paso**
 - M3.5 pendiente de implementación. Esta sesión recibió además una copia de las instrucciones anteriores en su contexto de mayor prioridad; editar el archivo no reemplaza esa copia. Recargar las instrucciones del proyecto en una nueva sesión antes de implementar la eliminación del alias y el opt-in.
 - Commit documental separado, sólo `AGENTS.md` y esta entrada; sin push. REQUIREMENTS/RESEARCH conservan el histórico anterior; su actualización de decisiones corresponde al bloque M3.5.
+
+### 2026-10-24 — M3.5 / Diff Settings & Command Cleanup
+
+**Estado vigente:** implementación M3.5 y gate automatizado PASS. Validación física
+nueva/CI nativa nueva NOT RUN; no declaración de DoD global ni avance a M4.
+
+**Cambió**
+- `src/ui/diff-settings.ts`: seis preferencias mediante SettingsList público en
+  overlay custom de Pi; defaults 45% (30–60), numbers On, paths Smart, collapse On,
+  remember width On, auto-open Off. Payload v1 estrictamente validado; datos
+  inválidos restablecen defaults sin consentimiento automático.
+- `src/index.ts`: `/diff-settings`, `/diff` sin colisión y F6 abre/enfoca; eliminado
+  `/iteration-diff`. Persistencia pública appendEntry/getBranch por rama, restore
+  en start/tree, sin código/diffs/rutas persistidos ni config global. Error de
+  almacenamiento avisa y no impide cleanup. Nueva sesión conserva defaults.
+- Auto-open sólo después de captura settled individual completa; sin foco ni
+  escritura/envío al editor. Guardas de generación, identidad/scope y preferencia
+  después de await; cierre manual de ventana activa y settled duplicado no reabren.
+- `src/ui/layout-adapter.ts`: ratio por instancia, sin global compartida; límites
+  30–60% y mínimos del editor/dock conservados. Remember guarda al concluir gesto,
+  teclado o cierre; Off deja resize transitorio hasta reapertura.
+- `src/ui/diff-panel.ts`: números opcionales y Smart/Full/Filename sin cambiar
+  identidad ni anexado; truncado Smart por columnas Unicode. Cambios de presentación
+  preservan selección/cursor/expansiones; collapse default sólo en vista nueva.
+- Tests settings, auto-open/eventos/ramas/errores, panel, comandos SDK y PTY;
+  `M3.5.md`, REQUIREMENTS/RESEARCH y especificación visual alineados con autorización
+  posterior a e923e7e. Historial de esta bitácora preservado íntegro por anexado.
+
+**Pruebas ejecutadas — Linux, Node v26.12.0, Pi/TUI 1.4.0**
+| Comando / caso | Resultado | Evidencia |
+|---|---|---|
+| Primer `npm run check` durante integración worker | FAIL | Firmas constructor/setPreferences aún no escritas; tsc pasó al integrar panel. |
+| Check con tests nuevos iniciales | FAIL 120/121 | Assertion Full esperaba ellipsis al final de salida ANSI; se normalizó con stripTerminalSequences antes de comprobar sufijo, conservando verificación de ruta/elisión. |
+| `npx --no-install tsx --test tests/diff-auto-open.test.ts tests/diff-settings.test.ts` | PASS 10/10 | Consentimiento SettingsList real, Off durante await, cierre manual, settled duplicado, shutdown/tree, ventanas agrupadas/aborto/error, defaults y límites. |
+| `npm run check` final | PASS | tsc + 124/124, cero fallos/skips/cancelados; 6205 ms. Incluye Remember On/Off/reopen/branch y fallo de persistencia sin bloquear cierre, snapshots/Git/SDK/HTTP. |
+| `python3 tests/pty-smoke.py` | PASS | CLI instalado, agente temporal sin credenciales/modelo; seis opciones visibles, /diff, F6 apertura/foco, borrador, reload, salida 0/reset mouse. PTY sintética 120×30, no mouse físico. |
+| LSP activo en ocho TS cambiados | PARCIAL | 6 clean confirmados, 2 inconclusos, cero errores recibidos; tsc es gate completo. |
+| Arquitecto read-only plan y revisión final | APROBADO | Corrigió validación enum por coerción y exigió tests async Off/cierre; regresión ['Full'] rechazada. Cierre sin bloqueantes, no ejecutó suite ni interacción física. |
+| Pi/Herdr físico nuevo; CI ubuntu/macOS/Windows nativo nueva | NOT RUN | No se ejecutaron runners remotos ni interacción humana. Evidencia M1 histórica no certifica este cambio. |
+
+**Límites / decisiones / parada**
+- API pública de Pi persiste datos por rama de sesión, no preferencias globales.
+  Se informó antes de implementar: reload/resume/fork/tree siguen la rama; nueva
+  sesión usa defaults; --no-session no persiste entre procesos. No solución propia
+  de filesystem, nuevas dependencias ni cambios al motor snapshots/Herdr.
+- Se mantiene geometría de dos líneas incluso Filename (basename en segunda);
+  rango/archivo real siempre intacto en contexto anexado. Full sigue acotado por
+  viewport, no promete mostrar ruta arbitrariamente larga sin truncamiento.
+- Ancho efectivo prioriza mínimos de 34/46 columnas en terminal pequeño. No se
+  certifican cursor/undo, drag físico ni compatibilidad multiplataforma nueva.
+- Próximo paso: validación humana del protocolo M3.5 y CI externa cuando se autorice.
+  **Detenido antes de M4. Sin push.**
+
+**Git**
+- Base e923e7e con working tree inicialmente limpio. Revisión status/diff/cached;
+  staged inicialmente vacío. Sólo rutas explícitas de M3.5, sin dependencias,
+  instalación/config global ni artefactos. Whitespace nuevo al final de test
+  corregido sin reformateo general.
+- Commit lógico previsto: `feat(ui): add diff settings and remove legacy command alias`.

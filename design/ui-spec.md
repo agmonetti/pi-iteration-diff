@@ -8,7 +8,7 @@
 
 ## 1. Principios de diseño definitivos
 
-1. **Extensión no intrusiva sobre Pi:** El panel derecho se monta dinámicamente preservando intactos el transcript de la conversación y el editor nativo de Pi a la izquierda. Nunca se abre automáticamente; se abre o cierra exclusivamente por acción explícita mediante `/diff` (o el fallback `/iteration-diff`).
+1. **Extensión no intrusiva sobre Pi:** El panel derecho se monta dinámicamente preservando intactos el transcript de la conversación y el editor nativo de Pi a la izquierda. Por defecto se abre/cierra mediante `/diff`; F6 abre/enfoca. M3.5 permite auto-open sólo por opt-in explícito tras iteración individual completa, sin robar foco; elimina `/iteration-diff`.
 2. **Consumo estricto del tema activo:** No se introduce ni se exige un tema propio obligatorio. Todos los colores, estilos y contrastes se resuelven dinámicamente desde `ctx.ui.theme` según la configuración del usuario en Pi (`system`, `dark`, `light` o tema personalizado).
 3. **Prioridad visual de la selección:** Cuando una línea (añadida, eliminada o de contexto) forma parte de un rango seleccionado, el estilo de selección (`selectedBg` o inversión de video) tiene **prioridad visual absoluta** sobre los fondos de adición y borrado, certificando con precisión qué líneas están marcadas.
 4. **Minimalismo y sobriedad en terminal:** Evitar adornos gráficos innecesarios, badges pesados o pestañas ficticias (sin `Current` ni `History` mientras esos modos no existan).
@@ -49,19 +49,19 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 | `DOCK_INITIAL_RATIO` | `0.45` (45%) | Proporción inicial del ancho del terminal asignada al dock. |
 | `CHAT_MIN_WIDTH` | `46 cols` | Ancho mínimo garantizado para el transcript y editor de Pi. |
 | `DOCK_MIN_WIDTH` | `34 cols` | Ancho mínimo del panel de diff al achicarlo. |
-| `DOCK_MAX_WIDTH` | `75% terminal` | Ancho máximo permitido para el dock al agrandarlo. |
+| `DOCK_MAX_WIDTH` | `60% terminal` | Ratio configurable entre 30% y 60%; mínimos de conversación/dock prevalecen en terminal pequeño. |
 
 ### Redimensionamiento
 - **Arrastre de ratón:** Arrastrar el separador vertical `│` ajusta dinámicamente el ancho del dock.
 - **Teclado:** Atajos `[` / `]` o `Ctrl+Left` / `Ctrl+Right` permiten expandir o contraer el dock en pasos de 4 columnas.
-- **Persistencia de estado:** El ancho ajustado se preserva al alternar focos o al cambiar de iteración, recalculándose proporcionalmente ante redimensionamientos del terminal (`resize`).
+- **Persistencia de estado:** El ancho ajustado se adapta a resize; Remember dock width On lo guarda por rama de sesión. Off mantiene el ajuste transitorio hasta cerrar. Las seis preferencias y su alcance se especifican en `../M3.5.md`.
 
 ---
 
 ## 3. Explorador de Archivos Inline (Dos Líneas por Encabezado)
 
 - **Inline con diffs:** Cada archivo presenta su contenido unified directamente debajo de su encabezado sin un visor separado.
-- **Colapso inicial:** Al recibir una nueva iteración, todos los archivos inician contraídos.
+- **Colapso inicial:** Por defecto todos contraídos; `/diff-settings` permite expandir al cargar una nueva iteración sin resetear expansiones actuales.
 - **Expansiones independientes:** `Enter` o clic en el encabezado alternan únicamente ese archivo. Múltiples archivos pueden permanecer abiertos a la vez.
 - **Encabezado de dos líneas:**
   - **Línea 1 (Principal):** Indicador de expansión (`▾`/`▸`), estado compacto (`A`, `M`, `D`) antes del nombre destacado (`bold`) y estadísticas (`+3 / -2`). Los estados describen sólo el delta observado; no consultan staging ni renames de Git.

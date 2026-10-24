@@ -970,4 +970,244 @@ test("two-line header across widths 34, 45, 60, 100, dark/light themes, all stat
   p.render(60);
 });
 
+test("preferences defaults to On/Smart/On and getPreferences returns a copy", () => {
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+  });
+  const prefs = p.getPreferences();
+  assert.equal(prefs.lineNumbers, true);
+  assert.equal(prefs.filePaths, "Smart");
+  assert.equal(prefs.collapseFiles, true);
+});
+
+test("collapseFiles:false in constructor expands all files on new view key; setPreferences preserves expansions", () => {
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+  }, { collapseFiles: false });
+
+  const f1: DiffFile = { path: "src/a.ts", kind: "modified", added: 1, removed: 0, getRows: () => [{ kind: "added", newLine: 1, text: "const a = 1;" }] };
+  const f2: DiffFile = { path: "src/b.ts", kind: "modified", added: 1, removed: 0, getRows: () => [{ kind: "added", newLine: 1, text: "const b = 2;" }] };
+
+  // New view.key 'v1': both files should start expanded
+  p.setView({ key: "v1", title: "DIFF", notices: [], files: [f1, f2] });
+  let rendered = p.render(80).join("\n");
+  assert.ok(rendered.includes("▾ M a.ts"));
+  assert.ok(rendered.includes("▾ M b.ts"));
+  assert.ok(rendered.includes("const a = 1;"));
+  assert.ok(rendered.includes("const b = 2;"));
+
+  // setPreferences({ collapseFiles: true }) does NOT collapse currently open files
+  p.setPreferences({ collapseFiles: true });
+  rendered = p.render(80).join("\n");
+  assert.ok(rendered.includes("▾ M a.ts"));
+  assert.ok(rendered.includes("▾ M b.ts"));
+
+  // Next view.key 'v2': applies updated collapseFiles:true default (both start collapsed)
+  p.setView({ key: "v2", title: "DIFF", notices: [], files: [f1, f2] });
+  rendered = p.render(80).join("\n");
+  assert.ok(rendered.includes("▸ M a.ts"));
+  assert.ok(rendered.includes("▸ M b.ts"));
+  assert.ok(!rendered.includes("const a = 1;"));
+});
+
+test("setPreferences applies presentation without resetting active selection, cursor or expansions", () => {
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+  });
+  const f: DiffFile = {
+    path: "src/module.ts", kind: "modified", added: 2, removed: 0,
+    getRows: () => [
+      { kind: "hunk", text: "@@ -1,1 +1,3 @@" },
+      { kind: "added", newLine: 1, text: "first" },
+      { kind: "added", newLine: 2, text: "second" },
+    ],
+  };
+  p.setView({ key: "k1", title: "DIFF", notices: [], files: [f] });
+
+  // Expand file
+  p.handleInput("\r");
+  assert.ok(p.render(80).some(line => line.includes("▾ M module.ts")));
+
+  // Navigate to code row and select range
+  p.handleInput("\x1b[B"); // hunk
+  p.handleInput("\x1b[B"); // first row
+  p.handleInput("\x1b[1;2B"); // shift+down to select first and second rows
+  assert.ok(p.hasSelection());
+
+  // Apply preference update
+  p.setPreferences({ lineNumbers: false, filePaths: "Filename" });
+
+  // Selection is preserved
+  assert.ok(p.hasSelection());
+  // File is still expanded
+  assert.ok(p.render(80).some(line => line.includes("▾ M module.ts")));
+  // Footer still shows selected lines
+  const footer = p.render(80)[p.render(80).length - 1]!;
+  assert.ok(footer.includes("selected") || footer.includes("Sel:"));
+});
+
+test("lineNumbers Off removes numeric gutter while keeping diff signs and code content", () => {
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+  }, { lineNumbers: false });
+
+  const f: DiffFile = {
+    path: "src/example.ts", kind: "modified", added: 1, removed: 1,
+    getRows: () => [
+      { kind: "hunk", text: "@@ -10 +10 @@" },
+      { kind: "removed", oldLine: 10, text: "console.log('old');" },
+      { kind: "added", newLine: 10, text: "console.log('new');" },
+    ],
+  };
+  p.setView({ key: "nums-test", title: "DIFF", notices: [], files: [f] });
+  p.handleInput("\r"); // Expand
+
+  const lines = p.render(80);
+  const removedLine = lines.find(l => l.includes("console.log('old');"))!;
+  const addedLine = lines.find(l => l.includes("console.log('new');"))!;
+
+  // Must contain diff sign
+  assert.ok(removedLine.includes("- console.log('old');"), `Should contain sign: ${removedLine}`);
+  assert.ok(addedLine.includes("+ console.log('new');"), `Should contain sign: ${addedLine}`);
+
+  // Must NOT contain line numbers
+  assert.ok(!removedLine.includes("  10"), `Should not contain numeric line gutter: ${removedLine}`);
+  assert.ok(!addedLine.includes("  10"), `Should not contain numeric line gutter: ${addedLine}`);
+});
+
+test("filePaths Filename maintains two-line header geometry with indented basename on second line", () => {
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+  }, { filePaths: "Filename" });
+
+  const f: DiffFile = {
+    path: "packages/core/src/sub/deep-component.tsx", kind: "modified", added: 3, removed: 1,
+    getRows: () => [],
+  };
+  p.setView({ key: "paths-fn", title: "DIFF", notices: [], files: [f] });
+
+  const lines = p.render(60);
+  // Line 1: Header with basename, chevron, status and stats
+  const headerLine = lines[3]!;
+  assert.ok(headerLine.includes("▸ M deep-component.tsx"));
+  assert.match(headerLine, /\+3\s*\/\s*-1/);
+
+  // Line 2: Secondary line with indented basename, NOT the full path
+  const pathLine = lines[4]!;
+  assert.ok(pathLine.includes("    deep-component.tsx"));
+  assert.ok(!pathLine.includes("packages/core/src/sub"));
+});
+
+test("filePaths Full shows relative path truncated at end without middle ellipsis", () => {
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+  }, { filePaths: "Full" });
+
+  const f: DiffFile = {
+    path: "packages/nested/long/directory/structure/file-to-render.ts", kind: "modified", added: 1, removed: 0,
+    getRows: () => [],
+  };
+  p.setView({ key: "paths-full", title: "DIFF", notices: [], files: [f] });
+
+  const lines = p.render(40);
+  const pathLine = lines[4]!;
+  const stripped = stripTerminalSequences(pathLine);
+  // Should NOT contain middle ellipsis '…/'
+  assert.ok(!stripped.includes("/…/"), `Full mode must not use middle ellipsis: ${stripped}`);
+  // Should start with directory path and truncate at end with '…'
+  assert.ok(stripped.includes("packages/nested/"));
+  assert.ok(stripped.endsWith("…"), `Full mode must end with ellipsis: ${stripped}`);
+});
+
+test("filePaths Smart uses smart middle truncation respecting Unicode columns", () => {
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+  }, { filePaths: "Smart" });
+
+  const f: DiffFile = {
+    path: "packages/nested/long/directory/structure/file-to-render.ts", kind: "modified", added: 1, removed: 0,
+    getRows: () => [],
+  };
+  p.setView({ key: "paths-smart", title: "DIFF", notices: [], files: [f] });
+
+  const lines = p.render(40);
+  const pathLine = lines[4]!;
+  // Smart mode preserves first dir and filename with middle ellipsis
+  assert.ok(pathLine.includes("/…/file-to-render.ts") || pathLine.includes("…/file-to-render.ts"));
+  assert.ok(visibleWidth(stripTerminalSequences(pathLine)) <= 40);
+});
+
+test("formatSelectedContext preserves full path identity regardless of filePaths preference", () => {
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+  }, { filePaths: "Filename" });
+
+  const fullPath = "very/deeply/nested/path/to/target.ts";
+  const f: DiffFile = {
+    path: fullPath, kind: "modified", added: 1, removed: 0,
+    getRows: () => [
+      { kind: "hunk", text: "@@ -1 +1,2 @@" },
+      { kind: "added", newLine: 2, text: "export const x = 1;" },
+    ],
+  };
+  p.setView({ key: "ctx-id", title: "DIFF", notices: [], files: [f] });
+  p.handleInput("\r"); // Expand
+  p.handleInput("\x1b[B"); // hunk
+  p.handleInput("\x1b[B"); // row
+  p.handleInput("\r"); // select row
+
+  const context = p.formatSelectedContext();
+  assert.ok(context, "Context should be formatted");
+  assert.ok(context.includes(`[${fullPath} | diff | new:2]`), `Context must use canonical path: ${context}`);
+  assert.ok(context.includes("+export const x = 1;"));
+});
+
+test("Actions.resizeEnd is invoked on separator release, not on selection drag release", () => {
+  let resizeEndCalls = 0;
+  let setDockWidthCols = 0;
+  const p = new DiffPanel({
+    render() {}, editor() {}, close() {}, style: (_r, t) => t,
+    setDockWidth: (cols) => { setDockWidthCols = cols; },
+    resizeEnd: () => { resizeEndCalls++; },
+  });
+
+  p.setView(view([{
+    path: "src/test.ts", kind: "modified", added: 1, removed: 0,
+    getRows: () => [{ kind: "added", newLine: 1, text: "code" }],
+  }]));
+
+  // 1. Separator resize drag & release invokes resizeEnd once
+  p.handleMouse({
+    type: "press", button: "left", x: 0, y: 5, screenX: 60, screenY: 5, width: 50, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  p.handleMouse({
+    type: "drag", button: "left", x: -4, y: 5, screenX: 56, screenY: 5, width: 50, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  assert.equal(setDockWidthCols, 54);
+  assert.equal(resizeEndCalls, 0); // Not called yet during drag
+
+  p.handleMouse({
+    type: "release", button: "left", x: -4, y: 5, screenX: 56, screenY: 5, width: 50, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  assert.equal(resizeEndCalls, 1); // Called on separator release
+
+  // 2. Selection drag & release does NOT invoke resizeEnd
+  p.handleInput("\r"); // Expand file
+  p.handleMouse({
+    type: "press", button: "left", x: 10, y: 5, screenX: 70, screenY: 5, width: 50, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  p.handleMouse({
+    type: "drag", button: "left", x: 10, y: 6, screenX: 70, screenY: 6, width: 50, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  p.handleMouse({
+    type: "release", button: "left", x: 10, y: 6, screenX: 70, screenY: 6, width: 50, height: 24,
+    shift: false, alt: false, ctrl: false,
+  });
+  assert.equal(resizeEndCalls, 1); // Still 1, no resizeEnd on selection drag!
+});
 

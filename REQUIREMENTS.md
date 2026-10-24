@@ -30,7 +30,7 @@ Si otro proceso modifica archivos entre snapshots, pueden aparecer cambios de te
 
 | ID | Prioridad | Requisito | Aceptación observable |
 |---|---|---|---|
-| FR-01 | P0 | Registrar `/diff` manual. | Ejecutarlo abre/cierra el panel; sin aperturas automáticas en toda la sesión. |
+| FR-01 | P0 | Registrar `/diff` manual. | Ejecutarlo abre/cierra el panel; sin apertura automática por defecto. M3.5 permite opt-in explícito en `/diff-settings`, sólo tras resultado individual completo y sin robar foco. |
 | FR-02 | P0 | Dock a la derecha de la conversación en Pi fullscreen. | Chat y editor original permanecen visibles, focus y entrada normales. |
 | FR-03 | P0 | Diff de la última petición completada como opción por defecto. | Cambios anteriores sin commit no aparecen al revisar la última iteración. |
 | FR-04 | P0 | Capturar el cambio neto por contenido, no solo `edit`. | Cambios de `write`, `edit`, `bash` y scripts externos observados durante la petición aparecen. |
@@ -42,7 +42,7 @@ Si otro proceso modifica archivos entre snapshots, pueden aparecer cambios de te
 | FR-10 | P0 | Sin cambios. | `/diff` informa «No hay cambios en la última iteración» sin inventar diff. |
 | FR-11 | P0 | Altura/anchura variables y fallback. | Redimensionar conserva conversación/editor; ancho insuficiente activa vista accesible, sin crash. |
 | FR-12 | P0 | Compatible con Pi solo y Pi en Herdr. | Matrix manual aprobada, especialmente mouse/focus/scroll. |
-| FR-13 | P0 | Manejar conflictos de comandos/layout. | No pisa `/diff` ni `layoutRoot` propiedad de otra extensión; ofrece `/iteration-diff` y/o fallback con mensaje. |
+| FR-13 | P0 | Manejar conflictos de comandos/layout. | No pisa `/diff` ni `layoutRoot` propiedad de otra extensión; informa colisión y conserva F6. M3.5 elimina `/iteration-diff`, sin aliases nuevos. |
 | FR-14 | P0 | Cancelación/cierre seguro. | `/reload`, `Ctrl+C`, cambio de sesión o cierre no dejan un root o mouse capturado. |
 | FR-15 | P0 | Mantener alcance por sesión/worktree. | No mezcla snapshots de dos repos, worktrees o sesiones distintas. |
 | FR-16 | P1 (paridad UX) | Arrastrar fragmento desde diff hacia editor. | Drag → drop en editor adjunta rango correcto y deja intacto el borrador; si el terminal bloquea esta interacción, guardar evidencia y ofrecer fallback de una acción, sin llamar a esa UX «completa». |
@@ -185,6 +185,7 @@ Pueden revisarse tras el spike. Incluir identificador de snapshot/diff en una se
 | **M1 — Captura** | Motor before/after compartido Linux/macOS/Windows, fixtures, seguridad/exclusiones, separación por sesión/worktree. | US-01, 02, 07, 08 automatizadas; sin mutación de Git; NFR-10 con CI nativa real en los tres SO. |
 | **M2 — Visor** | Diff estructurado, dock, navegación, empty/error states, fallback estrecho. | FR-01–05, 10, 11, 13 pasan. |
 | **M3 — Selección/feedback** | Rango de mouse/teclado, FIX/DISCUSS, anexado al prompt, drag-to-editor investigado e implementado donde viable. | US-03, 04, 05; sin sobreescritura ni envío automático. |
+| **M3.5 — Diff Settings & Command Cleanup** | Seis preferencias mediante `/diff-settings`; `/diff` y F6 sin alias antiguo. | Defaults/validación/persistencia por rama; presentación sin alterar identidad/selección; auto-open opt-in sólo final válido sin foco; regresiones y check PASS. |
 | **M4 — Herdr/robustez** | Test matrix real, resize, pane zoom, session switch/reload, conflictos, límites/benchmark. | US-06, FR-12–15, NFR relevantes. |
 | **M5 — Distribución** | Paquete Pi instalable, README, setup, troubleshooting, compatibilidad y release checklist. | `npm run check` PASS; evidencia de todos los escenarios, instrucciones de instalación reproducibles. |
 
@@ -238,7 +239,7 @@ Toda prueba real debe tener fecha, versión, comando/pasos, resultado (PASS/FAIL
 - [ ] NFR-10: integración del motor PASS real en Linux, macOS y Windows nativo; WSL separado; matriz y garantías particulares registradas (workflow no ejecutado = NOT RUN).
 - [ ] Pruebas manuales en Pi y Herdr PASS (o bloqueos explícitos que impiden declarar release listo).
 - [ ] No escritura no autorizada en staging/config global/sesiones ajenas.
-- [ ] Sin autoapertura, sin autosend, sin pérdida de borradores.
+- [ ] Sin autoapertura por defecto; opt-in explícito según M3.5, sin robo de foco, autosend ni pérdida de borradores.
 - [ ] Documentación y `PROGRESS.md` actualizados con versiones reales y limitaciones.
 - [ ] Sin procesos residentes, telemetría ni dependencias gráficas pesadas.
 

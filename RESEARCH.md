@@ -562,3 +562,22 @@ para estos cambios desde este checkout. Los tres jobs quedan **NOT RUN** hasta
 una ejecución externa real con URL/run ID y logs. Linux local es evidencia Linux
 local, no ubuntu-latest; macOS/Windows permanecen sin certificar. No avanzar a M2.
 
+## 17. M3.5 — Preferencias públicas y consentimiento (2026-10-24)
+
+Actualiza las decisiones históricas de comandos/apertura por autorización directa
+posterior al commit `e923e7e`; no borra los experimentos anteriores. `/diff` y F6
+permanecen, `/iteration-diff` se elimina. Auto-open requiere On explícito, default
+Off, sólo settled final individual completo, sin foco/envío/escritura de borrador.
+
+API Pi 1.4.0 contrastada: `docs/extensions.md`, `docs/tui.md` y ejemplo completo
+`examples/extensions/tools.ts`. `SettingsList` en `ctx.ui.custom` overlay evita UI
+propia de ajustes. `appendEntry`/`getBranch` son persistencia pública de sesión,
+no configuración global: se adopta alcance por rama con payload versionado y
+validación estricta; nueva sesión usa defaults. No se agregan archivos globales,
+IO de preferencias ni dependencias. El ejemplo oficial restaura en `session_tree`;
+aquí además se invalida la captura/abertura pendiente para no mostrar rama anterior.
+
+El ratio deja de ser global de módulo; el adaptador recibe preferencias del owner.
+Los cambios visuales no modifican filas reales ni formato de anexado. Contrato y
+protocolo en `M3.5.md`; resultados efectivos en `PROGRESS.md`. M4 no iniciado.
+

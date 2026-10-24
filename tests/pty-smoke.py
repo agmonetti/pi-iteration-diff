@@ -52,13 +52,17 @@ def main():
             assert b"DIFF:" not in output, "panel auto-opened"
             send(b"/diff\r")
             assert b"DIFF" in output, "sidebar did not render"
+            send(b"/diff-settings\r")
+            assert b"Auto-open after iteration" in output, "six-preference settings UI did not render"
+            send(b"\x1b")
             send(b"DRAFT-M2")
             send(b"\x1b[17~")  # F6
             send(b"\x1b")
             assert b"DRAFT-M2" in output, "native draft did not render"
             send(b"\x03")  # native clear, not send
             send(b"/diff\r")
-            send(b"/iteration-diff\r")
+            send(b"\x1b[17~")  # F6 opens the closed dock
+            send(b"\x1b")
             send(b"/reload\r")
             send(b"/diff\r")
             assert b"Failed to load extension" not in output
@@ -68,7 +72,7 @@ def main():
             pump(2)
             assert child.poll() == 0, "Pi did not exit cleanly"
             assert b"\x1b[?1006l" in output, "mouse reset missing"
-            print("PASS: installed Pi PTY startup, manual /diff and fallback, native draft, F6/Esc, reload, clean exit/mouse reset")
+            print("PASS: installed Pi PTY startup, manual /diff and F6 opening, native draft, F6/Esc, reload, clean exit/mouse reset")
             print("LIMIT: ANSI stream assertions outside Git; no visual/manual Herdr validation or lifecycle model run")
         except Exception:
             # Only synthetic isolated content is printed, never a real session transcript.
