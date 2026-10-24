@@ -1080,3 +1080,19 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 |---|---|---|
 | `npm run check` | PASS | Typecheck y 104/104 tests, 0 fallos/skips/cancelados. |
 | Búsqueda de referencias | PASS | Sin consumidores del experimento fuera de sus tres archivos eliminados. |
+
+### 2026-10-24 — Pre-M3.5 / política de comandos y apertura
+
+**Cambió**
+- `AGENTS.md`: `/diff` como único comando principal, `F6` conservado y eliminación de `/iteration-diff` autorizada para M3.5, sin aliases nuevos ni sobrescritura de comandos ajenos.
+- Apertura automática permitida exclusivamente por opt-in en `/diff-settings`, default Off, tras resultado final válido; sin captura intermedia, robo de foco, envío ni modificación del borrador y respetando cierres manuales. DoD alineado con esta excepción.
+- Ediciones puntuales; seguridad, snapshots, compatibilidad, Git e histórico documental conservados. No cambia runtime.
+
+**Validación**
+- Working tree inicialmente limpio. `npm run check`: PASS, typecheck + 104/104 tests, 0 fallos/skips/cancelados (Linux).
+- Revisión del diff y búsqueda de reglas de comandos/autoapertura en `AGENTS.md`: las tres reglas relacionadas quedan alineadas.
+- Pruebas físicas: NOT RUN; cambio exclusivamente documental.
+
+**Límite / próximo paso**
+- M3.5 pendiente de implementación. Esta sesión recibió además una copia de las instrucciones anteriores en su contexto de mayor prioridad; editar el archivo no reemplaza esa copia. Recargar las instrucciones del proyecto en una nueva sesión antes de implementar la eliminación del alias y el opt-in.
+- Commit documental separado, sólo `AGENTS.md` y esta entrada; sin push. REQUIREMENTS/RESEARCH conservan el histórico anterior; su actualización de decisiones corresponde al bloque M3.5.

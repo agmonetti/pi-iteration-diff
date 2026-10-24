@@ -50,7 +50,7 @@ La estructura es **propuesta**, no directorios ya existentes. Simplificar cuando
 - La interacción con internals `tui.layoutRoot` / `setLayoutRoot` se encapsula en un único `layout-adapter.ts` con detección de capacidad, ownership y cleanup.
 - Todo estado mutable se delimita por **Pi session ID + root del repositorio/worktree + iteration ID**. No mezclar panes ni proyectos.
 - Nunca escribir sobre el índice real de Git; nunca crear commits/stashes para capturar diffs.
-- El panel se abre **solo por acción explícita**. La captura silenciosa de snapshots no habilita popups automáticos.
+- Por defecto, el panel se abre exclusivamente mediante `/diff` o `F6`. Se permite apertura automática al finalizar una iteración sólo si el usuario habilitó explícitamente `Auto-open after iteration` en `/diff-settings` (default **Off**). Nunca abrir durante la captura ni por eventos intermedios; no robar foco al editor, enviar mensajes ni alterar borradores. Respetar cierres manuales durante la misma iteración y no presentar capturas inválidas o ambiguas como resultados confirmados.
 
 ## 3. Convenciones de implementación
 
@@ -59,7 +59,7 @@ La estructura es **propuesta**, no directorios ya existentes. Simplificar cuando
 - Usar herramientas de Pi TUI para medir columnas Unicode, manejar estilos, teclado, scroll y mouse; no computar ancho como `string.length`.
 - IO asíncrono cancelable cuando sea posible; límites de archivos, memoria, profundidad y tiempo configurables.
 - Nombres en inglés para código/comandos/API; documentación y reportes del proyecto en español.
-- Seguir la convención de slash commands de Pi. Registrar `/diff` **solo si no colisiona** con otra extensión; ofrecer comando alternativo `/iteration-diff` como fallback. No silenciar o sobrescribir comandos ajenos.
+- Seguir la convención de slash commands de Pi. `/diff` es el único comando principal del explorador y `F6` continúa como atajo; `/diff-settings` gestiona preferencias. Registrar `/diff` **solo si no colisiona** con otra extensión; informar la colisión sin silenciar ni sobrescribir comandos ajenos. M3.5 debe eliminar `/iteration-diff` del registro, sin crear aliases adicionales.
 - No confiar en extensión, nombre, stdout de herramientas o heurísticas como garantía de autoría del archivo.
 - Render y captura deben degradarse de forma segura ante errores. Restaurar root/editor/focus y liberar recursos.
 - Aplicación de feedback: construir un bloque compacto con `path`, `side`, `line range`, `excerpt`, `intent` y comentario. Preservar el texto previo y el orden del borrador; no autoenviar y no editar el código directamente.
@@ -138,7 +138,7 @@ Cada milestone debe producir:
 
 El proyecto solo se considera completado cuando:
 
-- `/diff` manual abre/cierra un dock lateral derecho con conversación y editor nativo operativos en Pi fullscreen; no se autoabre.
+- `/diff` manual abre/cierra un dock lateral derecho con conversación y editor nativo operativos en Pi fullscreen; `F6` continúa como atajo. No se autoabre por defecto; la apertura automática requiere consentimiento explícito mediante `Auto-open after iteration` en `/diff-settings` y cumple las garantías de apertura de la sección 2.
 - Por defecto muestra solo el **delta neto de la última petición completada**, separándolo de cambios previos sin commit. Incluye resultados de `write`, `edit` y comandos shell.
 - Se pueden seleccionar líneas y rangos con teclado y mouse en fullscreen, conservar selección al navegar y añadir **múltiples** fragmentos al prompt con `FIX`/`DISCUSS` sin borrar borrador ni enviar automáticamente.
 - El flujo de **arrastrar rangos hacia el editor** se probó; si el protocolo terminal lo impide en el entorno objetivo, documentar la limitación con evidencia, ofrecer alternativa de una acción y **no declarar paridad completa** sin aprobación del usuario.
