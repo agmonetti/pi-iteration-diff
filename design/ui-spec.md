@@ -74,12 +74,8 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 ## 4. Hunks y Líneas de Código (Unified Diff)
 
 - **Fila única por línea:** Un único renglón visual por línea de diff; sin envoltorio automático (no wrap).
-- **Gutter compacto y adaptativo:**
-  - Archivos creados: Columna única con números de línea nuevos (`newLine`), liberando 5 columnas adicionales para el código.
-  - Archivos eliminados: Columna única con números de línea antiguos (`oldLine`), liberando 5 columnas adicionales.
-  - Archivos modificados: Dos columnas compactas (`oldLine` y `newLine`) cuando ambas referencias son necesarias.
-  - Eliminación de sangrías redundantes: El código inicia en la columna 10 en archivos creados/eliminados (en lugar de columna 15).
-- **Gutter fijo ante desplazamiento horizontal:** `←`/`→` o `h`/`l` desplazan únicamente el contenido del código, manteniendo fijos el separador y el gutter. Un indicador `«` señala código oculto a la izquierda sin desplazar las columnas.
+- **Gutter contextual compacto (M4.1):** Una columna para todos los archivos: `oldLine` en eliminadas, `newLine` en agregadas y contexto. Ancho mínimo de cuatro dígitos, ampliable por archivo; `Line numbers: Off` la oculta. El modelo y los rangos old/new anexados permanecen completos. Overhead habitual 10 columnas frente a 15 del antiguo dual: 5 recuperadas en modificados, sin ganancia nueva en creados/eliminados. Sangría original preservada.
+- **Gutter fijo ante desplazamiento horizontal:** Con foco en el explorador, `←`/`→` o `h`/`l` desplazan ocho columnas de código del archivo activo expandido, también desde su encabezado. Borde, cursor, número y signo quedan fijos. `«` indica contenido oculto a la izquierda y `»` a la derecha (reserva una celda sólo con overflow). Offset independiente por archivo, acotado al contenido mostrado; se conserva al contraer, se ajusta al ampliar viewport y se reinicia al cambiar la identidad de iteración. `0`/`Home` reinicia el offset activo y conserva el salto existente al inicio del explorador. La rueda sigue siendo vertical: Pi 1.4.0 no expone un eje horizontal fiable. Protocolo humano y experimento de sangría aislado en `../M4.1.md`.
 - **Colores semánticos Pi Theme:** Adiciones (`toolDiffAdded`), eliminaciones (`toolDiffRemoved`), contexto (`text`), gutter (`dim`), borde (`border`), foco (`accent`).
 - **Encabezados de Hunk discretos:** Formato `@@ -12,3 +12,4 @@` en color tenue `muted`/`dim`.
 - **Selección de Hunk completo:** Posicionarse sobre el encabezado del hunk permite seleccionarlo íntegro para transferir.

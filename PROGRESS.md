@@ -1215,3 +1215,31 @@ nueva/CI nativa nueva NOT RUN; no declaración de DoD global ni avance a M4.
 **Git / límites / siguiente paso**
 - Inicio sin modificaciones tracked; `scripts/lab-horizontal-diff.ts` preexistente untracked leído y excluido. No existe documentación M4 específica en checkout: roadmap REQUIREMENTS/PROGRESS y laboratorio son las referencias disponibles; se creará protocolo M4.1.
 - Status/diff/cached revisados; commit separado `refactor(ui): compact diff line gutter`. Sin push. Continúa sólo fase 2 de M4.1; M4.2 fuera de alcance.
+
+### 2026-10-24 — M4.1 / fase 2 y preparación experimental de fase 3
+
+**Cambió**
+- `src/ui/diff-panel.ts`: offsets por path, reset por identidad de iteración, gutter fijo con ancho numérico por archivo, `«`/`»`, clamp según máximo mostrado y viewport real del hijo virtualizado. `h/l` y flechas funcionan desde encabezado/hunk/código del archivo expandido. Colapso conserva posición; resize la acota; métricas lazy invalidadas en rebuild. No cambios a snapshots/diffs/selección/formato/foco nativo.
+- `tests/diff-horizontal.test.ts`: ocho tests totales (seis nuevos desde fase 1), con independencia/colapso/iteración, límites y resize, Off, Unicode/tabs/cortas/vacías, selección y anexado con pan, recorte de glifos y fixture A/B. Test TUI real existente en `tests/diff-panel.test.ts` ampliado para pan desde header/layout hijo, resize y transcript intacto.
+- `tests/fixtures/indentation-lab.ts`: extensión experimental `/lab-diff a|b|close`, usa renderer actualizado; B reduce sólo visualmente espacios comunes por hunk y serializa el original al anexar. Datos sintéticos TS/Python/YAML con vacíos y hunks de distinta profundidad. No cargada por producto ni registrada en su runtime.
+- `M4.1.md`, `design/ui-spec.md`: contrato vigente, medidas de columnas, límites, instrucciones reproducibles Kitty/Herdr y comparación humana A/B. Laboratorio previo `scripts/` preservado sin modificaciones ni staging.
+
+**Pruebas ejecutadas — Linux, Node v26.12.0, Pi/TUI 1.4.0**
+| Comando / caso | Resultado | Evidencia |
+|---|---|---|
+| `npm run check` tras pan inicial | PASS | tsc + 133/133, 0 fallos/skips, 7130 ms. |
+| `npx --no-install tsx --test tests/diff-horizontal.test.ts` intermedio | PASS | 6/6; pruebas dirigidas pan/gutter/Unicode/contexto. |
+| `npm run check` final código/fixture | PASS | tsc + 139/139, 0 fallos/skips/cancelados, 6051 ms. |
+| `python3 tests/pty-smoke.py` | PASS | CLI instalado, /diff/F6, settings, borrador, reload, salida/reset mouse; PTY sintética, no prueba física Herdr. |
+| LSP activo cuatro TS cambiados | PARCIAL | 3 clean confirmados, 1 inconcluso, cero errores recibidos; tsc es gate completo. |
+| Arquitecto CLI delegado: plan y delta final | APROBADO sin regresiones nuevas | Sólo revisión estática suministrada, no ejecutó suite. Señaló tres riesgos preexistentes; follow-up contrastado contra padre excluye bloqueantes nuevos. |
+| Kitty / Herdr físico / decisión A vs B / CI nativa nueva | NOT RUN | Requieren operador/runners; protocolos en M4.1.md, no se inventa aceptación. |
+
+**Límites y decisiones**
+- Pi 1.4.0 `TuiMouseEvent` sólo expone wheelDelta escalar; parseWheelEvent acepta direcciones SGR 0/1, no 2/3. Sin eje horizontal fiable: no soporte de touchpad horizontal, hacks Shift+wheel ni interceptación global/Kitty. Rueda vertical y captura/resize conservan routing anterior.
+- Cinco columnas recuperadas con números hasta cuatro dígitos en modificados; `»` reserva una celda sólo con overflow derecho. Sin recorte de sangría en producto; B permanece experimental hasta validación visual humana. DoD físico de M4.1/global no certificado.
+- Riesgos previos encontrados por revisión: selección numérica puede retargetear tras rebuild estructural, selección multi-hunk conserva último header, Shift+Down desde header puede estancarse en path. Cuerpos correspondientes sin cambios frente a padre; no se introducen ni se refactorizan aquí. Comparar hunks individualmente y seleccionar después de expandir; pendientes documentados en M4.1.md.
+- Estado Git revisado antes del segundo commit; fase 1 en `a2bcc02 refactor(ui): compact diff line gutter`. Segundo commit por rutas explícitas `feat(ui): add per-file horizontal diff navigation`; no push, dependencias ni instalación/configuración modificadas.
+
+**Próximo paso / parada**
+- Operador valida producto y experimento A/B en Kitty/Herdr con M4.1.md; no decidir superioridad de B sin evidencia humana. No avanzar a M4.2.

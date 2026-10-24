@@ -236,7 +236,7 @@ test("real Pi viewport routes page navigation, wheel and resize independently of
   let dock: DockHandle;
   const p = new DiffPanel({ render: () => tui.requestRender(), editor: () => dock.focusEditor(),
     close: () => dock.close(), style: (_role, text) => text });
-  const f = files(100);
+  const f = files(100, [{ kind: "added", newLine: 12, text: "0123456789".repeat(16) }]);
   p.setView(view(f.files));
   dock = mountDock(tui, p);
   tui.start();
@@ -257,6 +257,11 @@ test("real Pi viewport routes page navigation, wheel and resize independently of
     terminal.input("\x1b[5~"); terminal.input("\x1b[H"); tui.renderNow(true);
     terminal.input("\x1b[<0;140;5M"); terminal.input("\x1b[<0;140;5m"); tui.renderNow(true);
     assert.ok(tui.getScreenLines().some(line => line.includes("▾ M file-0.ts")));
+    terminal.input("l"); tui.renderNow(true);
+    assert.ok(tui.getScreenLines().some(line => stripTerminalSequences(line).includes("12 +«890123")), "child layout supplies pan width without calling panel.render");
+    terminal.columns = 120; terminal.resize(); tui.renderNow(true);
+    assert.ok(tui.getScreenLines().some(line => stripTerminalSequences(line).includes("12 +«890123")), "resize retains valid pan");
+    assert.equal(nativeScroll.scrollTop, nativeTop);
     for (const height of [1, 2, 3]) {
       terminal.rows = height; terminal.resize(); tui.renderNow(true);
       assert.equal(tui.getScreenLines().length, height);

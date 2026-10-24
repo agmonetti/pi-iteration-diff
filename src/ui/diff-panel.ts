@@ -185,7 +185,8 @@ export function truncatePath(path: string, maxLength: number): string {
 class VirtualDiffScroll extends ScrollView {
   private lines: string[] = [];
   private width = 1;
-  constructor(private readonly count: () => number, private readonly line: (index: number, width: number) => string) {
+  constructor(private readonly count: () => number, private readonly line: (index: number, width: number) => string,
+    private readonly onWidth: (width: number) => void) {
     let owner: VirtualDiffScroll;
     const content: Component = {
       invalidate() {},
@@ -196,6 +197,7 @@ class VirtualDiffScroll extends ScrollView {
   }
   private prepare(width: number): string[] {
     this.width = width;
+    this.onWidth(width);
     this.lines = new Array<string>(this.count());
     return this.lines;
   }
@@ -223,7 +225,10 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private hasFocus = false;
   private readonly body: VirtualDiffScroll;
   private pressed = false;
-  private panX = 0;
+  private readonly offsets = new Map<string, number>();
+  private readonly codeWidths = new Map<string, number>();
+  private readonly numberWidths = new Map<string, number>();
+  private viewportWidth = 0;
   private inspecting = false;
   private showDetails = false;
   private preferences: DiffPanelPreferences;
@@ -241,7 +246,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
       filePaths: preferences?.filePaths ?? DEFAULT_DIFF_PREFERENCES.filePaths,
       collapseFiles: preferences?.collapseFiles ?? DEFAULT_DIFF_PREFERENCES.collapseFiles,
     };
-    this.body = new VirtualDiffScroll(() => this.diffEntries.length, (index, width) => this.entryLine(index, width));
+    this.body = new VirtualDiffScroll(() => this.diffEntries.length, (index, width) => this.entryLine(index, width),
+      width => { this.viewportWidth = width; });
     this.addChild({ invalidate() {}, render: width => this.heading(width) }, { basis: 3, shrink: 0, minSize: 3 });
     this.addChild(this.body, { basis: 0, grow: 1, shrink: 1, minSize: 0 });
     this.addChild({ invalidate() {}, render: width => [this.footer(width)] }, { basis: 1, shrink: 0, minSize: 1 });
@@ -286,7 +292,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
         }
       }
       this.cursor = 0;
-      this.panX = 0;
+      this.offsets.clear();
       this.inspecting = false;
       this.showDetails = false;
       this.clearSelection();
@@ -302,6 +308,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   private rebuild(): void {
     const entries: Entry[] = [];
+    this.codeWidths.clear();
+    this.numberWidths.clear();
     const hasFiles = this.view.files.length > 0;
 
     for (const text of this.view.notices.slice(0, MAX_NOTICES)) {
@@ -342,6 +350,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
           currentHunk++;
           entries.push({ kind: "hunk", file, row, hunkIndex: currentHunk });
         } else {
+          const number = row.kind === "removed" ? row.oldLine : row.newLine;
+          this.numberWidths.set(file.path, Math.max(this.numberWidths.get(file.path) ?? 4, String(number ?? "").length));
           entries.push({ kind: "row", file, row, hunkIndex: currentHunk, rowIndex: index });
         }
       }
@@ -571,6 +581,46 @@ export class DiffPanel extends VStack implements Component, Focusable {
     return [horizontal, line1, line2];
   }
 
+  private codeWidth(path: string, width: number): number {
+    const gutter = this.preferences.lineNumbers ? (this.numberWidths.get(path) ?? 4) + 1 : 0;
+    return Math.max(0, width - 5 - gutter); // border, cursor, space, sign, pan indicator
+  }
+
+  private maxOffset(path: string, width: number): number {
+    const available = this.codeWidth(path, width);
+    if (available === 0) return 0;
+    let longest = this.codeWidths.get(path);
+    if (longest === undefined) {
+      longest = 0;
+      // Measure only on pan, within the already bounded displayed rows; normal renders stay virtual.
+      for (const entry of this.diffEntries) {
+        if (entry.kind === "row" && entry.file.path === path) {
+          longest = Math.max(longest, visibleWidth(safeText(entry.row.text)));
+        }
+      }
+      this.codeWidths.set(path, longest);
+    }
+    return Math.max(0, longest - available);
+  }
+
+  private fileOffset(path: string, width: number): number {
+    const saved = this.offsets.get(path) ?? 0;
+    if (saved === 0 || !this.expanded.has(path)) return saved;
+    const offset = Math.min(saved, this.maxOffset(path, width));
+    this.offsets.set(path, offset);
+    return offset;
+  }
+
+  private panFile(delta: number): void {
+    const entry = this.diffEntries[this.cursor];
+    const path = entry && "file" in entry ? entry.file?.path : undefined;
+    if (!path || !this.expanded.has(path) || this.viewportWidth <= 0) return;
+    const offset = this.fileOffset(path, this.viewportWidth);
+    this.offsets.set(path, Math.max(0, Math.min(offset + delta, this.maxOffset(path, this.viewportWidth))));
+    this.invalidate();
+    this.actions.render();
+  }
+
   private footer(width: number): string {
     const active = this.diffEntries[this.cursor];
     if (this.inspecting && active) {
@@ -596,7 +646,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
       return this.actions.style("accent", truncateToWidth(text, width, "…"));
     }
 
-    const panStr = this.panX > 0 ? ` [pan +${this.panX}]` : "";
+    const path = active && "file" in active ? active.file?.path : undefined;
+    const panX = path ? this.fileOffset(path, width) : 0;
+    const panStr = panX > 0 ? ` [pan +${panX}]` : "";
     let text: string;
     if (width < 50) {
       text = `▏ Enter: expand${panStr} · a: append · Esc: editor`;
@@ -706,7 +758,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
     let numStr = "";
     if (this.preferences.lineNumbers) {
-      numStr = `${this.actions.style("dim", String(lineNumber ?? "").padStart(4))} `;
+      numStr = `${this.actions.style("dim", String(lineNumber ?? "").padStart(this.numberWidths.get(entry.file.path) ?? 4))} `;
     }
 
     const markStr = row.kind === "added" ? this.actions.style("added", mark)
@@ -714,11 +766,15 @@ export class DiffPanel extends VStack implements Component, Focusable {
       : mark;
 
     const rawCode = safeText(row.text);
-    let codePart = rawCode;
-    if (this.panX > 0) {
-      codePart = sliceByColumn(rawCode, this.panX, Number.MAX_SAFE_INTEGER);
+    const panX = this.fileOffset(entry.file.path, width);
+    const available = this.codeWidth(entry.file.path, width);
+    const overflow = visibleWidth(rawCode) > panX + available;
+    const textWidth = Math.max(0, available - (overflow ? 1 : 0));
+    let codePart = sliceByColumn(rawCode, panX, textWidth, true);
+    if (overflow && available > 0) {
+      codePart += " ".repeat(Math.max(0, textWidth - visibleWidth(codePart))) + "»";
     }
-    const sep = this.panX > 0 ? this.actions.style("dim", "«") : " ";
+    const sep = panX > 0 && visibleWidth(rawCode) > 0 ? this.actions.style("dim", "«") : " ";
     const codeStyled = row.kind === "added" ? this.actions.style("added", codePart)
       : row.kind === "removed" ? this.actions.style("removed", codePart)
       : this.actions.style("text", codePart);
@@ -734,6 +790,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   override render(width: number): string[] {
     if (width <= 0) return [];
+    this.viewportWidth = width;
     const lines = [...this.heading(width), ...this.body.visible(width), this.footer(width)];
     const verticalBorder = this.actions.style(this.focused ? "accent" : "dim", "▏");
     lines.forEach((line, index) => {
@@ -862,8 +919,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
       if (this.hasSelection()) this.clearSelection();
       this.moveCursor(-1);
     }
-    else if (matchesKey(data, "right") || data === "l") { this.panX += 8; this.actions.render(); return; }
-    else if (matchesKey(data, "left") || data === "h") { this.panX = Math.max(0, this.panX - 8); this.actions.render(); return; }
+    else if (matchesKey(data, "right") || data === "l") { this.panFile(8); return; }
+    else if (matchesKey(data, "left") || data === "h") { this.panFile(-8); return; }
     else if (matchesKey(data, "pageDown")) {
       if (this.hasSelection()) this.clearSelection();
       this.cursor += Math.max(1, this.body.viewportHeight - 1);
@@ -874,7 +931,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
     }
     else if (matchesKey(data, "home") || data === "0") {
       if (this.hasSelection()) this.clearSelection();
-      this.cursor = 0; this.panX = 0;
+      const active = this.diffEntries[this.cursor];
+      if (active && "file" in active && active.file) this.offsets.delete(active.file.path);
+      this.cursor = 0;
     }
     else if (matchesKey(data, "end")) {
       if (this.hasSelection()) this.clearSelection();
