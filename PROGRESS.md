@@ -1067,3 +1067,16 @@ Git 2.56.0, Pi/TUI npm fijados 1.4.0**
 **Límites / estado Git**
 - No incluye fixtures/experimentos `focus-border*` ni archivos `fake*`.
 - Las pruebas automatizadas verifican render, geometría, navegación, foco, resize y remount; no sustituyen la validación manual en otros terminales.
+
+### 2026-10-24 — Limpieza del experimento visual `focus-border`
+
+**Decisión**
+- Se eliminaron `tests/fixtures/focus-border.md` (protocolo manual obsoleto), `tests/fixtures/focus-border.ts` (overlay comparativo ajeno al dock de producto) y `tests/focus-border-experiment.test.ts` (sólo verificaba la geometría de esas muestras sintéticas).
+- El test sí entraba en `npm run check` por el glob `tests/*.test.ts`, pero no aportaba cobertura del borde final. `tests/diff-panel.test.ts` y `tests/native-pane-focus.test.ts` ya verifican `🭽▔▏`, su geometría, foco, resize y remount. No había consumidores externos de esos fixtures.
+- Copias exactas archivadas fuera del repositorio en `/tmp/pi-diff-focus-border-archive/`; no se cambió la UI.
+
+**Validación**
+| Comando | Resultado | Evidencia |
+|---|---|---|
+| `npm run check` | PASS | Typecheck y 104/104 tests, 0 fallos/skips/cancelados. |
+| Búsqueda de referencias | PASS | Sin consumidores del experimento fuera de sus tres archivos eliminados. |
