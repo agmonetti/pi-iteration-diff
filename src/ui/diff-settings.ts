@@ -126,7 +126,7 @@ export class DiffSettingsComponent implements Component {
     if (this.isEditingDockWidth) {
       lines.push(truncateToWidth(this.theme.fg("dim", "  ←/→: adjust (30%–60%) · Enter: confirm · Esc: cancel"), width));
     } else {
-      lines.push(truncateToWidth(this.theme.fg("dim", "  Saved in this session branch · ↑/↓: navigate · Enter: edit/toggle · Esc: close"), width));
+      lines.push(truncateToWidth(this.theme.fg("dim", "  Width saved per user; other settings per branch · ↑/↓: navigate · Enter: edit/toggle · Esc: close"), width));
     }
 
     return lines;

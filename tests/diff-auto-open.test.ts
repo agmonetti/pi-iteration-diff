@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import { initTheme, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, ScrollView, TuiAltScreen, VStack, type Component, type Terminal } from "@earendil-works/pi-tui";
+import { Container, ScrollView, TuiAltScreen, VStack, type Component, type Terminal, type TuiMouseEvent } from "@earendil-works/pi-tui";
 import iterationDiff from "../src/index.js";
 import { DEFAULT_SETTINGS, SETTINGS_ENTRY } from "../src/ui/diff-settings.js";
+import { DOCK_WIDTH_FILE } from "../src/ui/dock-width-store.js";
 import { ResizableDockRoot } from "../src/ui/layout-adapter.js";
 import { workspace } from "./fixtures/workspace.js";
 
@@ -19,7 +23,10 @@ class TestTerminal implements Terminal {
 
 type Handler = (event: never, ctx: ExtensionContext) => unknown;
 type Command = { handler: (args: string, ctx: ExtensionContext) => Promise<void> };
-async function fixture(autoOpen: boolean) {
+async function fixture(autoOpen: boolean, agentDir?: string) {
+  const dir = agentDir ?? await mkdtemp(join(tmpdir(), "diff-width-agent-"));
+  const oldAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = dir;
   initTheme("dark");
   const w = await workspace();
   const handlers = new Map<string, Handler[]>();
@@ -88,7 +95,12 @@ async function fixture(autoOpen: boolean) {
     async finish(aborted = false) { await dispatch("agent_settled", { aborted }); },
     setBranch(autoOpen: boolean) { entries = [{ type: "custom", customType: SETTINGS_ENTRY,
       data: { version: 1, ...DEFAULT_SETTINGS, autoOpen } }]; },
-    async close() { await dispatch("session_shutdown"); await w.close(); },
+    async close() {
+      await dispatch("session_shutdown"); await w.close();
+      if (oldAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      else process.env.PI_CODING_AGENT_DIR = oldAgentDir;
+      if (!agentDir) await rm(dir, { recursive: true, force: true });
+    },
   };
 }
 
@@ -219,11 +231,12 @@ test("Remember width persists resize only when On; branch restoration resets def
     await f.commands.get("diff")!.handler("", f.ctx);
     assert.equal(f.entries().length, count, "transient width was not persisted");
     await f.shortcuts.get("f6")!(f.ctx);
-    assert.equal(ratio(), saved);
+    assert.equal(ratio(), 0.45, "Off uses default on next opening");
     f.setBranch(false);
     await f.dispatch("session_tree");
     await f.shortcuts.get("f6")!(f.ctx);
-    assert.equal(ratio(), 0.45);
+    assert.equal(ratio(), 0.45, "Off restores default even with a saved global width");
+    await f.settings(Array(4).fill("\x1b[B").concat("\r")); // On
     f.failPersistence();
     f.tui.getFocusedComponent()!.handleInput!(">");
     await f.commands.get("diff")!.handler("", f.ctx);
@@ -231,6 +244,107 @@ test("Remember width persists resize only when On; branch restoration resets def
     assert.ok(f.notifications.some(text => text.includes("could not be saved")));
     assert.equal(f.writes(), 0);
   } finally { await f.close(); }
+});
+
+test("width and Remember follow the user across branches, sessions, projects and process restarts", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "diff-width-shared-"));
+  try {
+    const first = await fixture(false, agentDir);
+    try {
+      await assert.rejects(stat(join(agentDir, DOCK_WIDTH_FILE)), { code: "ENOENT" });
+      await first.shortcuts.get("f6")!(first.ctx);
+      first.tui.getFocusedComponent()!.handleInput!(">");
+      const saved = (first.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio;
+      first.setBranch(false);
+      await first.dispatch("session_tree");
+      await first.shortcuts.get("f6")!(first.ctx);
+      assert.equal((first.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, saved);
+      assert.equal(first.entries().at(-1)!.data.autoOpen, false);
+      const before = (await stat(join(agentDir, DOCK_WIDTH_FILE))).mtimeMs;
+      await first.commands.get("diff")!.handler("", first.ctx);
+      assert.equal((await stat(join(agentDir, DOCK_WIDTH_FILE))).mtimeMs, before, "unchanged width does not rewrite");
+    } finally { await first.close(); }
+    let configured = 0;
+    const second = await fixture(false, agentDir); // fresh extension + workspace, same agent dir
+    try {
+      await second.shortcuts.get("f6")!(second.ctx);
+      assert.ok((second.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio > 0.45);
+      await second.settings(["\r", "\x1b[C", "\r"]);
+      configured = (second.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio;
+      assert.equal(JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8")).dockWidth, configured * 100);
+      const moduleUrl = pathToFileURL(join(process.cwd(), "src/ui/dock-width-store.ts")).href;
+      const restarted = execFileSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e",
+        `import { loadDockWidth } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(loadDockWidth()))`],
+      { env: { ...process.env, PI_CODING_AGENT_DIR: agentDir }, encoding: "utf8" });
+      assert.equal(JSON.parse(restarted).value.dockWidth, configured * 100, "fresh Node process reads saved width");
+      await second.settings(Array(4).fill("\x1b[B").concat("\r")); // Off
+      assert.equal(JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8")).dockWidth, configured * 100);
+      await second.commands.get("diff")!.handler("", second.ctx);
+      await second.shortcuts.get("f6")!(second.ctx);
+      assert.equal((second.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, 0.45);
+      await second.commands.get("diff")!.handler("", second.ctx);
+    } finally { await second.close(); }
+    const third = await fixture(false, agentDir);
+    try {
+      await third.shortcuts.get("f6")!(third.ctx);
+      assert.equal((third.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, 0.45);
+      await third.settings(Array(4).fill("\x1b[B").concat("\r")); // On
+      await third.commands.get("diff")!.handler("", third.ctx);
+      await third.shortcuts.get("f6")!(third.ctx);
+      assert.equal((third.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, configured);
+    } finally { await third.close(); }
+  } finally { await rm(agentDir, { recursive: true, force: true }); }
+});
+
+test("separator drag writes once on release, not on each motion", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "diff-width-mouse-"));
+  const f = await fixture(false, agentDir);
+  try {
+    await f.shortcuts.get("f6")!(f.ctx);
+    const panel = f.tui.getFocusedComponent()!;
+    const mouse = (type: TuiMouseEvent["type"], width: number): TuiMouseEvent => ({
+      type, button: "left", x: 0, y: 3, screenX: 60, screenY: 3, width, height: 24,
+      ctrl: false, alt: false, shift: false,
+    });
+    panel.handleMouse?.(mouse("press", 54));
+    panel.handleMouse?.(mouse("drag", 59));
+    await assert.rejects(stat(join(agentDir, DOCK_WIDTH_FILE)), { code: "ENOENT" });
+    panel.handleMouse?.(mouse("drag", 60));
+    panel.handleMouse?.(mouse("release", 60));
+    assert.equal(JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8")).dockWidth, 50);
+  } finally { await f.close(); await rm(agentDir, { recursive: true, force: true }); }
+});
+
+test("missing global config uses legacy branch; invalid or inaccessible config falls back safely", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "diff-width-invalid-"));
+  try {
+    let f = await fixture(false, agentDir);
+    try {
+      f.setBranch(false);
+      f.entries()[0]!.data.dockWidth = 53; // M3.5 legacy branch, no global file
+      await f.dispatch("session_tree");
+      await f.shortcuts.get("f6")!(f.ctx);
+      assert.equal((f.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, 0.53);
+      assert.equal(JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8")).dockWidth, 53);
+    } finally { await f.close(); }
+    await writeFile(join(agentDir, DOCK_WIDTH_FILE), JSON.stringify({ version: 1, dockWidth: 900, rememberWidth: true }));
+    f = await fixture(false, agentDir);
+    try {
+      await f.shortcuts.get("f6")!(f.ctx);
+      assert.equal((f.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, 0.45);
+      assert.ok(f.notifications.some(text => text.includes("invalid or inaccessible")));
+    } finally { await f.close(); }
+    await rm(join(agentDir, DOCK_WIDTH_FILE));
+    await mkdir(join(agentDir, DOCK_WIDTH_FILE));
+    f = await fixture(false, agentDir);
+    try {
+      await f.shortcuts.get("f6")!(f.ctx);
+      assert.equal((f.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, 0.45);
+      assert.ok(f.notifications.some(text => text.includes("invalid or inaccessible")));
+      f.tui.getFocusedComponent()!.handleInput!(">");
+      assert.ok(f.notifications.some(text => text.includes("Global diff width could not be saved")));
+    } finally { await f.close(); }
+  } finally { await rm(agentDir, { recursive: true, force: true }); }
 });
 
 test("layout updates dock width on hot settings change without altering editor draft", async () => {

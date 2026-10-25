@@ -6,6 +6,7 @@ import { createIterationView } from "./diffs/iteration-diff.js";
 import { registerCaptureLifecycle } from "./lifecycle/pi-lifecycle.js";
 import { workspaceRoot } from "./snapshots/capture.js";
 import { DEFAULT_SETTINGS, SETTINGS_ENTRY, restoreSettings, showDiffSettings } from "./ui/diff-settings.js";
+import { loadDockWidth, saveDockWidth, type SavedDockWidth } from "./ui/dock-width-store.js";
 
 /** Silent capture; the native conversation/editor are never replaced. */
 export default function iterationDiff(pi: ExtensionAPI): void {
@@ -13,6 +14,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
   let dock: DockHandle | undefined;
   let panel: DiffPanel | undefined;
   let settings = { ...DEFAULT_SETTINGS };
+  let savedWidth: SavedDockWidth | undefined;
   let owner: ExtensionContext | undefined;
   let closedWindow: string | undefined;
   let attemptedWindow: string | undefined;
@@ -26,12 +28,20 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     try { pi.appendEntry(SETTINGS_ENTRY, { version: 1, ...settings }); }
     catch { ctx?.ui.notify("Diff settings could not be saved; changes apply only in memory", "warning"); }
   };
+  const saveWidth = (ctx = owner): void => {
+    const value = { dockWidth: settings.rememberWidth ? settings.dockWidth : (savedWidth?.dockWidth ?? settings.dockWidth),
+      rememberWidth: settings.rememberWidth };
+    if (savedWidth?.dockWidth === value.dockWidth && savedWidth.rememberWidth === value.rememberWidth) return;
+    try { saveDockWidth(value); savedWidth = value; }
+    catch { ctx?.ui.notify("Global diff width could not be saved; changes apply only in memory", "warning"); }
+  };
   const rememberWidth = (): void => {
     if (!dock || !settings.rememberWidth) return;
     const width = dock.getDockRatio() * 100;
-    if (width === settings.dockWidth) return;
+    if (width === settings.dockWidth) { saveWidth(); return; }
     settings = { ...settings, dockWidth: width };
     persist();
+    saveWidth();
   };
   let shownState: typeof capture.state | undefined;
   let generation = 0;
@@ -50,6 +60,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     closedWindow = windowKey();
     rememberWidth();
     dismiss();
+    if (!settings.rememberWidth) settings = { ...settings, dockWidth: DEFAULT_SETTINGS.dockWidth };
   };
   const refresh = (): void => {
     if (!panel || shownState === capture.state) return;
@@ -167,6 +178,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     description: "Configure diff presentation and opt-in automatic opening",
     handler: async (_args: string, ctx: ExtensionContext): Promise<void> => {
       const version = settingsGeneration;
+      const previous = { dockWidth: settings.dockWidth, rememberWidth: settings.rememberWidth };
       await showDiffSettings(ctx, settings, next => {
         if (version !== settingsGeneration) return;
         settings = next;
@@ -174,12 +186,41 @@ export default function iterationDiff(pi: ExtensionAPI): void {
         dock?.setDockRatio(settings.dockWidth / 100);
         persist(ctx);
       });
+      if (version === settingsGeneration) {
+        if (!previous.rememberWidth && settings.rememberWidth &&
+            settings.dockWidth === DEFAULT_SETTINGS.dockWidth && savedWidth) {
+          settings = { ...settings, dockWidth: savedWidth.dockWidth };
+          dock?.setDockRatio(settings.dockWidth / 100);
+          persist(ctx);
+        }
+        if (previous.rememberWidth !== settings.rememberWidth ||
+            (settings.rememberWidth && previous.dockWidth !== settings.dockWidth)) saveWidth(ctx);
+        if (!settings.rememberWidth && !dock) settings = { ...settings, dockWidth: DEFAULT_SETTINGS.dockWidth };
+      }
     },
   };
   const restore = (ctx: ExtensionContext): void => {
     settingsGeneration++;
     dismiss();
     settings = restoreSettings(ctx.sessionManager.getBranch());
+    const loaded = loadDockWidth();
+    if (loaded.status === "ok") {
+      savedWidth = loaded.value;
+      settings = { ...settings, rememberWidth: loaded.value.rememberWidth,
+        dockWidth: loaded.value.rememberWidth ? loaded.value.dockWidth : DEFAULT_SETTINGS.dockWidth };
+    } else {
+      savedWidth = undefined;
+      if (loaded.status !== "missing") {
+        settings = { ...settings, dockWidth: DEFAULT_SETTINGS.dockWidth, rememberWidth: DEFAULT_SETTINGS.rememberWidth };
+        ctx.ui.notify("Global diff width is invalid or inaccessible; using defaults", "warning");
+      } else if (!settings.rememberWidth) {
+        saveWidth(ctx);
+        settings = { ...settings, dockWidth: DEFAULT_SETTINGS.dockWidth };
+      } else if (settings.dockWidth !== DEFAULT_SETTINGS.dockWidth) {
+        // Adopt a legacy branch width once; a later branch must not replace global state.
+        saveWidth(ctx);
+      }
+    }
     closedWindow = undefined;
     attemptedWindow = undefined;
   };

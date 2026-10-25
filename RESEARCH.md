@@ -581,3 +581,15 @@ El ratio deja de ser global de módulo; el adaptador recibe preferencias del own
 Los cambios visuales no modifican filas reales ni formato de anexado. Contrato y
 protocolo en `M3.5.md`; resultados efectivos en `PROGRESS.md`. M4 no iniciado.
 
+## 18. M4.4 — Ancho global (2026-10-24)
+
+La decisión histórica por rama de §17 no satisface `Remember dock width` entre
+procesos. En Pi 1.4.0 `docs/extensions.md` (State) indica almacenamiento externo
+para datos fuera de sesión; `docs/configuration.md` define directorio por usuario y
+`getAgentDir()` está exportada en `dist/index.d.ts`. No hay API pública para
+escribir claves propias en settings globales de Pi. Se guarda exclusivamente
+ancho y flag Remember en `<agent-dir>/iteration-diff.json` sin tocar `settings.json`.
+Los demás campos y consentimiento auto-open siguen en appendEntry/getBranch.
+Migración de rama sólo si no hay archivo global; tras crearlo, global prevalece.
+Véase alcance, fallbacks y limitaciones en `M3.5.md` (actualización M4.4).
+
