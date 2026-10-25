@@ -1,79 +1,79 @@
-# Investigación técnica #2 — Claude Code Diff: Bash Attribution & Concurrency Deep Dive
+# Technical Research #2 — Claude Code Diff: Bash Attribution & Concurrency Deep Dive
 
-**Fecha de investigación:** 2026-10-23  
-**Repositorio de referencia:** `anthropics/claude-code`, directorio `mods/diff`  
-**Alcance:** Investigación documental estricta (sin modificaciones de código runtime, sin alterar M1 ni ADR-003).
-
----
-
-## 1. Resumen ejecutivo
-
-Este documento profundiza en dos mecanismos críticos del sistema `/diff` de Claude Code (`mods/diff`):
-1. **Atribución de cambios producidos por Bash:** Demuestra que Claude Code combina la inspección acumulada del working tree (`git diff HEAD`, untracked files) con telemetría específica de ejecución de herramientas (`bashEditDiff`, introducida en v2.1.269). Sin embargo, **no ofrece una atribución perfecta ni determinista por turno** para procesos en segundo plano o subprocesos desatados fuera del ciclo directo de la herramienta Bash.
-2. **Concurrencia y prevención de actualizaciones obsoletas:** Identifica el uso coordinado de un guardián de concurrencia (`isRefreshing`), un backend de Git con ruta anclada (`gitBackendOf`), y promesas acotadas por modo (`fetchDiff`) que descartan o serializan actualizaciones superpuestas para evitar condiciones de carrera.
+**Research Date:** 2026-10-23
+**Reference Repository:** `anthropics/claude-code`, directory `mods/diff`
+**Scope:** Strict documentary research (no runtime code modifications, M1 and ADR-003 unaltered).
 
 ---
 
-## 2. Análisis de atribución de cambios producidos por Bash
+## 1. Executive Summary
 
-### 2.1. ¿Cómo detecta el backend las modificaciones de Bash y PowerShell?
-Claude Code opera mediante un modelo híbrido para capturar modificaciones impulsadas por shell (`bash` / `powershell`):
-- **Working Tree Global (`Current`):** Por defecto, cualquier comando ejecutado en la terminal persistente que modifique, cree o elimine archivos altera el estado no commiteado del repositorio (`git diff HEAD` + `git status --porcelain`).
-- **Telemetría de Herramienta (`bashEditDiff`):** A partir de la versión v2.1.269, el sistema registra `toolUseResult.bashEditDiff` en los hooks de `PostToolUse`. Esto captura de forma heurística los diffs unificados generados alrededor de comandos de edición por shell (p. ej., `sed`, heredocs, redirecciones `>` o scripts ejecutados).
-
-### 2.2. ¿Aparecen únicamente en `Current` o también en turnos (`T1`, `T2`)?
-- **Turnos (`T1`, `T2`, ...):** Se apoyan en el grabador del motor (`Record.recorderOf(engine)`) asociado a las transiciones de turnos del LLM y eventos de herramientas.
-- **Limitación fundamental:** Los cambios realizados por subprocesos huérfanos, procesos en segundo plano (*daemonized/async jobs*), o modificaciones acumuladas fuera del turno activo **no pueden atribuirse de forma determinista a un turno individual `Tn`**. Por lo tanto, tales cambios gravitan y se reflejan primariamente en la vista acumulada del working tree (`Current`), mientras que los turnos individuales dependen estrictamente de los límites de invocación de la herramienta.
-
-### 2.3. Casos límite (Múltiples archivos, subprocesses, archivos pre-alterados)
-- **Múltiples archivos:** Si un script de Bash modifica simultáneamente múltiples archivos, `bashEditDiff` procesa el diff por archivo resultante, pero las fallas parciales o truncamientos de salida por límites de buffer del shell pueden omitir archivos o hunks enteros.
-- **Subprocesos y pipes complejos:** Si un comando invoca un proceso secundario que escribe en archivos de forma asíncrona tras el retorno del hook `PostToolUse`, el sistema no captura el evento en el turno actual, requiriendo un sondeo del working tree (`Current`) para detectarlo.
-- **Archivos pre-alterados:** Si un archivo ya modificado por el usuario u otro turno es alterado nuevamente por Bash, el delta calculado representa la diferencia neta respecto al baseline original de la sesión (`wasDirtyAtStart`), no una superposición algebraica de parches por turno.
-
-> **Respuesta a la pregunta central:** Claude Code **no puede reconstruir el delta exacto producido por Bash en un turno individual** en presencia de ejecuciones asíncronas o subprocesos; sólo puede atribuir cambios directos acotados al hook `PostToolUse` de la herramienta y reflejar el estado acumulado en el working tree (`Current`).
+This document delves into two critical mechanisms of Claude Code's `/diff` system (`mods/diff`):
+1. **Attribution of changes produced by Bash:** Demonstrates that Claude Code combines accumulated working tree inspection (`git diff HEAD`, untracked files) with tool-specific execution telemetry (`bashEditDiff`, introduced in v2.1.269). However, **it does not offer perfect or deterministic per-turn attribution** for background processes or spawned subprocesses outside the direct cycle of the Bash tool.
+2. **Concurrency and stale update prevention:** Identifies the coordinated use of a concurrency guard (`isRefreshing`), a pinned-path Git backend (`gitBackendOf`), and mode-bounded promises (`fetchDiff`) that discard or serialize overlapping updates to prevent race conditions.
 
 ---
 
-## 3. Análisis de concurrencia y actualización obsoleta
+## 2. Bash-Produced Changes Attribution Analysis
 
-### 3.1. Mecanismos de control de concurrencia
-El análisis de `mods/diff/hooks/register.ts` y componentes asociados revela los siguientes patrones defensivos frente a la concurrencia:
-- **Flag de exclusión mutua (`isRefreshing`):** Cuando una actualización o sondeo de diffs está en curso, `isRefreshing = true` bloquea nuevas solicitudes concurrentes de recálculo hasta finalizar la promesa activa.
-- **Backend anclado (`gitBackendOf`):** Todas las consultas de Git se ejecutan utilizando un entorno raíz fijado por `git rev-parse --show-toplevel` con `--git-dir` y `--work-tree` explícitos, previniendo derivas de directorio o corrupción de contexto si la sesión cambia de ruta de trabajo.
-- **Invalidación por modo solicitado (`requestedMode`):** Los resultados de `fetchDiff` se cachean y asocian al modo activo. Si la sesión, rama o `HEAD` cambian, o si el usuario cambia de modo, las promesas pendientes se invalidan o se descartarán si el resultado pertenece a un estado anterior.
+### 2.1. How does the backend detect Bash and PowerShell modifications?
+Claude Code operates via a hybrid model to capture shell-driven modifications (`bash` / `powershell`):
+- **Global Working Tree (`Current`):** By default, any command executed in persistent terminal that modifies, creates, or deletes files alters uncommitted repository state (`git diff HEAD` + `git status --porcelain`).
+- **Tool Telemetry (`bashEditDiff`):** Starting from version v2.1.269, the system logs `toolUseResult.bashEditDiff` in `PostToolUse` hooks. This heuristically captures unified diffs generated around shell editing commands (e.g., `sed`, heredocs, `>` redirections, or executed scripts).
 
-### 3.2. Prevención de condiciones de carrera
-- Serialización estricta de las operaciones de lectura de Git y renderizado de la TUI.
-- Verificación síncrona del estado antes y después de resolver llamadas asíncronas, evitando que una respuesta lenta de Git superpuesta sobrescriba una mutación posterior del working tree.
+### 2.2. Do they appear exclusively in `Current` or also in turns (`T1`, `T2`)?
+- **Turns (`T1`, `T2`, ...):** Rely on engine recorder (`Record.recorderOf(engine)`) associated with LLM turn transitions and tool events.
+- **Fundamental limitation:** Changes made by orphaned subprocesses, background/async jobs, or accumulated modifications outside active turn **cannot be deterministically attributed to an individual turn `Tn`**. Therefore, such changes gravitate and reflect primarily in accumulated working tree view (`Current`), while individual turns depend strictly on tool invocation boundaries.
+
+### 2.3. Edge Cases (Multiple files, subprocesses, pre-altered files)
+- **Multiple files:** If a Bash script simultaneously modifies multiple files, `bashEditDiff` processes the resulting per-file diff, but partial failures or shell buffer limit truncations may omit entire files or hunks.
+- **Complex subprocesses and pipes:** If a command invokes a secondary process writing to files asynchronously after `PostToolUse` hook return, the system does not capture event in current turn, requiring working tree polling (`Current`) to detect it.
+- **Pre-altered files:** If a file already modified by user or another turn is altered again by Bash, calculated delta represents net difference relative to session's original baseline (`wasDirtyAtStart`), not an algebraic superposition of per-turn patches.
+
+> **Answer to central question:** Claude Code **cannot reconstruct the exact delta produced by Bash in an individual turn** in the presence of asynchronous execution or subprocesses; it can only attribute direct changes bounded to tool's `PostToolUse` hook and reflect accumulated state in working tree (`Current`).
 
 ---
 
-## 4. Diagramas de secuencia
+## 3. Concurrency and Stale Update Analysis
 
-### 4.1. Flujo de ejecución de Bash y captura de diffs (`bashEditDiff`)
+### 3.1. Concurrency Control Mechanisms
+Analysis of `mods/diff/hooks/register.ts` and associated components reveals following defensive patterns against concurrency:
+- **Mutual exclusion flag (`isRefreshing`):** When diff update or polling is in progress, `isRefreshing = true` blocks concurrent recalculation requests until active promise finishes.
+- **Pinned backend (`gitBackendOf`):** All Git queries execute using root environment pinned by `git rev-parse --show-toplevel` with explicit `--git-dir` and `--work-tree`, preventing directory drifts or context corruption if session changes working path.
+- **Requested mode invalidation (`requestedMode`):** `fetchDiff` results cached and associated to active mode. If session, branch, or `HEAD` change, or if user changes mode, pending promises invalidated or discarded if result belongs to prior state.
+
+### 3.2. Race Condition Prevention
+- Strict serialization of Git read operations and TUI rendering.
+- Synchronous verification of state before and after resolving async calls, preventing slow overlapping Git response from overwriting subsequent working tree mutation.
+
+---
+
+## 4. Sequence Diagrams
+
+### 4.1. Bash Execution Flow and Diff Capture (`bashEditDiff`)
 
 ```mermaid
 sequenceDiagram
-    participant User as Usuario / LLM
+    participant User as User / LLM
     participant Engine as Engine / Bash Tool
     participant Hook as PostToolUse Hook
     participant Git as Git Backend (pinned)
     participant UI as Panel / Diff View
 
-    User->>Engine: Ejecuta comando Bash (ej. sed / script)
-    Engine->>Hook: Dispara evento PostToolUse
-    alt bashEditDiff habilitado
-        Hook->>Git: Calcula delta unificado del archivo modificado
-        Git-->>Hook: Retorna toolUseResult.bashEditDiff
-    else Fallback a Working Tree
-        Hook->>Git: Consulta estado general (git status / diff)
-        Git-->>Hook: Retorna delta acumulado Current
+    User->>Engine: Run Bash command (e.g. sed / script)
+    Engine->>Hook: Trigger PostToolUse event
+    alt bashEditDiff enabled
+        Hook->>Git: Compute unified delta of modified file
+        Git-->>Hook: Return toolUseResult.bashEditDiff
+    else Working Tree Fallback
+        Hook->>Git: Query general status (git status / diff)
+        Git-->>Hook: Return accumulated delta Current
     end
-    Hook->>UI: Actualiza modelo de diffs de la sesión
-    UI-->>User: Renderiza cambios en el panel lateral
+    Hook->>UI: Update session diff model
+    UI-->>User: Render changes in side panel
 ```
 
-### 4.2. Prevención de actualizaciones obsoletas por concurrencia
+### 4.2. Stale Update Prevention via Concurrency
 
 ```mermaid
 sequenceDiagram
@@ -82,43 +82,43 @@ sequenceDiagram
     participant Guard as isRefreshing Guard
     participant Git as Git Backend
 
-    Timer->>Reg: Dispara solicitud de actualización de diff
-    Reg->>Guard: Comprueba estado (isRefreshing)
+    Timer->>Reg: Trigger diff update request
+    Reg->>Guard: Check state (isRefreshing)
     alt isRefreshing == true
-        Guard-->>Reg: Descarta solicitud concurrente (Evita race condition)
+        Guard-->>Reg: Discard concurrent request (Avoids race condition)
     else isRefreshing == false
-        Reg->>Guard: Establece isRefreshing = true
-        Reg->>Git: Ejecuta fetchDiff(requestedMode)
-        Git-->>Reg: Retorna nuevo baseline / hunks
-        Reg->>Guard: Establece isRefreshing = false
-        Reg-->>UI: Aplica renderizado atómico del diff actualizado
+        Guard-->>Reg: Set isRefreshing = true
+        Reg->>Git: Run fetchDiff(requestedMode)
+        Git-->>Reg: Return new baseline / hunks
+        Reg->>Guard: Set isRefreshing = false
+        Reg-->>UI: Apply atomic render of updated diff
     end
 ```
 
 ---
 
-## 5. Comparación con ADR-003 y la arquitectura de M1
+## 5. Comparison with ADR-003 and M1 Architecture
 
-| Dimensión | Claude Code (`mods/diff`) | ADR-003 / M1 (`pi-iteration-diff`) | Evaluación |
+| Dimension | Claude Code (`mods/diff`) | ADR-003 / M1 (`pi-iteration-diff`) | Evaluation |
 |---|---|---|---|
-| **Unidad de Agrupación** | Turnos individuales (`T1`, `T2`) + Vista `Current` | Última iteración completada del usuario (`agent_settled`) | **ADAPT:** Pi carece de turnos LLM directos expuestos de forma idéntica; la iteración lógica es más robusta y evita falsas atribuciones por reintentos. |
-| **Atribución de Bash** | Heurística `bashEditDiff` en `PostToolUse` + Working Tree | Captura agnóstica de working tree antes/después de la iteración (`M1`) | **ADOPT / ALIGN:** M1 evita adivinar atribuciones de Bash por turno y captura el delta neto de la iteración, manteniendo la simplicidad sin telemetría frágil. |
-| **Concurrencia** | `isRefreshing` lock + pinned git backend | Serialización síncrona en controlador aislado y verificación post-await | **ADOPT:** El uso de un flag de exclusión mutua (`isRefreshing`) y un backend anclado es directamente aplicable a nuestro controlador de snapshots. |
+| **Grouping Unit** | Individual turns (`T1`, `T2`) + `Current` view | Last completed user iteration (`agent_settled`) | **ADAPT:** Pi lacks direct LLM turns exposed identically; logical iteration is more robust and avoids false attribution from retries. |
+| **Bash Attribution** | `bashEditDiff` heuristic in `PostToolUse` + Working Tree | Agnostic working tree capture pre/post iteration (`M1`) | **ADOPT / ALIGN:** M1 avoids guessing Bash per-turn attribution and captures iteration net delta, keeping simplicity without fragile telemetry. |
+| **Concurrency** | `isRefreshing` lock + pinned git backend | Synchronous serialization in isolated controller and post-await verification | **ADOPT:** Using mutual exclusion flag (`isRefreshing`) and pinned backend is directly applicable to our snapshot controller. |
 
 ---
 
-## 6. Recomendaciones concretas (`ADOPT`, `ADAPT`, `REJECT`)
+## 6. Concrete Recommendations (`ADOPT`, `ADAPT`, `REJECT`)
 
-1. **`ADOPT` — Guardián de concurrencia (`isRefreshing`):** Implementar un semáforo o flag booleano de exclusión en nuestro controlador de captura para descartar sondeos superpuestos de Git durante operaciones asíncronas pesadas.
-2. **`ADOPT` — Pinned Git Root:** Asegurar que todas las llamadas a Git operen con `--git-dir` y `--work-tree` explícitos descubiertos una sola vez al iniciar la sesión (`git rev-parse --show-toplevel`), evitando problemas si la ejecución cambia de directorio.
-3. **`ADAPT` — Gestión de cambios de Bash:** No intentar una atribución granular por turno para comandos Bash complejos o asíncronos; mantener la atribución a nivel de iteración de usuario (ADR-003), utilizando el estado antes/después de la ejecución del agente.
-4. **`REJECT` — Grabadores propietarios del motor (`Record.recorderOf`):** Rechazado por depender de los internals cerrados del SDK de Claude Code. Pi utiliza eventos públicos estables (`pi-lifecycle.ts`).
+1. **`ADOPT` — Concurrency Guard (`isRefreshing`):** Implement semaphore or boolean exclusion flag in our capture controller to discard overlapping Git polls during heavy async operations.
+2. **`ADOPT` — Pinned Git Root:** Ensure all Git calls operate with explicit `--git-dir` and `--work-tree` discovered once upon session start (`git rev-parse --show-toplevel`), avoiding issues if execution changes directory.
+3. **`ADAPT` — Bash Changes Handling:** Do not attempt granular per-turn attribution for complex or asynchronous Bash commands; maintain attribution at user iteration level (ADR-003), using pre/post agent execution state.
+4. **`REJECT` — Proprietary Engine Recorders (`Record.recorderOf`):** Rejected as depending on closed internal Claude Code SDK architecture. Pi uses stable public events (`pi-lifecycle.ts`).
 
 ---
 
-## 7. Riesgos no resueltos y evidencia necesaria
+## 7. Unresolved Risks and Necessary Evidence
 
-- **Riesgo 1:** Concurrencia extrema donde múltiples escrituras concurrentes ocurren exactamente en el límite de un cambio de iteración.
-  - *Evidencia necesaria:* Tests de integración con escrituras rápidas superpuestas en el worktree durante el evento `agent_settled`.
-- **Riesgo 2:** Rendimiento de Git status/diff en repositorios masivos con miles de archivos untracked.
-  - *Evidencia necesaria:* Benchmarks de tiempo de captura de snapshots con repositorios sintéticos grandes (>= 10,000 archivos).
+- **Risk 1:** Extreme concurrency where multiple concurrent writes occur exactly at iteration change boundary.
+  - *Necessary evidence:* Integration tests with rapid overlapping writes in worktree during `agent_settled` event.
+- **Risk 2:** Git status/diff performance in massive repositories with thousands of untracked files.
+  - *Necessary evidence:* Snapshot capture time benchmarks with large synthetic repositories (>= 10,000 files).

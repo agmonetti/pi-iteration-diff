@@ -1,115 +1,115 @@
-# Auditoría de Fidelidad Visual: M2 vs. Especificación de Diseño (`/design`)
+# Visual Fidelity Audit: M2 vs. Design Specification (`/design`)
 
-**Fecha de auditoría:** 2026-10-23  
-**Proyecto:** `pi-iteration-diff`  
-**Milestone auditado:** M2 (Visor real de diffs con archivos colapsables)  
-**Alcance:** Comparación exhaustiva entre los documentos de diseño (`design/ui-spec.md`, `design/mockups.md`, `design/theme-tokens.json`) y la implementación real (`src/ui/diff-panel.ts`, `src/ui/layout-adapter.ts`, `src/diffs/iteration-diff.ts`, `src/index.ts`).
+**Audit Date:** 2026-10-23
+**Project:** `pi-iteration-diff`
+**Audited Milestone:** M2 (Real diff viewer with collapsible files)
+**Scope:** Exhaustive comparison between design documents (`design/ui-spec.md`, `design/mockups.md`, `design/theme-tokens.json`) and actual implementation (`src/ui/diff-panel.ts`, `src/ui/layout-adapter.ts`, `src/diffs/iteration-diff.ts`, `src/index.ts`).
 
 ---
 
-## 1. Matriz de Cumplimiento (Compliance Matrix)
+## 1. Compliance Matrix
 
-| Área de UI / Requisito de Diseño | Estado | Referencia de Código (`src/`) | Notas y Hallazgos de Implementación |
+| UI Area / Design Requirement | Status | Code Reference (`src/`) | Implementation Notes and Findings |
 |---|---|---|---|
-| **Apertura y Ocultamiento Exclusivo** | `IMPLEMENTED` | `src/index.ts:44-92` | Se abre/cierra por comando explícito `/diff` o `/iteration-diff`. No se autoabre. |
-| **Colapso Inicial por Defecto (M2)** | `IMPLEMENTED` | `src/ui/diff-panel.ts:128` | Todos los archivos inician contraídos en cada iteración nueva. |
-| **Expansiones Independientes** | `IMPLEMENTED` | `src/ui/diff-panel.ts:103,147` | El conjunto `expanded` persiste durante la sesión para la misma iteración; se limpia al cambiar de iteración. |
-| **Ancho Proporcional / Adaptativo** | `IMPLEMENTED` | `src/ui/layout-adapter.ts:36-42` | Ancho responsivo real (35-40%, `basis: 36, grow: 40, minSize: 34, maxSize: 70`) preservando ancho mínimo del chat (`minSize: 52, grow: 60`). |
-| **Ocultamiento Automático (< 90 cols)** | `IMPLEMENTED` | `src/ui/layout-adapter.ts:38-41` | El dock se oculta automáticamente si el ancho total es menor a 90 columnas. |
-| **Separador Vertical / Borde de Dock** | `IMPLEMENTED` | `src/ui/diff-panel.ts:182` | Borde `│` estilizado con token `border` de forma uniforme e independiente del contenido de cada línea. |
-| **Indicador de Foco Minimalista** | `IMPLEMENTED` | `src/ui/diff-panel.ts:168,183` | Cabecera y cursor `>` con token `accent` solo en foco; indicador atenuado `dim`/`muted` sin foco. |
-| **Selector de Scope en Cabecera** | `IMPLEMENTED` | `src/ui/diff-panel.ts:166-169` | Cabecera estructurada con badge de scope contextual `[Last*]` cuando el ancho es >= 42 cols. |
-| **Estilos de Tokens de Tema (`toolDiffAdded` / `toolDiffRemoved`)** | `IMPLEMENTED` | `src/index.ts:71-82`, `src/ui/diff-panel.ts:188-260` | Mapeo completo de tokens (`border`, `bold`, `dim`, `accent`, `muted`, `warning`, `toolDiffAdded`, `toolDiffRemoved`, `text`). |
-| **Gutter de Números de Línea** | `IMPLEMENTED` | `src/ui/diff-panel.ts:246` | Números de línea estilizados con `dim` y signos `+`/`-` con `toolDiffAdded`/`toolDiffRemoved`. |
-| **Lectura de Líneas Largas y Rutas** | `IMPLEMENTED` | `src/ui/diff-panel.ts:36-64,174,250` | Desplazamiento horizontal (`←`/`→`) con indicador `«`, truncamiento medio inteligente de rutas (`truncatePath`) e inspección bajo demanda (`i`). |
-| **Truncamiento Estricto con Elipsis** | `IMPLEMENTED` | `src/ui/diff-panel.ts:30,167,222` | Truncamiento acotado con elipsis sin desbordes de celda en terminal. |
-| **Atajos de Teclado y Paginación** | `IMPLEMENTED` | `src/ui/diff-panel.ts:269-286` | `↑↓`, `Enter`, `[]`, `{}`, `←→` (pan), `0` (reset), `i` (inspect), `PgUp/Down`, `Home/End`, `Esc`/`Tab` (`editor`), `q` (`close`). |
-| **Scroll Independiente del Transcript** | `IMPLEMENTED` | `src/ui/diff-panel.ts:40-67` | `VirtualDiffScroll` con `ScrollView` y rueda de ratón dedicada. |
-| **Gestión de Estados Especiales (ADR-003 / Batch Net / Abort)** | `IMPLEMENTED` | `src/diffs/iteration-diff.ts:206-265` | Mapeo textual fiel de ventanas agrupadas, abortos, truncamiento y estados vacíos. |
+| **Exclusive Opening and Hiding** | `IMPLEMENTED` | `src/index.ts:44-92` | Opens/closes via explicit command `/diff` or `/iteration-diff`. Does not auto-open. |
+| **Default Initial Collapse (M2)** | `IMPLEMENTED` | `src/ui/diff-panel.ts:128` | All files start collapsed on each new iteration. |
+| **Independent Expansions** | `IMPLEMENTED` | `src/ui/diff-panel.ts:103,147` | The `expanded` set persists during the session for the same iteration; cleared on iteration switch. |
+| **Proportional / Adaptive Width** | `IMPLEMENTED` | `src/ui/layout-adapter.ts:36-42` | Real responsive width (35-40%, `basis: 36, grow: 40, minSize: 34, maxSize: 70`) preserving chat minimum width (`minSize: 52, grow: 60`). |
+| **Automatic Hiding (< 90 cols)** | `IMPLEMENTED` | `src/ui/layout-adapter.ts:38-41` | Dock hides automatically if total width is less than 90 columns. |
+| **Vertical Separator / Dock Border** | `IMPLEMENTED` | `src/ui/diff-panel.ts:182` | Styled `│` border with `border` token uniformly and independently of each line's content. |
+| **Minimalist Focus Indicator** | `IMPLEMENTED` | `src/ui/diff-panel.ts:168,183` | Header and cursor `>` with `accent` token only on focus; dimmed/`muted` indicator without focus. |
+| **Scope Selector in Header** | `IMPLEMENTED` | `src/ui/diff-panel.ts:166-169` | Structured header with contextual scope badge `[Last*]` when width >= 42 cols. |
+| **Theme Token Styles (`toolDiffAdded` / `toolDiffRemoved`)** | `IMPLEMENTED` | `src/index.ts:71-82`, `src/ui/diff-panel.ts:188-260` | Full mapping of tokens (`border`, `bold`, `dim`, `accent`, `muted`, `warning`, `toolDiffAdded`, `toolDiffRemoved`, `text`). |
+| **Line Number Gutter** | `IMPLEMENTED` | `src/ui/diff-panel.ts:246` | Line numbers styled with `dim` and signs `+`/`-` with `toolDiffAdded`/`toolDiffRemoved`. |
+| **Long Line and Path Reading** | `IMPLEMENTED` | `src/ui/diff-panel.ts:36-64,174,250` | Horizontal scrolling (`←`/`→`) with `«` indicator, smart middle path truncation (`truncatePath`), and on-demand inspection (`i`). |
+| **Strict Ellipsis Truncation** | `IMPLEMENTED` | `src/ui/diff-panel.ts:30,167,222` | Bounded ellipsis truncation without terminal cell overflows. |
+| **Keyboard Shortcuts and Pagination** | `IMPLEMENTED` | `src/ui/diff-panel.ts:269-286` | `↑↓`, `Enter`, `[]`, `{}`, `←→` (pan), `0` (reset), `i` (inspect), `PgUp/Down`, `Home/End`, `Esc`/`Tab` (`editor`), `q` (`close`). |
+| **Transcript-Independent Scroll** | `IMPLEMENTED` | `src/ui/diff-panel.ts:40-67` | `VirtualDiffScroll` with `ScrollView` and dedicated mouse wheel. |
+| **Special State Handling (ADR-003 / Batch Net / Abort)** | `IMPLEMENTED` | `src/diffs/iteration-diff.ts:206-265` | Faithful text mapping of batched windows, aborts, truncation, and empty states. |
 
 ---
 
-## 2. Desviaciones Visuales Observadas
+## 2. Observed Visual Deviations
 
-1. **Rigidez Dimensional del Dock (34 columnas fijas):**
-   - *Diseño:* Proporcional al ancho del terminal (`35% - 40%` o adaptable entre 34 y 42 columnas según el espacio disponible).
-   - *Realidad:* `basis: 34` fijo en `layout-adapter.ts`. En terminales estándar de 120 columnas, el dock ocupa exactamente 34 celdas, dejando 86 celdas al chat de Pi (aproximadamente 28%, por debajo del mínimo de diseño).
+1. **Dock Dimensional Rigidity (Fixed 34 Columns):**
+   - *Design:* Proportional to terminal width (`35% - 40%` or adaptable between 34 and 42 columns depending on available space).
+   - *Reality:* Fixed `basis: 34` in `layout-adapter.ts`. In standard 120-column terminals, the dock occupies exactly 34 cells, leaving 86 cells to Pi's chat (approximately 28%, below design minimum).
 
-2. **Pérdida de Jerarquía Tipográfica y Color en Cabeceras de Archivo:**
-   - *Diseño:* El nombre del archivo en negrita (`font-weight: 600`), estadísticas `+3 / -2` con colores diferenciados de adición y eliminación.
-   - *Realidad:* `src/ui/diff-panel.ts` renderiza el nombre y las estadísticas como una cadena de texto plana concatenada (`[modificado] +3/-2`) sin estilos específicos de negrita ni separación clara de colores en las estadísticas.
+2. **Loss of Typographic Hierarchy and Color in File Headers:**
+   - *Design:* File name in bold (`font-weight: 600`), statistics `+3 / -2` with distinct addition and deletion colors.
+   - *Reality:* `src/ui/diff-panel.ts` renders name and statistics as a concatenated plain text string (`[modified] +3/-2`) without specific bold styles or clear color separation in statistics.
 
-3. **Inconsistencia en el Indicador de Foco (`>`):**
-   - *Diseño:* El cursor indicador de línea activa (`>`) y el resaltado de cabecera solo se activan cuando el panel tiene el foco de usuario.
-   - *Realidad:* La columna de control siempre antepone `> ` o `  ` independientemente de si el foco está en el chat o en el dock, y el título cambia de color pero mantiene el marcador de fila activo todo el tiempo.
+3. **Inconsistency in Focus Indicator (`>`):**
+   - *Design:* Active line indicator cursor (`>`) and header highlight activate only when panel has user focus.
+   - *Reality:* Control column always prepends `>` or `  ` regardless of whether focus is on chat or dock, and title changes color but keeps active row marker all the time.
 
-4. **Ausencia de Selectores de Scope y Badges Superiores:**
-   - *Diseño:* Pestañas superiores `[Last*] Current History`.
-   - *Realidad:* Omitidas en la implementación de M2, lo que obliga al usuario a usar únicamente el comando sin feedback visual del alcance actual.
-
----
-
-## 3. Problemas de Usabilidad Detectados
-
-1. **Truncamiento Severo de Rutas de Archivo y Código:**
-   - Con un ancho fijo de 34 columnas, descontando el prefijo de expansión (`▾ ` o `▸ `) y el sufijo de estadísticas (` [modificado] +12/-3`), **quedan menos de 15 caracteres visibles para las rutas de archivo**. Rutas comunes como `src/integrations/herdr/manager.ts` se truncan irreconociblemente a `src/integrat…`.
-   - Dentro de los archivos expandidos, el espacio de código útil se reduce a solo **19 caracteres** (ancho total 34 menos 15 de gutter y separadores), provocando que casi cualquier línea de código con indentación quede fuera de la vista sin scroll horizontal en el panel.
-
-2. **Línea de Acciones / Footer Saturada e Invisible:**
-   - El texto del footer (`Enter/clic abrir · ↑↓ PgUp/PgDn · [] archivo · {} hunk · Esc editor · q cerrar`) tiene 73 caracteres de longitud.
-   - En el dock de 34 columnas, **el pie de página se trunca por completo**, ocultando por completo las instrucciones de uso para el usuario.
-
-3. **Duplicación y Confusión en Números de Línea (Gutter):**
-   - El formato actual muestra `old` y `new` de forma contigua en 11 caracteres (`old.padStart(4) + ' ' + next.padStart(4)`), pero en líneas de contexto o adiciones puras genera espacios vacíos excesivos o alineaciones extrañas que dificultan la lectura rápida comparativa con un diff unificado estándar.
+4. **Absence of Scope Selectors and Top Badges:**
+   - *Design:* Top tabs `[Last*] Current History`.
+   - *Reality:* Omitted in M2 implementation, forcing users to rely solely on command without visual feedback of current scope.
 
 ---
 
-## 4. Diferenciación: Limitaciones de Pi TUI vs. Decisiones de Implementación
+## 3. Detected Usability Issues
 
-| Aspecto | Naturaleza | Justificación / Evidencia |
+1. **Severe Truncation of File Paths and Code:**
+   - With a fixed width of 34 columns, subtracting expansion prefix (`▾ ` or `▸ `) and stats suffix (` [modified] +12/-3`), **less than 15 characters remain visible for file paths**. Common paths like `src/integrations/herdr/manager.ts` get unrecognizably truncated to `src/integrat…`.
+   - Inside expanded files, useful code space reduces to only **19 characters** (total width 34 minus 15 for gutter and separators), causing almost any indented code line to fall out of view without horizontal scrolling in the panel.
+
+2. **Saturated and Invisible Actions Line / Footer:**
+   - Footer text (`Enter/click open · ↑↓ PgUp/PgDn · [] file · {} hunk · Esc editor · q close`) is 73 characters long.
+   - In the 34-column dock, **the footer gets completely truncated**, completely hiding usage instructions from the user.
+
+3. **Duplication and Confusion in Line Numbers (Gutter):**
+   - Current format shows `old` and `new` contiguously in 11 columns (`old.padStart(4) + ' ' + next.padStart(4)`), but in context lines or pure additions it produces excessive whitespace or strange alignments that hinder quick comparative reading against a standard unified diff.
+
+---
+
+## 4. Differentiation: Pi TUI Limitations vs. Implementation Decisions
+
+| Aspect | Nature | Justification / Evidence |
 |---|---|---|
-| **Incapacidad de mostrar fondos de color por celda complejos** | Limitación TUI | `@earendil-works/pi-tui` opera con cadenas de texto ANSI devueltas por componentes; aplicar estilos por celda fragmentaria incrementa el riesgo de corrupción de secuencias ANSI en terminales restrictivas (como algunos multiplexores de Herdr). |
-| **Ancho fijo de 34 columnas** | **Decisión de implementación** | *Evitable.* La API de `HStack` y `Component` acepta pesos (`grow`, `basis`, proporciones). La fijación a 34 columnas fue una simplificación de M2 para garantizar estabilidad, pero contradice el principio de adaptabilidad de la especificación. |
-| **Ausencia de footer corto o responsivo** | **Decisión de implementación** | *Evitable.* El texto del footer no se adaptó al ancho reducido del dock, provocando su truncamiento total. |
-| **Falta de pestañas de scope (`Current`/`History`)** | Decisión de alcance M2 | *Correcto.* La especificación de M2 acotó explícitamente que `Current` y `History` pertenecen a fases posteriores, por lo que su ausencia en M2 es una decisión de diseño respetada, no un defecto. |
+| **Inability to show complex per-cell background colors** | TUI Limitation | `@earendil-works/pi-tui` operates with ANSI text strings returned by components; applying per-fragment cell styles increases the risk of ANSI sequence corruption in restrictive terminals (such as some Herdr multiplexers). |
+| **Fixed 34-column width** | **Implementation Decision** | *Avoidable.* `HStack` and `Component` API accepts weights (`grow`, `basis`, proportions). Fixing to 34 columns was an M2 simplification to guarantee stability, but contradicts specification adaptability principle. |
+| **Absence of short or responsive footer** | **Implementation Decision** | *Avoidable.* Footer text was not adapted to reduced dock width, causing total truncation. |
+| **Lack of scope tabs (`Current`/`History`)** | M2 Scope Decision | *Correct.* M2 specification explicitly bounded that `Current` and `History` belong to later phases, making their absence in M2 a respected design decision, not a defect. |
 
 ---
 
-## 5. Correcciones Priorizadas (Roadmap de Ajuste Visual)
+## 5. Prioritized Corrections (Visual Adjustment Roadmap)
 
-1. **Prioridad Alta (Bloqueador de Usabilidad):**
-   - **Footer responsivo:** Adaptar el texto del pie de página según el ancho disponible del dock (ej: si ancho < 50, mostrar únicamente `[Esc] Editor  [q] Cerrar`).
-   - **Formato de estadísticas y nombres de archivo:** Permitir priorizar la ruta del archivo frente a las estadísticas cuando el ancho es reducido, truncando el nombre por la izquierda o compactando el indicador de estado (`[m]` en lugar de `[modificado]`).
+1. **High Priority (Usability Blocker):**
+   - **Responsive footer:** Adapt footer text according to available dock width (e.g., if width < 50, show only `[Esc] Editor  [q] Close`).
+   - **File statistics and name formatting:** Allow prioritizing file path over statistics when width is reduced, truncating name from the left or compacting status indicator (`[m]` instead of `[modified]`).
 
-2. **Prioridad Media (Fidelidad Visual):**
-   - **Ancho proporcional adaptativo:** Modificar `layout-adapter.ts` para que el basis del dock escale entre 36 y 46 columnas cuando el terminal supere las 120 columnas (`DOCK_PROPORTIONAL_RATIO`), en lugar de mantener estáticas 34 columnas.
-   - **Jerarquía de Foco:** Asegurar que el indicador de fila activa `>` solo aparezca cuando `this.hasFocus === true`, reduciendo el ruido visual en modo lectura.
+2. **Medium Priority (Visual Fidelity):**
+   - **Adaptive proportional width:** Modify `layout-adapter.ts` so dock basis scales between 36 and 46 columns when terminal exceeds 120 columns (`DOCK_PROPORTIONAL_RATIO`), instead of keeping static 34 columns.
+   - **Focus Hierarchy:** Ensure active row indicator `>` appears only when `this.hasFocus === true`, reducing visual noise in reading mode.
 
-3. **Prioridad Baja (Refinamiento Estético - No urgente para M2):**
-   - Integración de colores de fondo (`addedBg`/`removedBg`) mediante pruebas de regresión de terminal ANSI.
+3. **Low Priority (Aesthetic Refinement - Not urgent for M2):**
+   - Integration of background colors (`addedBg`/`removedBg`) via ANSI terminal regression tests.
 
 ---
 
-## 6. Recomendaciones de Implementación Concreta para el Agente de Código
+## 6. Concrete Implementation Recommendations for Code Agent
 
-- **No reescribir M2:** Los motores de diff, la virtualización de scroll y la separación de ciclos de vida funcionan correctamente (81/81 tests pasando). Los cambios deben limitarse exclusivamente a la capa de presentación (`src/ui/diff-panel.ts` y `src/ui/layout-adapter.ts`).
-- **Ajuste del Footer en `diff-panel.ts`:**
+- **Do not rewrite M2:** Diff engines, scroll virtualization, and lifecycle separation work correctly (81/81 tests passing). Changes must be strictly limited to presentation layer (`src/ui/diff-panel.ts` and `src/ui/layout-adapter.ts`).
+- **Footer adjustment in `diff-panel.ts`:**
   ```ts
   private footer(width: number): string {
     const short = width < 45;
-    const text = short 
-      ? "Enter: abrir · Esc: editor · q: cerrar"
-      : "Enter/clic: abrir · ↑↓: navegar · Esc: editor · q: cerrar";
+    const text = short
+      ? "Enter: open · Esc: editor · q: close"
+      : "Enter/click: open · ↑↓: navigate · Esc: editor · q: close";
     return this.actions.style("muted", truncateToWidth(`│ ${text}`, width, "–"));
   }
   ```
-- **Optimización del Gutter y Ancho Mínimo:** Evaluar elevar `MIN_COLUMNS_THRESHOLD` de 90 a 100 columnas si el dock requiere 34+ celdas para evitar el colapso visual de rutas y código.
+- **Gutter and Minimum Width Optimization:** Evaluate raising `MIN_COLUMNS_THRESHOLD` from 90 to 100 columns if dock requires 34+ cells to prevent visual collapse of paths and code.
 
 ---
 
-## 7. Estado de Corrección (Implementado en M2 Corrección de Fidelidad Visual)
+## 7. Correction Status (Implemented in M2 Visual Fidelity Correction)
 
-- **Dock adaptable:** Implementado en `src/ui/layout-adapter.ts` mediante `basis: 40, minSize: 34, maxSize: 55`, permitiendo adaptación fluida en terminales anchas y medianas.
-- **Footer responsivo:** Implementado en `src/ui/diff-panel.ts` con conmutación automática a modo corto (< 45 cols) para evitar truncamiento.
-- **Estadísticas de archivo:** Formateadas con espacios explícitos (`+3 / -2`) según los mockups.
-- **Verificación:** Suite de pruebas ampliada a 82/82 tests pasando exitosamente (`npm run check`).
+- **Adaptive dock:** Implemented in `src/ui/layout-adapter.ts` via `basis: 40, minSize: 34, maxSize: 55`, allowing smooth adaptation in wide and medium terminals.
+- **Responsive footer:** Implemented in `src/ui/diff-panel.ts` with automatic switching to short mode (< 45 cols) to prevent truncation.
+- **File statistics:** Formatted with explicit spaces (`+3 / -2`) matching mockups.
+- **Verification:** Test suite expanded to 82/82 tests passing successfully (`npm run check`).

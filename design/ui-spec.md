@@ -1,32 +1,32 @@
 # UI Specification: pi-iteration-diff
 
-**Versión:** 2.0 — Especificación definitiva aprobada por el usuario  
-**Entorno de ejecución:** Pi Coding Agent (Terminal interactiva fullscreen y dentro de Herdr).  
-**Tipo de interfaz:** Terminal User Interface (TUI) montada como extensión sobre `@earendil-works/pi-tui`.
+**Version:** 2.0 — Definitive specification approved by the user
+**Execution Environment:** Pi Coding Agent (Fullscreen interactive terminal and inside Herdr).
+**Interface Type:** Terminal User Interface (TUI) mounted as an extension over `@earendil-works/pi-tui`.
 
 ---
 
-## 1. Principios de diseño definitivos
+## 1. Definitive Design Principles
 
-1. **Extensión no intrusiva sobre Pi:** El panel derecho se monta dinámicamente preservando intactos el transcript de la conversación y el editor nativo de Pi a la izquierda. Por defecto se abre/cierra mediante `/diff`; F6 abre/enfoca. M3.5 permite auto-open sólo por opt-in explícito tras iteración individual completa, sin robar foco; elimina `/iteration-diff`.
-2. **Consumo estricto del tema activo:** No se introduce ni se exige un tema propio obligatorio. Todos los colores, estilos y contrastes se resuelven dinámicamente desde `ctx.ui.theme` según la configuración del usuario en Pi (`system`, `dark`, `light` o tema personalizado).
-3. **Prioridad visual de la selección:** Cuando una línea (añadida, eliminada o de contexto) forma parte de un rango seleccionado, el estilo de selección (`selectedBg` o inversión de video) tiene **prioridad visual absoluta** sobre los fondos de adición y borrado, certificando con precisión qué líneas están marcadas.
-4. **Minimalismo y sobriedad en terminal:** Evitar adornos gráficos innecesarios, badges pesados o pestañas ficticias (sin `Current` ni `History` mientras esos modos no existan).
-5. **Transferencia de contexto pura sin autoenvío:** La única acción principal es anexar el fragmento seleccionado (`a`) al borrador del editor nativo de Pi. No se introducen comandos `FIX`, `DISCUSS` ni prompts prefabricados. Jamás se dispara el envío automático y se preserva íntegramente el borrador existente.
-6. **Retorno automático de foco:** Al presionar `a`, se anexa el contexto y el foco regresa automáticamente al editor nativo de Pi para continuar redactando la instrucción libremente. El panel permanece abierto y conserva sus expansiones.
+1. **Non-intrusive extension over Pi:** The right panel mounts dynamically while preserving Pi's conversation transcript and native editor intact on the left. By default it opens/closes via `/diff`; F6 opens/focuses. M3.5 allows auto-open only by explicit opt-in after a complete individual iteration, without stealing focus; removes `/iteration-diff`.
+2. **Strict consumption of the active theme:** No custom theme is introduced or required. All colors, styles, and contrasts are resolved dynamically from `ctx.ui.theme` according to the user's configuration in Pi (`system`, `dark`, `light`, or custom theme).
+3. **Visual priority of selection:** When a line (added, deleted, or context) is part of a selected range, the selection style (`selectedBg` or video inversion) has **absolute visual priority** over addition and deletion backgrounds, precisely certifying which lines are marked.
+4. **Minimalism and terminal sobriety:** Avoid unnecessary graphical ornaments, heavy badges, or fictitious tabs (no `Current` or `History` while those modes do not exist).
+5. **Pure context transfer without auto-sending:** The sole primary action is appending the selected snippet (`a`) to Pi's native editor draft. No `FIX`, `DISCUSS`, or prefabricated prompts are introduced. Automatic sending is never triggered, and the existing draft is fully preserved.
+6. **Automatic focus return:** Upon pressing `a`, context is appended and focus automatically returns to Pi's native editor to continue drafting freely. The panel remains open and retains its expansions.
 
 ---
 
-## 2. Parámetros de Layout y Redimensionamiento Interactivo
+## 2. Layout and Interactive Resizing Parameters
 
-El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del terminal y preserva un ancho funcional mínimo para el chat y editor nativos.
+The right-side dock uses an initial target width of **45%** of the terminal and preserves a minimum functional width for the native chat and editor.
 
 ```text
 ┌────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────┐
 │  PI TRANSCRIPT / CONVERSATION                              │  DIFF DOCK (45% terminal width)                         │
 │                                                            │                                                         │
-│  User: Refactorizá el cálculo de tasas                     │  │ DIFF · Last iteration                        2 files │
-│  Agent: Apliqué la normalización en calculator.ts...       │  │ +12 / -4                                             │
+│  User: Refactor rate calculation                           │  │ DIFF · Last iteration                        2 files │
+│  Agent: I applied normalization in calculator.ts...        │  │ +12 / -4                                             │
 │                                                            │  │                                                      │
 │                                                            │  │ ▾ calculator.ts M +3 / -2                   │
 │                                                            │  │     src/utils/calculator.ts                          │
@@ -36,103 +36,103 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 │                                                            │  │                                                      │
 ├────────────────────────────────────────────────────────────┤  │ ▸ rate.ts A +9 / -0                          │
 │  PI NATIVE EDITOR                                          │  │     src/core/rate.ts                                 │
-│  > Revisá también las excepciones|                         │  │                                                      │
+│  > Review exceptions as well|                              │  │                                                      │
 │                                                            │  │ Enter: expand · a: append · ↑↓: navigate · Esc: edit │
 └────────────────────────────────────────────────────────────┴──┴──────────────────────────────────────────────────────┘
 ```
 
-### Tabla de parámetros de layout
+### Layout Parameter Table
 
-| Parámetro | Valor por defecto | Comportamiento |
+| Parameter | Default Value | Behavior |
 |---|---|---|
-| `MIN_COLUMNS_THRESHOLD` | `90 cols` | Si el ancho total es menor, el dock se oculta automáticamente y el foco regresa al editor nativo para salvaguardar la legibilidad del chat. |
-| `DOCK_INITIAL_RATIO` | `0.45` (45%) | Proporción inicial del ancho del terminal asignada al dock. |
-| `CHAT_MIN_WIDTH` | `46 cols` | Ancho mínimo garantizado para el transcript y editor de Pi. |
-| `DOCK_MIN_WIDTH` | `34 cols` | Ancho mínimo del panel de diff al achicarlo. |
-| `DOCK_MAX_WIDTH` | `60% terminal` | Ratio configurable entre 30% y 60%; mínimos de conversación/dock prevalecen en terminal pequeño. |
+| `MIN_COLUMNS_THRESHOLD` | `90 cols` | If total width is smaller, the dock hides automatically and focus returns to the native editor to safeguard chat readability. |
+| `DOCK_INITIAL_RATIO` | `0.45` (45%) | Initial terminal width proportion assigned to the dock. |
+| `CHAT_MIN_WIDTH` | `46 cols` | Guaranteed minimum width for Pi's transcript and editor. |
+| `DOCK_MIN_WIDTH` | `34 cols` | Minimum diff panel width when shrinking. |
+| `DOCK_MAX_WIDTH` | `60% terminal` | Configurable ratio between 30% and 60%; conversation/dock minimums prevail in small terminal. |
 
-### Redimensionamiento
-- **Arrastre de ratón:** Arrastrar el separador vertical `│` ajusta dinámicamente el ancho del dock.
-- **Teclado:** Atajos `[` / `]` o `Ctrl+Left` / `Ctrl+Right` permiten expandir o contraer el dock en pasos de 4 columnas.
-- **Persistencia de estado:** El ancho ajustado se adapta a resize; Remember dock width On lo guarda por rama de sesión. Off mantiene el ajuste transitorio hasta cerrar. Las seis preferencias y su alcance se especifican en `../docs/milestones/M3.5.md`.
-
----
-
-## 3. Explorador de Archivos Inline (Dos Líneas por Encabezado)
-
-- **Inline con diffs:** Cada archivo presenta su contenido unified directamente debajo de su encabezado sin un visor separado.
-- **Colapso inicial:** Por defecto todos contraídos; `/diff-settings` permite expandir al cargar una nueva iteración sin resetear expansiones actuales.
-- **Expansiones independientes:** `Enter` o clic en el encabezado alternan únicamente ese archivo. Múltiples archivos pueden permanecer abiertos a la vez.
-- **Encabezado de dos líneas:**
-  - **Línea 1 (Principal):** Indicador de expansión (`▾`/`▸`), estado compacto (`A`, `M`, `D`) antes del nombre destacado (`bold`) y estadísticas (`+3 / -2`). Los estados describen sólo el delta observado; no consultan staging ni renames de Git.
-  - **Línea 2 (Secundaria):** Ruta relativa atenuada (`dim`/`muted`), sangrada discretamente (`    src/path/to/file.ts`).
-- **Inspección de ruta completa:** La ruta nunca se pierde; ante anchos reducidos se trunca con `truncatePath` y el modo de inspección `i` o la barra inferior permiten ver la ruta completa sin cortes.
-- **Diferenciación visual:** Distingue el archivo activo (cursor `>`), el archivo expandido (`▾`) y el estado de foco del panel (`accent`).
+### Resizing
+- **Mouse drag:** Dragging the vertical separator `│` dynamically adjusts dock width.
+- **Keyboard:** Shortcuts `[` / `]` or `Ctrl+Left` / `Ctrl+Right` allow expanding or collapsing the dock in steps of 4 columns.
+- **State persistence:** Adjusted width adapts to resize; Remember dock width On saves it per session branch. Off keeps transient adjustment until close. All six preferences and their scope are specified in `../docs/milestones/M3.5.md`.
 
 ---
 
-## 4. Hunks y Líneas de Código (Unified Diff)
+## 3. Inline File Explorer (Two Lines per Header)
 
-- **Fila única por línea:** Un único renglón visual por línea de diff; sin envoltorio automático (no wrap).
-- **Gutter contextual compacto (M4.1):** Una columna para todos los archivos: `oldLine` en eliminadas, `newLine` en agregadas y contexto. Ancho mínimo de cuatro dígitos, ampliable por archivo; `Line numbers: Off` la oculta. El modelo y los rangos old/new anexados permanecen completos. Overhead habitual 10 columnas frente a 15 del antiguo dual: 5 recuperadas en modificados, sin ganancia nueva en creados/eliminados. Sangría original preservada.
-- **Gutter fijo ante desplazamiento horizontal:** Con foco en el explorador, `←`/`→` o `h`/`l` desplazan ocho columnas de código del archivo activo expandido, también desde su encabezado. Borde, cursor, número y signo quedan fijos. `«` indica contenido oculto a la izquierda y `»` a la derecha (reserva una celda sólo con overflow). Offset independiente por archivo, acotado al contenido mostrado; se conserva al contraer, se ajusta al ampliar viewport y se reinicia al cambiar la identidad de iteración. `0`/`Home` reinicia el offset activo y conserva el salto existente al inicio del explorador. La rueda sigue siendo vertical: Pi 1.4.0 no expone un eje horizontal fiable. Protocolo humano y experimento de sangría aislado en `../docs/milestones/M4.1.md`.
-- **Colores semánticos Pi Theme:** Adiciones (`toolDiffAdded`), eliminaciones (`toolDiffRemoved`), contexto (`text`), gutter (`dim`), borde (`border`), foco (`accent`).
-- **Encabezados de Hunk discretos:** Formato `@@ -12,3 +12,4 @@` en color tenue `muted`/`dim`.
-- **Selección de Hunk completo:** Posicionarse sobre el encabezado del hunk permite seleccionarlo íntegro para transferir.
-
----
-
-## 5. Cabecera y Footer Compactos y Responsivos (English-only)
-
-### Cabecera de Dos Líneas (`basis: 2`)
-- El dock añade una fila superior real fuera del scroll: `🭽` + `▔` hasta el ancho visible, en accent con foco y en dim sin foco. Los laterales y prefijos usan `▏`; el área de contenido/mouse empieza debajo del borde superior. No se usa SGR overline.
-- **Línea 1 (Título y alcance):** `│ DIFF · <Scope>` a la izquierda y cantidad de archivos alineada a la derecha (`N files` o `1 file`).
-  - **Alcances contextuales (ADR-003):**
-    - `Last iteration`: Iteración individual completa normal.
-    - `Batch Net`: Ventana agrupada con múltiples entradas.
-    - `Unverified`: Ventana sin atribución verificada.
-    - `Partial`: Captura incompleta o parcial.
-    - `Cancelled`: Ejecución interrumpida o cancelada.
-    - `Failed`: Ejecución fallida con cambios netos observados.
-    - `Unavailable`: Diff o captura no disponible.
-    - `Capturing`: Captura en curso.
-  - **Diferenciación conceptual de exclusiones y omisiones:** Las rutas excluidas por política (.git, node_modules, límites de snapshot) no añaden `[omissions]` a la cabecera; sus detalles permanecen accesibles bajo demanda en la vista compacta de información (`d`).
-- **Línea 2 (Resumen de cambios):** `│ +added / -removed` utilizando los tokens semánticos de Pi (`toolDiffAdded`, `toolDiffRemoved`, `dim`).
-  - Sin cambios: `│ No changes` en estilo `dim`.
-  - Estadísticas no disponibles: `│ stats unavailable` en estilo `dim`.
-- **Detalles bajo demanda:** Conmutables mediante teclado (`d`) o clic con ratón en la cabecera (`y === 0 || y === 1`).
-
-### Footer (1 línea)
-- Todo en inglés, adaptable al ancho del dock:
-  - Sin selección (< 50 cols): `│ Enter: expand · a: append · Esc: editor`
-  - Sin selección (< 75 cols): `│ Enter: expand · a: append · ↑↓: navigate · Esc: editor`
-  - Estándar (>= 75 cols): `│ Enter: expand · a: append · ↑↓: navigate · Esc: editor · d: details`
-  - Con selección (< 55 cols): `│ N lines selected · a: append`
-  - Con selección (>= 55 cols): `│ Sel: old:X, new:Y (N lines) · a: append to editor`
-  - Modo inspección activo (`i`): `│ i: <full path or raw line text>`
+- **Inline with diffs:** Each file presents its unified content directly below its header without a separate viewer.
+- **Initial collapse:** All collapsed by default; `/diff-settings` allows expanding when loading a new iteration without resetting current expansions.
+- **Independent expansions:** `Enter` or click on the header toggles solely that file. Multiple files can remain open at once.
+- **Two-line header:**
+  - **Line 1 (Main):** Expansion indicator (`▾`/`▸`), compact status (`A`, `M`, `D`) before highlighted name (`bold`), and statistics (`+3 / -2`). Statuses describe observed delta only; do not query Git staging or renames.
+  - **Secondary Line (Secondary):** Dimmed/`muted` relative path, discretely indented (`    src/path/to/file.ts`).
+- **Full path inspection:** Path is never lost; under reduced widths it is truncated with `truncatePath` and inspection mode `i` or the bottom bar allow viewing the full path without cuts.
+- **Visual differentiation:** Distinguishes active file (cursor `>`), expanded file (`▾`), and panel focus state (`accent`).
 
 ---
 
-## 6. Selección y Transferencia de Contexto (Etapa B)
+## 4. Hunks and Code Lines (Unified Diff)
 
-### Mecánica de Selección
-- **Clic:** Selecciona una línea individual de diff (añadida, eliminada o contexto).
-- **Arrastre de ratón (Drag):** Selecciona el rango continuo de líneas abarcado.
-- **Teclado:** `Shift + ↑` y `Shift + ↓` extienden o contraen el rango de selección.
-- **Encabezado de hunk:** Seleccionar un encabezado `@@` marca el hunk completo.
-- **Mapeo exacto:** La selección registra fielmente el rango `old` (líneas originales) y `new` (líneas nuevas) correspondientes.
-- **Prioridad visual:** El fondo `selectedBg` o inversión de video prevalece sobre `toolDiffAdded` y `toolDiffRemoved`.
+- **Single row per line:** A single visual line per diff line; no auto-wrapping (no wrap).
+- **Compact contextual gutter (M4.1):** One column for all files: `oldLine` in deletions, `newLine` in additions and context. Minimum width of four digits, expandable per file; `Line numbers: Off` hides it. The model and appended old/new ranges remain complete. Usual overhead 10 columns vs 15 of old dual: 5 recovered in modified, no new gain in created/deleted. Original indentation preserved.
+- **Fixed gutter during horizontal scroll:** With focus on explorer, `←`/`→` or `h`/`l` scroll eight columns of code of the active expanded file, also from its header. Border, cursor, number, and sign remain fixed. `«` indicates hidden content to the left and `»` to the right (reserves one cell only on overflow). Independent offset per file, bounded to shown content; preserved when collapsing, adjusted when resizing viewport, and reset when iteration identity changes. `0`/`Home` resets active offset and preserves existing jump at start of explorer. Wheel remains vertical: Pi 1.4.0 exposes no reliable horizontal axis. Human protocol and isolated indentation experiment in `../docs/milestones/M4.1.md`.
+- **Pi Theme semantic colors:** Additions (`toolDiffAdded`), deletions (`toolDiffRemoved`), context (`text`), gutter (`dim`), border (`border`), focus (`accent`).
+- **Discrete Hunk headers:** Format `@@ -12,3 +12,4 @@` in muted/`dim` tone.
+- **Full Hunk selection:** Positioning on the hunk header allows selecting it wholly for transfer.
 
-### Transferencia al Editor Nativo
-- **Atajo `a`:** Anexa el fragmento seleccionado al final del borrador actual del editor de Pi.
-- **Sin prompts prefabricados:** No se añaden palabras clave fijas como `FIX` o `DISCUSS`. El usuario conserva total libertad para formular su petición.
-- **Preservación total del borrador:** El texto previo en el editor se mantiene intacto (`previousDraft + "\n\n" + snippet`).
-- **Sin autoenvío:** Nunca se llama a enviar o ejecutar el prompt; el usuario decide cuándo pulsar `Enter`.
-- **Retorno automático de foco:** Tras presionar `a`, el foco vuelve inmediatamente al editor nativo de Pi.
-- **Persistencia del dock:** El dock permanece montado, visible y con sus archivos expandidos.
-- **Anexado sucesivo:** El usuario puede seleccionar otro fragmento de otro archivo y volver a pulsar `a`, concatenando múltiples fragmentos separados limpiamente.
+---
 
-### Formato de Contexto Transferido
+## 5. Compact and Responsive Header and Footer (English-only)
+
+### Two-Line Header (`basis: 2`)
+- The dock adds a real top row outside scroll: `🭽` + `▔` up to visible width, in accent when focused and dim when unfocused. Sides and prefixes use `▏`; content/mouse area starts below top border. No SGR overline used.
+- **Line 1 (Title and scope):** `│ DIFF · <Scope>` on the left and file count aligned to the right (`N files` or `1 file`).
+  - **Contextual scopes (ADR-003):**
+    - `Last iteration`: Normal complete individual iteration.
+    - `Batch Net`: Batched window with multiple entries.
+    - `Unverified`: Window without verified attribution.
+    - `Partial`: Incomplete or partial capture.
+    - `Cancelled`: Interrupted or cancelled execution.
+    - `Failed`: Failed execution with observed net changes.
+    - `Unavailable`: Diff or capture unavailable.
+    - `Capturing`: Capture in progress.
+  - **Conceptual differentiation of exclusions and omissions:** Paths excluded by policy (.git, node_modules, snapshot limits) do not add `[omissions]` to the header; their details remain accessible on demand in the compact info view (`d`).
+- **Line 2 (Changes summary):** `│ +added / -removed` using Pi semantic tokens (`toolDiffAdded`, `toolDiffRemoved`, `dim`).
+  - No changes: `│ No changes` in `dim` style.
+  - Stats unavailable: `│ stats unavailable` in `dim` style.
+- **On-demand details:** Toggleable via keyboard (`d`) or mouse click on header (`y === 0 || y === 1`).
+
+### Footer (1 line)
+- All in English, adaptable to dock width:
+  - No selection (< 50 cols): `│ Enter: expand · a: append · Esc: editor`
+  - No selection (< 75 cols): `│ Enter: expand · a: append · ↑↓: navigate · Esc: editor`
+  - Standard (>= 75 cols): `│ Enter: expand · a: append · ↑↓: navigate · Esc: editor · d: details`
+  - With selection (< 55 cols): `│ N lines selected · a: append`
+  - With selection (>= 55 cols): `│ Sel: old:X, new:Y (N lines) · a: append to editor`
+  - Active inspection mode (`i`): `│ i: <full path or raw line text>`
+
+---
+
+## 6. Selection and Context Transfer (Stage B)
+
+### Selection Mechanics
+- **Click:** Selects an individual diff line (added, deleted, or context).
+- **Mouse drag (Drag):** Selects the continuous range of lines spanned.
+- **Keyboard:** `Shift + ↑` and `Shift + ↓` extend or collapse selection range.
+- **Hunk header:** Selecting an `@@` header marks the entire hunk.
+- **Exact mapping:** Selection faithfully records `old` (original lines) and `new` (new lines) corresponding ranges.
+- **Visual priority:** Background `selectedBg` or video inversion prevails over `toolDiffAdded` and `toolDiffRemoved`.
+
+### Transfer to Native Editor
+- **Shortcut `a`:** Appends selected snippet to the end of Pi's editor current draft.
+- **No prefabricated prompts:** Fixed keywords like `FIX` or `DISCUSS` are not added. The user retains total freedom to formulate their request.
+- **Total draft preservation:** Prior text in editor is kept intact (`previousDraft + "\n\n" + snippet`).
+- **No auto-sending:** Sending or executing prompt is never called; user decides when to press `Enter`.
+- **Automatic focus return:** Upon pressing `a`, focus returns immediately to Pi's native editor.
+- **Dock persistence:** Dock remains mounted, visible, and with its files expanded.
+- **Successive appending:** User can select another snippet from another file and press `a` again, cleanly concatenating multiple separated fragments.
+
+### Transferred Context Format
 ```text
 [src/utils/calculator.ts | diff | old:12-14 | new:12-15]
 @@ -12,3 +12,4 @@
@@ -142,8 +142,8 @@ El dock lateral derecho utiliza un ancho inicial objetivo del **45 %** del termi
 +  return valid.reduce(sum, 0);
  }
 ```
-- Rutas relativas al workspace, nunca absolutas.
-- Rangos `old` y `new` derivados de las líneas reales seleccionadas.
-- Prefijos `+`, `-` y espacio de contexto rigurosamente preservados.
-- Encabezado `@@` incluido cuando se selecciona un hunk completo.
-- Separación discreta de fragmentos (`\n\n`).
+- Workspace-relative paths, never absolute.
+- `old` and `new` ranges derived from actual selected lines.
+- `+`, `-` prefixes and context spacing rigorously preserved.
+- `@@` header included when a full hunk is selected.
+- Discrete snippet separation (`\n\n`).
