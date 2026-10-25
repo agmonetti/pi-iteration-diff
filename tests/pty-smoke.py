@@ -22,9 +22,15 @@ def main():
         env = {k: v for k, v in os.environ.items() if not k.startswith("HERDR_")}
         env.update(PI_CODING_AGENT_DIR=temp, PI_OFFLINE="1", PI_TELEMETRY="0", TERM="xterm-256color")
         env.pop("TERM_PROGRAM", None)
-        command = [shutil.which("pi"), "--offline", "--no-session", "--no-extensions",
+        pi_bin = shutil.which("pi") or "pi"
+
+        # Verify native package installation and settings registration without -e
+        install_res = subprocess.run([pi_bin, "install", str(ROOT)], env=env, capture_output=True, text=True)
+        assert install_res.returncode == 0, f"pi install failed: {install_res.stderr}"
+
+        command = [pi_bin, "--offline", "--no-session",
                    "--no-mcp", "--no-skills", "--no-prompt-templates", "--no-context-files",
-                   "--tui-mode", "fullscreen", "-e", str(ROOT / "src/index.ts")]
+                   "--tui-mode", "fullscreen"]
         child = subprocess.Popen(command, cwd=temp, env=env, stdin=slave, stdout=slave,
                                  stderr=slave, start_new_session=True)
         os.close(slave)
@@ -74,7 +80,7 @@ def main():
             pump(2)
             assert child.poll() == 0, "Pi did not exit cleanly"
             assert b"\x1b[?1006l" in output, "mouse reset missing"
-            print("PASS: installed Pi PTY startup, manual /diff and F6 opening, native draft, F6/Esc, reload, clean exit/mouse reset")
+            print("PASS: native installed package Pi PTY startup (no -e), manual /diff and F6 opening, native draft, F6/Esc, reload, clean exit/mouse reset")
             print("LIMIT: ANSI stream assertions outside Git; no visual/manual Herdr validation or lifecycle model run")
         except Exception:
             # Only synthetic isolated content is printed, never a real session transcript.
