@@ -1243,3 +1243,50 @@ nueva/CI nativa nueva NOT RUN; no declaración de DoD global ni avance a M4.
 
 **Próximo paso / parada**
 - Operador valida producto y experimento A/B en Kitty/Herdr con M4.1.md; no decidir superioridad de B sin evidencia humana. No avanzar a M4.2.
+
+### 2026-10-24 — M4.1c: compactación visual de sangría e integración A/B
+
+**Cambió**
+- `src/ui/diff-panel.ts`:
+  - `computeHunkIndent`: calcula la sangría común mínima entre líneas no vacías de cada hunk (`spaces` o `tabs`). Ante ambigüedad (mezcla de tabs y espacios en prefijos o líneas dispares), retorna `undefined` conservando el formato original.
+  - `compactLineText`: reduce la sangría común exclusivamente durante el renderizado visual (`safeText`). No altera `DiffRow`, ni snapshots, ni rangos old/new ni estadísticas. Preserva líneas vacías y no afecta diferencias relativas entre líneas.
+  - Protección ante truncamiento (`isLastHunkCut`): si un hunk es cortado por el límite de filas (`MAX_FILE_ROWS`), no se compacta con datos parciales para evitar falsas asunciones de sangría común.
+  - Modos A (original, default de producción) y B (sangría común compactada).
+  - Tecla `c` en `DiffPanel`: alterna A/B en caliente, recalculando métricas de ancho y acotando el pan horizontal de inmediato.
+  - `maxOffset` y `entryLine`: el desplazamiento horizontal (`h/l` o flechas) opera directamente sobre el texto ya compactado visualmente; `«`/`»` respetan los límites reales compactados.
+  - `formatSelectedContext` y tecla `a`: el texto anexado al editor nativo utiliza intacto el contenido original de `DiffRow.text`, sin pérdida de sangría ni tabs originales.
+- `src/index.ts`:
+  - Slash command `/diff`: soporte de argumentos `/diff a` y `/diff b` para abrir directamente en el modo deseado o alternar en caliente si el dock ya está abierto.
+  - Soporte de entorno `PI_DIFF_COMPACT=1` o `PI_DIFF_MODE=b` para arrancar en Modo B en entornos de prueba si se desea.
+  - Sin nuevas preferencias permanentes en `/diff-settings` (producción permanece en Modo A por defecto).
+- `tests/fixtures/compaction-fixtures.ts`:
+  - Fixtures aislados con modificaciones reales (`M`), no sólo archivos agregados (`A`):
+    - TypeScript con método anidado (12 espacios comunes) y función top-level (0 espacios).
+    - Python con generador anidado (8 espacios comunes) y función módulo (0 espacios).
+    - YAML con especificación de pods anidada (6 espacios comunes) y metadatos top-level (0 espacios).
+    - Go con sangría por tabs (2 tabs comunes).
+    - Casos de ambigüedad mixta tab/espacio.
+    - Generador `createModifiedWorkspace()` para pruebas Git reales con commits base y modificaciones dirty.
+- `tests/diff-compaction.test.ts`:
+  - Suite de 11 tests automatizados que cubren: cálculo de sangría común, jerarquía relativa, espacios/tabs/líneas vacías, ambigüedades, renderizado A vs B, toggle en caliente con `c`, pan horizontal sobre texto compactado, selección por teclado/mouse, anexado intacto con sangría original, resize de 34 a 100 cols, corte por límite de filas, y comando `/diff a|b`.
+
+**Pruebas ejecutadas — Linux, Node v26.12.0, Pi/TUI 1.4.0**
+| Comando / caso | Resultado | Evidencia |
+|---|---|---|
+| `npm run check` | PASS | tsc sin errores + 150/150 tests pasan, 0 fallos/skips, 6.7s. |
+| `python3 tests/pty-smoke.py` | PASS | PTY aislada: arranque Pi, apertura manual /diff y F6, borrador nativo, Esc/F6, reload, salida limpia y reset mouse. |
+| Arquitecto CLI delegado (intercom) | REVISADO Y APROBADO | Identificó riesgo de truncamiento de hunk y sincronización de apertura del comando; ambos resueltos con regresiones dedicadas en suite. |
+| Validación visual humana en Kitty/Herdr | PENDING / NOT RUN | Requiere operador humano para inspección visual de legibilidad A vs B. |
+
+**Instrucciones para alternar A/B en Pi y Herdr**
+1. En Pi normal o dentro de un pane de Herdr, abrir el diff: `/diff` (inicia en Modo A original) o `/diff b` (inicia directamente en Modo B compactado).
+2. Con el foco en el panel de diff, presionar la tecla `c` para alternar instantáneamente entre Modo A y Modo B.
+   - En Modo B, el footer indica `[B: compact]` y la ayuda `c: A/B`.
+   - El scroll horizontal (`h`/`l`) se ajusta al texto compactado.
+   - Al pulsar `a`, el texto copiado al editor contiene la sangría original intacta.
+3. Para volver al Modo A en cualquier momento, presionar `c` nuevamente o ejecutar `/diff a`.
+
+**Git / límites / siguiente paso**
+- Archivos del commit delimitados por rutas explícitas: `src/index.ts`, `src/ui/diff-panel.ts`, `tests/diff-compaction.test.ts`, `tests/fixtures/compaction-fixtures.ts`, `PROGRESS.md`.
+- No push, no dependencias agregadas, no modificación de `/diff-settings`.
+- M4.2 permanece fuera de alcance hasta validación humana.

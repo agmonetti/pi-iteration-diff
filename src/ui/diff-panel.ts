@@ -25,6 +25,72 @@ export type Role =
 
 export type DiffFilePathMode = "Smart" | "Full" | "Filename";
 
+export type HunkIndent =
+  | { kind: "spaces"; count: number }
+  | { kind: "tabs"; count: number };
+
+/**
+ * Calculates the minimum common indentation among non-empty lines of a hunk.
+ * Preserves original formatting if ambiguous (e.g. mixed tabs and spaces across lines,
+ * or mixed characters in leading whitespace).
+ */
+export function computeHunkIndent(rows: readonly DiffRow[]): HunkIndent | undefined {
+  const codeRows = rows.filter(r => r.kind !== "hunk" && r.text.trim().length > 0);
+  if (codeRows.length === 0) return undefined;
+
+  // If any non-blank line has no leading whitespace, the common minimum indentation is 0.
+  if (codeRows.some(r => !r.text.startsWith(" ") && !r.text.startsWith("\t"))) {
+    return undefined;
+  }
+
+  const leadingWhitespaces = codeRows.map(r => /^[ \t]*/.exec(r.text)?.[0] ?? "");
+
+  // If any line mixes tabs and spaces in its leading whitespace, it is ambiguous.
+  if (leadingWhitespaces.some(w => w.includes(" ") && w.includes("\t"))) {
+    return undefined;
+  }
+
+  const hasSpace = leadingWhitespaces.some(w => w.includes(" "));
+  const hasTab = leadingWhitespaces.some(w => w.includes("\t"));
+
+  // If some lines use spaces while others use tabs, it is ambiguous.
+  if (hasSpace && hasTab) {
+    return undefined;
+  }
+
+  if (hasSpace) {
+    const minSpaces = Math.min(...leadingWhitespaces.map(w => w.length));
+    return minSpaces > 0 ? { kind: "spaces", count: minSpaces } : undefined;
+  }
+
+  if (hasTab) {
+    const minTabs = Math.min(...leadingWhitespaces.map(w => w.length));
+    return minTabs > 0 ? { kind: "tabs", count: minTabs } : undefined;
+  }
+
+  return undefined;
+}
+
+/**
+ * Reduces common leading indentation from a code line for visual presentation.
+ * Returns safeText representation of the compacted line without modifying original data.
+ */
+export function compactLineText(text: string, indent: HunkIndent | undefined): string {
+  if (!indent) return safeText(text);
+  if (text.trim().length === 0) return "";
+  if (indent.kind === "spaces") {
+    const leading = /^ */.exec(text)?.[0].length ?? 0;
+    const toRemove = Math.min(indent.count, leading);
+    return safeText(text.slice(toRemove));
+  }
+  if (indent.kind === "tabs") {
+    const leading = /^\t*/.exec(text)?.[0].length ?? 0;
+    const toRemove = Math.min(indent.count, leading);
+    return safeText(text.slice(toRemove));
+  }
+  return safeText(text);
+}
+
 export interface DiffPanelPreferences {
   lineNumbers: boolean;
   filePaths: DiffFilePathMode;
@@ -231,7 +297,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private viewportWidth = 0;
   private inspecting = false;
   private showDetails = false;
+  private compactMode = false;
   private preferences: DiffPanelPreferences;
+  private readonly hunkIndents = new Map<string, HunkIndent>();
 
   // Selection state
   private selectionAnchor: number | null = null;
@@ -239,8 +307,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private isDraggingSelection = false;
   private resizingSeparator = false;
 
-  constructor(private readonly actions: Actions, preferences?: Partial<DiffPanelPreferences>) {
+  constructor(private readonly actions: Actions, preferences?: Partial<DiffPanelPreferences>, initialCompact = false) {
     super();
+    this.compactMode = initialCompact;
     this.preferences = {
       lineNumbers: preferences?.lineNumbers ?? DEFAULT_DIFF_PREFERENCES.lineNumbers,
       filePaths: preferences?.filePaths ?? DEFAULT_DIFF_PREFERENCES.filePaths,
@@ -256,6 +325,22 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   getPreferences(): Readonly<DiffPanelPreferences> {
     return { ...this.preferences };
+  }
+
+  getCompactMode(): boolean {
+    return this.compactMode;
+  }
+
+  setCompactMode(compact: boolean): void {
+    if (this.compactMode === compact) return;
+    this.compactMode = compact;
+    this.codeWidths.clear();
+    this.invalidate();
+    this.actions.render();
+  }
+
+  toggleCompactMode(): void {
+    this.setCompactMode(!this.compactMode);
   }
 
   setPreferences(preferences: Partial<DiffPanelPreferences>): void {
@@ -310,6 +395,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
     const entries: Entry[] = [];
     this.codeWidths.clear();
     this.numberWidths.clear();
+    this.hunkIndents.clear();
     const hasFiles = this.view.files.length > 0;
 
     for (const text of this.view.notices.slice(0, MAX_NOTICES)) {
@@ -343,18 +429,32 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const rows = file.getRows();
       const count = Math.min(rows.length, MAX_FILE_ROWS, remaining);
       let currentHunk = 0;
+      let currentHunkRows: DiffRow[] = [];
+
+      const flushHunk = (hunkNum: number, isCut: boolean) => {
+        if (hunkNum > 0 && currentHunkRows.length > 0 && !isCut) {
+          const indent = computeHunkIndent(currentHunkRows);
+          if (indent) this.hunkIndents.set(`${file.path}:${hunkNum}`, indent);
+        }
+        currentHunkRows = [];
+      };
 
       for (let index = 0; index < count; index++) {
-        const row = rows[index]!;
+        const row = rows[index];
+        if (!row) continue;
         if (row.kind === "hunk") {
+          flushHunk(currentHunk, false);
           currentHunk++;
           entries.push({ kind: "hunk", file, row, hunkIndex: currentHunk });
         } else {
+          currentHunkRows.push(row);
           const number = row.kind === "removed" ? row.oldLine : row.newLine;
           this.numberWidths.set(file.path, Math.max(this.numberWidths.get(file.path) ?? 4, String(number ?? "").length));
           entries.push({ kind: "row", file, row, hunkIndex: currentHunk, rowIndex: index });
         }
       }
+      const isLastHunkCut = count < rows.length && count > 0 && rows[count]?.kind !== "hunk";
+      flushHunk(currentHunk, isLastHunkCut);
       remaining -= count;
       if (count < rows.length) {
         entries.push({ kind: "notice", text: `Diff truncated: ${count}/${rows.length} rows (maximum ${MAX_FILE_ROWS}/file and ${MAX_CONTENT_ROWS} total).` });
@@ -581,6 +681,12 @@ export class DiffPanel extends VStack implements Component, Focusable {
     return [horizontal, line1, line2];
   }
 
+  private getRowDisplayCode(entry: Entry & { kind: "row" }): string {
+    if (!this.compactMode) return safeText(entry.row.text);
+    const indent = this.hunkIndents.get(`${entry.file.path}:${entry.hunkIndex}`);
+    return compactLineText(entry.row.text, indent);
+  }
+
   private codeWidth(path: string, width: number): number {
     const gutter = this.preferences.lineNumbers ? (this.numberWidths.get(path) ?? 4) + 1 : 0;
     return Math.max(0, width - 5 - gutter); // border, cursor, space, sign, pan indicator
@@ -595,7 +701,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       // Measure only on pan, within the already bounded displayed rows; normal renders stay virtual.
       for (const entry of this.diffEntries) {
         if (entry.kind === "row" && entry.file.path === path) {
-          longest = Math.max(longest, visibleWidth(safeText(entry.row.text)));
+          longest = Math.max(longest, visibleWidth(this.getRowDisplayCode(entry)));
         }
       }
       this.codeWidths.set(path, longest);
@@ -649,13 +755,14 @@ export class DiffPanel extends VStack implements Component, Focusable {
     const path = active && "file" in active ? active.file?.path : undefined;
     const panX = path ? this.fileOffset(path, width) : 0;
     const panStr = panX > 0 ? ` [pan +${panX}]` : "";
+    const modeStr = this.compactMode ? " [B: compact]" : "";
     let text: string;
     if (width < 50) {
-      text = `▏ Enter: expand${panStr} · a: append · Esc: editor`;
+      text = `▏ Enter: expand${panStr}${modeStr} · a: append · Esc: editor`;
     } else if (width < 75) {
-      text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor`;
+      text = `▏ Enter: expand${panStr}${modeStr} · a: append · ↑↓: navigate · Esc: editor`;
     } else {
-      text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor · d: details`;
+      text = `▏ Enter: expand${panStr}${modeStr} · a: append · c: A/B · ↑↓: navigate · Esc: editor · d: details`;
     }
     return this.actions.style("muted", truncateToWidth(text, width, "…"));
   }
@@ -765,7 +872,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       : row.kind === "removed" ? this.actions.style("removed", mark)
       : mark;
 
-    const rawCode = safeText(row.text);
+    const rawCode = this.getRowDisplayCode(entry);
     const panX = this.fileOffset(entry.file.path, width);
     const available = this.codeWidth(entry.file.path, width);
     const overflow = visibleWidth(rawCode) > panX + available;
@@ -878,6 +985,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
   handleInput(data: string): void {
     if (matchesKey(data, "escape") || matchesKey(data, "tab")) { this.actions.editor(); return; }
     if (data === "q") { this.actions.close(); return; }
+    if (data === "c") { this.toggleCompactMode(); return; }
     if (data === "d") { this.showDetails = !this.showDetails; this.rebuild(); this.actions.render(); return; }
     if (data === "i") { this.inspecting = !this.inspecting; this.actions.render(); return; }
     if (data === "a") { this.transferContext(); return; }

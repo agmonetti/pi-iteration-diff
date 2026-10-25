@@ -71,7 +71,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
   });
   pi.on("session_shutdown", () => { settingsGeneration++; dismiss(); });
 
-  const open = async (ctx: ExtensionContext, automatic = false): Promise<void> => {
+  const open = async (ctx: ExtensionContext, automatic = false, modeOverride?: boolean): Promise<void> => {
       if (dock) return;
       if (ctx.mode !== "tui") {
         ctx.ui.notify("Diff requires Pi TUI fullscreen", "warning"); return;
@@ -103,6 +103,8 @@ export default function iterationDiff(pi: ExtensionAPI): void {
       owner = ctx;
       try {
         ctx.ui.setWidget("iteration-diff", (tui) => {
+          const defaultCompact = process.env.PI_DIFF_COMPACT === "1" || process.env.PI_DIFF_MODE === "b";
+          const initialCompact = modeOverride ?? defaultCompact;
           panel = new DiffPanel({
             render: () => tui.requestRender(),
             editor: () => dock?.focusEditor(),
@@ -136,7 +138,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
               if (role === "selected") return `\x1b[7m${text}\x1b[27m`;
               return text;
             },
-          }, settings);
+          }, settings, initialCompact);
           refresh();
           dock = mountDock(tui, panel, settings.dockWidth / 100);
           return { dispose: close, invalidate() {}, render(width) {
@@ -152,10 +154,21 @@ export default function iterationDiff(pi: ExtensionAPI): void {
       }
   };
   const command = {
-    description: "Toggle the last observed iteration diff (F6 opens/focuses files)",
-    handler: async (_args: string, ctx: ExtensionContext): Promise<void> => {
-      if (dock) manualDismiss();
-      else await open(ctx);
+    description: "Toggle the last observed iteration diff (F6 opens/focuses files; /diff a|b selects compaction)",
+    handler: async (args: string, ctx: ExtensionContext): Promise<void> => {
+      const mode = args.trim().toLowerCase();
+      if (dock) {
+        if (mode === "a" || mode === "b") {
+          panel?.setCompactMode(mode === "b");
+          return;
+        }
+        manualDismiss();
+      } else {
+        let modeOverride: boolean | undefined;
+        if (mode === "b") modeOverride = true;
+        else if (mode === "a") modeOverride = false;
+        await open(ctx, false, modeOverride);
+      }
     },
   };
   pi.registerShortcut("f6", { description: "Open or focus diff", handler: async ctx => {
