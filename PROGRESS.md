@@ -1395,3 +1395,25 @@ No se declara compatibilidad física Herdr ni M4.2 certificado.
 - Untracked preexistentes `fake-*`, `m4-test/`, `scripts/` excluidos del commit.
   Próximo paso: operador verifica `/diff` y foco en Herdr/Pi reales siguiendo
   M4.2; M4.3 no iniciado. Sin push.
+
+### 2026-10-24 — M4.2 / cierre documental y gate CI del SHA vigente
+
+**Cambió**
+- `M4.2.md` y esta bitácora: se registra el informe físico del operador en Herdr (selección, anexado entre archivos/hunks, resize, settings, foco y cambios de sesión: **PASS reportado**). Sin metadatos de terminal/dimensiones/hora/capturas ni desglose para afirmar pruebas adicionales; no se repitió físicamente aquí el foco manual *tras* la corrección.
+- Corrección ya presente en `1c1fc67` confirmada por lectura de `src/index.ts` y `tests/diff-auto-open.test.ts`: `/diff` manual enfoca el panel al montar, F6 abre o reenfoca, auto-open sólo tras settled individual válido conserva foco en editor. PTY comprueba apertura/cierre y Esc, no auto-open físico. Sin cambios de código ni workflow en este cierre.
+
+**Pruebas ejecutadas — 2026-10-24, Arch Linux, Node v26.12.0, Pi 1.4.0, Herdr 0.9.5 instalado**
+| Comando / caso | Resultado | Evidencia / límite |
+|---|---|---|
+| `npm run check` | PASS | tsc y 141/141 tests, 0 fail/skip/cancel; primera suite 6182.81234 ms, gate tras documentación 6669.221508 ms; incluye regresión foco manual/F6/auto-open y motor de snapshots. |
+| `python3 tests/pty-smoke.py` | PASS | Pi real en PTY aislada, `/diff`, F6, Esc, settings, draft, reload, salida y reset mouse; sin Herdr/mouse físico. |
+| Informe del usuario: selección, anexado entre archivos/hunks, resize, settings, foco y cambios de sesión en Herdr | PASS reportado | Operador humano; no ejecución de este agente. No se informa repetición específica del gesto `/diff` enfocado tras el commit del fix. |
+| `/diff` manual tras fix y auto-open sin robo de foco en Herdr físico; Pi standalone físico nuevo | NOT RUN verificable | Requiere confirmación del operador con versión de terminal/acciones y fecha. |
+| `.github/workflows/portability.yml` | PASS inspección | Matriz ubuntu/macos/windows-latest, Node 26, `npm ci`, `npm run check` (typecheck + suite completa) y checkout intacto. |
+| `gh run list --commit 1c1fc67d08371df7e820005fb539e74aca46d373` | PASS consulta / CI NOT RUN | `[]`; remoto main = `3c268e4ce093fec6322f67661d08390be61e732b`. Run 40109386562 SUCCESS en tres SO, pero SHA **anterior** 3c268e4; run 40018853023 es 116b6a8. |
+| CI del SHA 1c1fc67: ubuntu-latest / macos-latest / windows-latest | NOT RUN / BLOCKED para certificación | Seis commits locales sin publicar; push no autorizado. Un commit documental posterior también necesitará CI en su SHA final. |
+| `git status`, `git diff`, `git diff --cached` iniciales | PASS inspección | Sin cambios tracked/staged; untracked `fake-*`, `m4-test/`, `scripts/` ajenos preservados y excluidos. |
+
+**Riesgos / siguiente paso**
+- No equivaler PASS humano reportado al ensayo del fix posterior, ni runners de M1/`3c268e4` a CI actual. Drag literal FR-16, multi-hunk/Shift+Down, cambios concurrentes ABA y dependencia de layout Pi 1.4.0 pendientes. Revisión read-only por peer: aconseja conservar esa distinción; no aporta test independiente.
+- Para **comenzar M4.3**: confirmar manualmente en Herdr (y registrar Pi standalone si se busca su matriz) `/diff` enfocando tras fix, Esc y auto-open sin robo de foco; obtener autorización explícita para publicar y ejecutar CI sobre SHA final, registrar URL/run ID y resultados de cada SO. Para **cerrar M4.3** además se requieren sus casos de robustez pendientes y evidencia de sus propios cambios; no se infiere cierre por M4.2. No push ni M5.
