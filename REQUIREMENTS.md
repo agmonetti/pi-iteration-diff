@@ -215,7 +215,7 @@ Pueden revisarse tras el spike. Incluir identificador de snapshot/diff en una se
 
 ### Registro de resultados
 
-Toda prueba real debe tener fecha, versión, comando/pasos, resultado (PASS/FAIL/BLOCKED/NOT RUN), evidencia y cualquier limitación en `PROGRESS.md`. `NOT RUN` no equivale a PASS.
+Toda prueba real debe tener fecha, versión, comando/pasos, resultado (PASS/FAIL/BLOCKED/NOT RUN), evidencia y cualquier limitación en `docs/milestones/PROGRESS.md`. `NOT RUN` no equivale a PASS.
 
 ## 10. Riesgos con mitigación
 
@@ -240,7 +240,7 @@ Toda prueba real debe tener fecha, versión, comando/pasos, resultado (PASS/FAIL
 - [ ] Pruebas manuales en Pi y Herdr PASS (o bloqueos explícitos que impiden declarar release listo).
 - [ ] No escritura no autorizada en staging/config global/sesiones ajenas.
 - [ ] Sin autoapertura por defecto; opt-in explícito según M3.5, sin robo de foco, autosend ni pérdida de borradores.
-- [ ] Documentación y `PROGRESS.md` actualizados con versiones reales y limitaciones.
+- [ ] Documentación y `docs/milestones/PROGRESS.md` actualizados con versiones reales y limitaciones.
 - [ ] Sin procesos residentes, telemetría ni dependencias gráficas pesadas.
 
 ## 12. Fuentes e hipótesis

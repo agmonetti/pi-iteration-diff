@@ -236,8 +236,8 @@ pero compatibilidad Herdr sigue sin certificar. No se adopta código de terceros
 El renderer `tui-alt-screen.js` npm e instalado coincide por SHA-256
 `ea5f52dc983f60c4354c674bd19f0d296fda8b5fa86185d4a4bdf0343b1ff92b`;
 también coinciden `tui.js`, `h-stack.js`, `stack.js`, `interactive-mode.js` y
-`chat-viewport.js`. Versiones, resultados, bloqueos y próximo gate en `PROGRESS.md`;
-pasos reproducibles en `M0.md`. M0 permanece abierto y no habilita M1.
+`chat-viewport.js`. Versiones, resultados, bloqueos y próximo gate en `docs/milestones/PROGRESS.md`;
+pasos reproducibles en `docs/milestones/M0.md`. M0 permanece abierto y no habilita M1.
 
 ### Continuación M0 (2026-10-22): límites de evidencia y protocolo
 
@@ -246,7 +246,7 @@ pasos reproducibles en `M0.md`. M0 permanece abierto y no habilita M1.
   No se manipuló el pane activo ni se instalaron integraciones.
 - `npm run check` (5/5) y `python3 tests/pty-smoke.py` vuelven a pasar. Son evidencia
   automatizada del spike, NO trazas de modelo ni validación manual Herdr.
-- `M0.md` ahora separa ocho casos humanos y seis casos de lifecycle, con entradas,
+- `docs/milestones/M0.md` ahora separa ocho casos humanos y seis casos de lifecycle, con entradas,
   entorno, resultado esperado y límites. Todos siguen pendientes, no aprobados.
 - **Drag/drop:** el spike no implementa hit-testing ni transferencia al soltar sobre
   el editor. Un release fuera del panel no demuestra imposibilidad del terminal.
@@ -288,7 +288,7 @@ cambiar el rango. Mantener el arrastre literal como NOT IMPLEMENTED / validació
 humana NOT RUN. Alternativa propuesta y ya presente en el spike: seleccionar dentro
 del panel → `a` anexa al editor explícitamente, preservando borrador, sin envío.
 No equivale a FR-16 ni constituye una excepción aprobada. Comandos humanos para Pi
-y sesión Herdr nombrada, con integración oficial explícita, están en M0.md.
+y sesión Herdr nombrada, con integración oficial explícita, están en docs/milestones/M0.md.
 
 Resultado automatizado de esta continuación: `npm run check` PASS 10/10. Sin PTY
 nueva, sin pruebas humanas; compatibilidad Herdr no certificada. M0 permanece abierto.
@@ -302,7 +302,7 @@ son viables en ese entorno. H3 funcional PASS pero indicador visual ausente (FAI
 H8 PASS limitado a cierre/resize/restauración reportados. No hay certificación
 individual de detach/reattach, zoom, split, reload o cambios/restauración de sesión.
 La captura mencionada no fue adjuntada para inspección; fuente: informe humano.
-Terminal cliente, dimensiones y hora de ejecución no informados (detalle en M0.md).
+Terminal cliente, dimensiones y hora de ejecución no informados (detalle en docs/milestones/M0.md).
 
 Se adopta la API pública Focusable (`focused`) para el indicador H3. TUI actualiza
 esa propiedad tanto por teclado como por foco solicitado con mouse. Encabezado
@@ -342,7 +342,7 @@ iteration de una sola petición. Se rechaza atribución falsa: si no se demuestr
 frontera individual, declarar indisponibilidad del delta individual en lugar de
 mostrar un grupo o un resultado anterior como último. Esa limitación **no es una
 excepción FR-03 aprobada**; aceptación de colas y gate M0 siguen abiertos. Tabla de
-señales, baseline temprano y política ante sesión/worktree/reload en M0.md. No se
+señales, baseline temprano y política ante sesión/worktree/reload en docs/milestones/M0.md. No se
 ha implementado captura; no se cambia alcance/requisitos ni se habilita M1.
 
 **Drag: siguiente experimento, no conclusión de inviabilidad.** Declaraciones públicas
@@ -358,7 +358,7 @@ sin excepción aprobada; seleccionar→a sigue siendo la alternativa validada.
 
 ## 13. Síntesis de cierre M0 / ADR-003 confirmado (2026-10-22)
 
-La sección final de `M0.md` es el contrato operativo vigente y la matriz autoritativa;
+La sección final de `docs/milestones/M0.md` es el contrato operativo vigente y la matriz autoritativa;
 las entradas anteriores son histórico de investigación, no instrucciones de ampliar M0.
 No se implementaron snapshots ni nuevos experimentos de drag. Aceptación final humana
 condicionada a H3 visual y H7/H8 individualizados; no declarar gate total PASS.
@@ -421,7 +421,7 @@ de scope y serialización de capturas; si no puede demostrar individualidad, fai
 - Drag literal: **DEFERRED a evaluación M3**, no imposible ni paridad/excepción
   aprobada. No continuar implementándolo/investigándolo en M0.
 - H3 visual nuevo, H7 sidebar/split/zoom y H8 resize/reload/new/resume individual:
-  **NOT RUN humano**; protocolo mínimo en M0.md. Detach/reattach extendido: M4.
+  **NOT RUN humano**; protocolo mínimo en docs/milestones/M0.md. Detach/reattach extendido: M4.
 - Cierre documental preparado; aceptación humana final pendiente. M1 no autorizado.
 - Gate final ejecutado 2026-10-22 21:06 UTC−03: `npm run check` PASS, tsc y 14/14,
   Node 26.12.0/npm 12.2.1. No PTY ni pruebas humanas nuevas; sin cambios de runtime.
@@ -442,7 +442,7 @@ No elimina FR-03 ni equivale a implementar/probar el motor de captura.
 También acepta diferir evaluación de drag literal a M3, manteniendo FR-16 y la
 alternativa seleccionar → a ya validada. Detach/reattach extendido sigue en M4.
 
-**Gate M0 PASS, cerrado.** La matriz final de M0.md sustituye pendientes históricos.
+**Gate M0 PASS, cerrado.** La matriz final de docs/milestones/M0.md sustituye pendientes históricos.
 No se amplían pruebas ni se reabre investigación. M1 no iniciado ni autorizado;
 riesgos de correlación, límites/seguridad de snapshots e internals del layout se
 trasladan documentados, no se consideran resueltos por el cierre de factibilidad.
@@ -459,7 +459,7 @@ O_NONBLOCK, lstat de padres, rechazo de hardlinks y validación Linux de fd en p
 antes de leer. En otras plataformas falla cerrado (contenido omitido); portabilidad
 pendiente, no se introduce FFI. Esto no es una garantía frente a escritor malicioso
 ni atomicidad del workspace. Defaults, filtros best-effort, cota de contenidos vs
-RSS y cancelación cooperativa de metadata documentados en `M1.md`.
+RSS y cancelación cooperativa de metadata documentados en `docs/milestones/M1.md`.
 
 Ignorados tracked y untracked se registran sin contenido, incluidos prefijos de
 directorios; cambios de ignore/exclude producen incertidumbre, no creación ficticia.
@@ -474,7 +474,7 @@ por huella efímera en before_agent_start user. Transforms/expansiones/images/cu
 source extension se degradan conservadoramente si falta correlación. Message_start
 user adicional o input durante ventana marca agrupación aun si su consumo es incierto.
 Turn_end/before_settle sólo actualizan outcome; retries/agent_end no cierran. Settled
-captura final (incluido aborto); error final nunca completo. Detalles y tabla M1.md.
+captura final (incluido aborto); error final nunca completo. Detalles y tabla docs/milestones/M1.md.
 
 Controlador aislado de Pi/TUI, serializa IO y verifica identidad tras awaits;
 invalida síncronamente antes de resolver scope async y no reconstruye buffers al
@@ -579,7 +579,7 @@ aquí además se invalida la captura/abertura pendiente para no mostrar rama ant
 
 El ratio deja de ser global de módulo; el adaptador recibe preferencias del owner.
 Los cambios visuales no modifican filas reales ni formato de anexado. Contrato y
-protocolo en `M3.5.md`; resultados efectivos en `PROGRESS.md`. M4 no iniciado.
+protocolo en `docs/milestones/M3.5.md`; resultados efectivos en `docs/milestones/PROGRESS.md`. M4 no iniciado.
 
 ## 18. M4.4 — Ancho global (2026-10-24)
 
@@ -591,5 +591,5 @@ escribir claves propias en settings globales de Pi. Se guarda exclusivamente
 ancho y flag Remember en `<agent-dir>/iteration-diff.json` sin tocar `settings.json`.
 Los demás campos y consentimiento auto-open siguen en appendEntry/getBranch.
 Migración de rama sólo si no hay archivo global; tras crearlo, global prevalece.
-Véase alcance, fallbacks y limitaciones en `M3.5.md` (actualización M4.4).
+Véase alcance, fallbacks y limitaciones en `docs/milestones/M3.5.md` (actualización M4.4).
 

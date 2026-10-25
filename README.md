@@ -1,11 +1,8 @@
 # pi-iteration-diff
 
-A diff viewer extension for [Pi Coding Agent](https://github.com/earendil-works/pi-coding-agent) that shows the net changes from the last completed request in a side dock. Select lines and send them back as feedback — without touching Git or your draft.
+A lightweight diff viewer for [Pi Coding Agent](https://github.com/earendil-works/pi-coding-agent).
 
-<!--
-Screenshot placeholder — replace with an actual capture of the dock
-alongside Pi's conversation pane once the extension is published.
--->
+Review the net changes from your last completed request in a side-by-side dock. Select lines and append them to your prompt without modifying Git state or sending your message automatically.
 
 ## Install
 
@@ -13,57 +10,62 @@ alongside Pi's conversation pane once the extension is published.
 pi install git:github.com/agmonetti/pi-iteration-diff
 ```
 
-Project-local only: add `-l`.
+For project-local installation, add `-l`.
 
 ## Features
 
-- **Net delta only** — isolates what changed in the last request from prior uncommitted work.
-- **Git-safe** — never stages, commits, or stashes.
-- **Side dock** — mounts to the right of Pi's editor; resizable, persistent width.
-- **Keyboard & mouse** — full navigation, file jumps, horizontal pan, and multi-line selection.
-- **Selective feedback** — append lines to the prompt draft as `FIX` / `DISCUSS` excerpts without auto-sending.
-- **Herdr compatible** — works in standard terminals and inside Herdr panes.
+- **Iteration-scoped diffs** — see what changed during the last request, separate from previous uncommitted work.
+- **Git-safe** — never stages, commits, stashes, or modifies your Git index.
+- **Side-by-side dock** — explore changes alongside Pi's conversation and editor, with adjustable width.
+- **Keyboard & mouse** — navigate files, expand hunks, select line ranges, and pan horizontally.
+- **Selective feedback** — append selected changes as formatted diff excerpts to your existing prompt, without auto-sending.
+- **Persistent width** — keep your preferred dock size across sessions and projects.
 
 ## Usage
 
 | Action | Command / Key |
 |---|---|
-| Toggle dock | `/diff` or `F6` |
+| Open / close dock | `/diff` |
+| Open / focus dock | `F6` |
 | Settings | `/diff-settings` |
-| Navigate lines | `Up` / `Down` |
-| Select range | `Shift+Up` / `Shift+Down` |
+| Navigate | `↑` / `↓` |
+| Extend selection | `Shift+↑` / `Shift+↓` |
 | Jump between files | `[` / `]` |
-| Expand / collapse file | `Enter` or click |
-| Append to prompt | `a` |
-| Resize dock | `Ctrl+Left` / `Ctrl+Right` |
-| Focus back to editor | `Esc` |
+| Expand / collapse | `Enter` or click |
+| Append selection to prompt | `a` |
+| Horizontal pan | `←` / `→` or `h` / `l` |
+| Resize dock | `Ctrl+←` / `Ctrl+→` |
+| Return to editor | `Esc` |
 | Close dock | `q` |
 
 ## Configuration
 
-Available via `/diff-settings`:
+Configure the dock using `/diff-settings`.
 
-| Setting | Default | Description |
+| Setting | Default | Options |
 |---|---|---|
-| Auto-open after iteration | Off | Open dock automatically when a request completes |
-| Line numbers | On | Show line numbers in diff |
-| File paths | Smart | `Smart` / `Full` / `Filename` |
-| Collapse files | On | Start with files collapsed |
-| Dock width | 45% | Adjustable 30–60% |
-| Remember width | On | Persist width across sessions |
+| Auto-open after iteration | Off | On / Off |
+| Line numbers | On | On / Off |
+| File paths | Smart | Smart / Full / Filename |
+| Collapse files | On | On / Off |
+| Dock width | 45% | 30–60% |
+| Remember dock width | On | On / Off |
+
+When enabled, **Remember dock width** saves your preferred width across Pi sessions, projects, and restarts.
 
 ## Compatibility
 
-- **Pi** ≥ 1.4.0, **Node** ≥ 22
-- Linux, macOS, Windows native
-- Herdr panes, resize, and mouse routing
+- **Pi Coding Agent** 1.4.0+
+- **Node.js** 22+
+- **Linux, macOS, and native Windows**
+- **Herdr** and standard terminal environments
 
 ## Limitations
 
-- Terminal drag-to-editor support varies by emulator; press `a` as the reliable alternative.
-- Files modified outside Pi during a session are recorded as observed deltas, not guaranteed agent-authored.
-- Files deleted by another process mid-capture are marked partial.
+- Drag-to-editor behavior depends on terminal capabilities. Use `a` to append selected changes reliably.
+- Changes made by external processes may appear in the iteration diff and are not guaranteed to originate from the agent.
+- Files changed or deleted during capture may produce partial results.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 Agustin Monetti

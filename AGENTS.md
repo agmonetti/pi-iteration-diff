@@ -4,7 +4,7 @@
 
 Construir `pi-iteration-diff`, una **extensión ligera de Pi Coding Agent** para revisar mediante `/diff` los cambios netos de la **última petición del usuario**, al final de esa ejecución, en un **panel a la derecha de la conversación**, seleccionar líneas/rangos y agregarlos **sin envío automático** al editor nativo de Pi. Debe funcionar tanto en terminal común como con Pi dentro de **Herdr**.
 
-Antes de escribir código, leer en orden: `AGENTS.md` → `REQUIREMENTS.md` → `RESEARCH.md` → `PROGRESS.md`. Al terminar cada bloque de trabajo, actualizar `PROGRESS.md`.
+Antes de escribir código, leer en orden: `AGENTS.md` → `REQUIREMENTS.md` → `RESEARCH.md` → `docs/milestones/PROGRESS.md`. Al terminar cada bloque de trabajo, actualizar `docs/milestones/PROGRESS.md`.
 
 **Portabilidad obligatoria del producto:** Linux, macOS y Windows nativo en entornos soportados por Pi. Arch Linux es sólo el entorno de desarrollo; WSL es Linux, no evidencia de Windows nativo. Mantener un motor compartido de snapshots con adaptaciones mínimas justificadas; no exigir mecanismos internos idénticos. Documentar garantías de seguridad por SO y estados parciales ante identidad no verificable. CI debe ejecutar integración en `ubuntu-latest`, `macos-latest` y `windows-latest`; un workflow sin ejecutar es **NOT RUN**, nunca soporte certificado.
 
@@ -108,7 +108,7 @@ Cada milestone debe producir:
 
 1. **Objetivo observable**, archivos concretos y alcance pequeño.
 2. Evidencia de prueba (`comando`, resultado real, ambiente, fecha). Distinguir `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`.
-3. Actualización de `PROGRESS.md`: qué cambió, tests, fallos, siguiente paso y riesgos.
+3. Actualización de `docs/milestones/PROGRESS.md`: qué cambió, tests, fallos, siguiente paso y riesgos.
 4. Si cambia un requisito/decisión, actualizar `REQUIREMENTS.md`/`RESEARCH.md` con razón, sin borrar el histórico.
 5. No anunciar «terminado» si hay pruebas obligatorias sin ejecutar o aceptación incumplida.
 
@@ -127,7 +127,7 @@ Cada milestone debe producir:
   - `test(lifecycle): cover interrupted agent runs`
   - `docs: record Herdr compatibility constraints`
 - Cada commit debe representar **un cambio lógico y comprobable**. No combinar implementación, refactors independientes y cambios cosméticos sin relación. Evitar commits vacíos, de progreso artificial o por cada edición mínima.
-- Antes de commitear: ejecutar `git status --short`, revisar `git diff` y `git diff --cached`, correr los checks disponibles (`npm run check` cuando exista) y registrar los resultados reales en `PROGRESS.md`. No afirmar PASS si no se ejecutaron.
+- Antes de commitear: ejecutar `git status --short`, revisar `git diff` y `git diff --cached`, correr los checks disponibles (`npm run check` cuando exista) y registrar los resultados reales en `docs/milestones/PROGRESS.md`. No afirmar PASS si no se ejecutaron.
 - Agregar solo archivos relacionados con la tarea, **por rutas explícitas** (`git add -- path/to/file`); nunca `git add -A`, `git add .` ni `git commit -a` sin permiso. No incluir secretos, artefactos generados, logs, snapshots ni cambios previos del usuario.
 - Se permite crear commits locales de cambios del propio proyecto una vez verificados, **si el repositorio ya está inicializado y el usuario no pidió evitar commits**. No hacer `git push`, crear tags, reescribir historia, amend, rebase ni modificar configuración Git sin autorización explícita.
 - Si existen modificaciones ajenas, staged changes ajenos, conflictos, hooks fallidos o el repositorio no está inicializado: **no forzar ni limpiar el estado**; documentar el bloqueo y dejar los archivos propios sin commitear cuando no sea posible aislarlos de forma segura.
@@ -144,6 +144,6 @@ El proyecto solo se considera completado cuando:
 - El flujo de **arrastrar rangos hacia el editor** se probó; si el protocolo terminal lo impide en el entorno objetivo, documentar la limitación con evidencia, ofrecer alternativa de una acción y **no declarar paridad completa** sin aprobación del usuario.
 - Funciona en Pi sin Herdr y dentro de Herdr sin romper integración oficial, mouse, focus, resize y recuperación del layout.
 - Test suite y typecheck pasan; integración del motor ejecutada realmente en Linux, macOS y Windows nativo (WSL separado), con garantías/limitaciones explícitas por SO; pruebas manuales obligatorias registradas, sin regresiones ni cambios del índice Git.
-- Documentación de instalación, uso, límites y compatibilidad actualizada; `PROGRESS.md` consigna evidencia del DoD.
+- Documentación de instalación, uso, límites y compatibilidad actualizada; `docs/milestones/PROGRESS.md` consigna evidencia del DoD.
 
 Leer los criterios verificables y el roadmap completo en `REQUIREMENTS.md`.
