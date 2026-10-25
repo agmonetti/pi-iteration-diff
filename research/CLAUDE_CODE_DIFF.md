@@ -8,7 +8,7 @@
 
 ## 1. Introducción y alcance
 
-Esta investigación analiza la arquitectura y el funcionamiento interno del sistema `/diff` de Claude Code, implementado como el mod integrado `mods/diff` (`cc-plugin-diff`). El propósito es contrastar sus decisiones de diseño con nuestra arquitectura (`RESEARCH.md`, ADR-003) y los requisitos del proyecto `pi-iteration-diff`.
+Esta investigación analiza la arquitectura y el funcionamiento interno del sistema `/diff` de Claude Code, implementado como el mod integrado `mods/diff` (`cc-plugin-diff`). El propósito es contrastar sus decisiones de diseño con nuestra arquitectura (`../docs/RESEARCH.md`, ADR-003) y los requisitos del proyecto `pi-iteration-diff`.
 
 ---
 

@@ -4,7 +4,7 @@
 
 Construir `pi-iteration-diff`, una **extensión ligera de Pi Coding Agent** para revisar mediante `/diff` los cambios netos de la **última petición del usuario**, al final de esa ejecución, en un **panel a la derecha de la conversación**, seleccionar líneas/rangos y agregarlos **sin envío automático** al editor nativo de Pi. Debe funcionar tanto en terminal común como con Pi dentro de **Herdr**.
 
-Antes de escribir código, leer en orden: `AGENTS.md` → `REQUIREMENTS.md` → `RESEARCH.md` → `docs/milestones/PROGRESS.md`. Al terminar cada bloque de trabajo, actualizar `docs/milestones/PROGRESS.md`.
+Antes de escribir código, leer en orden: `AGENTS.md` → `docs/REQUIREMENTS.md` → `docs/RESEARCH.md` → `docs/milestones/PROGRESS.md`. Al terminar cada bloque de trabajo, actualizar `docs/milestones/PROGRESS.md`.
 
 **Portabilidad obligatoria del producto:** Linux, macOS y Windows nativo en entornos soportados por Pi. Arch Linux es sólo el entorno de desarrollo; WSL es Linux, no evidencia de Windows nativo. Mantener un motor compartido de snapshots con adaptaciones mínimas justificadas; no exigir mecanismos internos idénticos. Documentar garantías de seguridad por SO y estados parciales ante identidad no verificable. CI debe ejecutar integración en `ubuntu-latest`, `macos-latest` y `windows-latest`; un workflow sin ejecutar es **NOT RUN**, nunca soporte certificado.
 
@@ -109,7 +109,7 @@ Cada milestone debe producir:
 1. **Objetivo observable**, archivos concretos y alcance pequeño.
 2. Evidencia de prueba (`comando`, resultado real, ambiente, fecha). Distinguir `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`.
 3. Actualización de `docs/milestones/PROGRESS.md`: qué cambió, tests, fallos, siguiente paso y riesgos.
-4. Si cambia un requisito/decisión, actualizar `REQUIREMENTS.md`/`RESEARCH.md` con razón, sin borrar el histórico.
+4. Si cambia un requisito/decisión, actualizar `docs/REQUIREMENTS.md`/`docs/RESEARCH.md` con razón, sin borrar el histórico.
 5. No anunciar «terminado» si hay pruebas obligatorias sin ejecutar o aceptación incumplida.
 
 **Secuencia:** M0 viabilidad TUI/mouse/lifecycle → M1 snapshots → M2 diff + revisión → M3 editor y drag/feedback → M4 Herdr y robustez → M5 empaquetado/documentación.
@@ -146,4 +146,4 @@ El proyecto solo se considera completado cuando:
 - Test suite y typecheck pasan; integración del motor ejecutada realmente en Linux, macOS y Windows nativo (WSL separado), con garantías/limitaciones explícitas por SO; pruebas manuales obligatorias registradas, sin regresiones ni cambios del índice Git.
 - Documentación de instalación, uso, límites y compatibilidad actualizada; `docs/milestones/PROGRESS.md` consigna evidencia del DoD.
 
-Leer los criterios verificables y el roadmap completo en `REQUIREMENTS.md`.
+Leer los criterios verificables y el roadmap completo en `docs/REQUIREMENTS.md`.

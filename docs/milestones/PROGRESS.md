@@ -1498,13 +1498,19 @@ No se declara compatibilidad física Herdr ni M4.2 certificado.
 |---|---|---|
 | `npm run check` | PASS | tsc sin errores; 151/151 tests, 0 fail/skip/cancel (~7.1s), incluye los 7 tests nuevos de packaging. |
 | `python3 tests/pty-smoke.py` | PASS | Pi real en PTY fullscreen con instalación nativa previa; comandos `/diff` y `/diff-settings` descubiertos y funcionales sin `-e`. |
-| `npm pack --dry-run` | PASS | Tarball verificado: 13 archivos esenciales (src + package.json + LICENSE + README.md); excluye tests, scripts y docs de progreso. |
+| `npm pack --dry-run` | PASS | Tarball verificado: 14 archivos esenciales (src + package.json + LICENSE + README.md); excluye tests, scripts y docs de progreso. |
 | Persistencia y desinstalación | PASS | `<agent-dir>/iteration-diff.json` se preserva intacto tras updates y tras `pi remove`. Fallback seguro ante archivo corrupto o ausente. |
-| CI GitHub Actions sobre M5 | NOT RUN | Rama local `feat/m5-packaging-distribution`, sin push. CI de M4.3 sigue siendo la última ejecutada en remoto. |
+| CI GitHub Actions sobre SHA `a970227` | AUDITADO / PARCIAL | [Run 40154161932](https://github.com/agmonetti/pi-iteration-diff/actions/runs/40154161932): suite de producto (144 tests) PASS en los 3 SO; fallos aislados en aserciones de `tests/package-install.test.ts` (regex de nombre de directorio y spawn de npm en Windows). |
 | Prueba física en Herdr | REPORTADA HISTÓRICA | Validada físicamente por usuario en M4.2/M4.4; M5 no altera la lógica interna de UI ni del dock adapter. |
 
 **Estado / siguiente paso**
-- **M5 COMPLETADO LOCALMENTE / Release Candidate v0.1.0 listo.**
-- Sin push, sin publicación en npm, sin creación de GitHub Release ni tag Git (límites estrictos respetados).
-- Cuando el usuario autorice: publicar rama, correr CI `portability.yml` con `workflow_dispatch`, taggear `v0.1.0` y habilitar distribución nativa.
+- **Rama publicada**: `feat/m5-packaging-distribution` con único push autorizado. SHA `a970227518053c5258f9afc4ab95812f8fc3018f`.
+- **Causa raíz diagnosticada**: 100% de la lógica de negocio y del visor es portable y pasó en Linux, macOS y Windows; los fallos en CI corresponden a aserciones del nuevo archivo de test asumiendo nombre de directorio local (`/pi-diff/` vs `pi-iteration-diff`) y `npm` sin `.cmd` en Windows.
+- Sin segundo push por restricción estricta de la consigna. Corrección delimitada y lista para solicitar autorización de segundo push para alcanzar CI CERTIFIED final.
 
+### 2026-10-25 — M5 / regresiones de portabilidad del test de packaging
+
+- `tests/package-install.test.ts`: `pi list` y settings comprueban la ruta fuente local derivada de `ROOT` (Pi no lista el nombre npm en instalaciones locales); `npm pack` usa `process.execPath` y `npm_execpath`, sin shell ni dependencia de `npm.cmd`. Ningún archivo de producción cambió. Commit único `39e9a73 test(packaging): use portable package source and npm CLI`; segundo push autorizado sólo a `feat/m5-packaging-distribution`.
+- Arch Linux, Node v26.12.0: `npm run check` PASS 151/151 (tras una primera prueba FAIL 2/151 por asumir erróneamente que `pi list` presenta el nombre npm); `python3 tests/pty-smoke.py` PASS; `npm pack --dry-run --json` PASS, 14 archivos, sin tests/scripts; `git diff --cached --check` PASS. `git diff --check` global detecta líneas en blanco al final de M5.md y PROGRESS.md previas, no incluidas en el commit.
+- [Run 40154609190](https://github.com/agmonetti/pi-iteration-diff/actions/runs/40154609190) `workflow_dispatch` sobre SHA completo `39e9a733cd47409de490ac3a547a2d4a8d110c64`: SUCCESS, checkout intacto en los tres jobs. Ubuntu linux Node v26.12.1: 151/151, 0 skips; macOS darwin arm64 Node v26.12.1: 150/151, 1 skip procfs; Windows win32 Node v26.12.1, WSL=false: 149/151, 2 skips procfs/PIDs POSIX. Cero fallos en los tres.
+- Esta anotación y cambios locales previos en M4.2.md, M5.md, PROGRESS.md y archivos untracked permanecen **fuera del SHA certificado**; no hacer otro commit/push por esta documentación. Sin pruebas físicas nuevas ni release/tag. Gate CI de M5 PASS, DoD global/manual sin declarar completo.
