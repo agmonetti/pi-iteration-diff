@@ -3,7 +3,6 @@ import { test } from "node:test";
 import { sliceByColumn, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import type { DiffRow } from "../src/diffs/iteration-diff.js";
 import { DiffPanel } from "../src/ui/diff-panel.js";
-import { IndentationLabPanel } from "./fixtures/indentation-lab.js";
 
 const rows: DiffRow[] = [
   { kind: "hunk", text: "@@ -999,2 +1234,2 @@" },
@@ -32,6 +31,16 @@ function plain(panel: DiffPanel, width = 80): string[] {
   return panel.render(width).map(stripTerminalSequences);
 }
 
+test("footer advertises only definitive actions, including after horizontal pan", () => {
+  const { panel } = fixture([{ kind: "added", newLine: 1, text: "  " + "long line ".repeat(12) }]);
+  assert.ok(plain(panel, 100).at(-1)?.includes("d: details"));
+  assert.ok(!plain(panel, 100).at(-1)?.includes("A/B"));
+  panel.render(34);
+  panel.handleInput("l");
+  assert.ok(plain(panel, 100).at(-1)?.includes("[pan +8]"));
+  assert.ok(plain(panel, 100)[5]?.includes("«"));
+});
+
 test("contextual gutter has one exact number, fixed signs and original indentation", () => {
   const { panel } = fixture();
   const lines = plain(panel);
@@ -47,7 +56,7 @@ test("contextual gutter has one exact number, fixed signs and original indentati
   assert.equal(plain(panel)[7], "▏  +     new 界 e\u0301");
 });
 
-test("compact rendering leaves mouse/keyboard ranges and appended context byte-identical", () => {
+test("original indentation survives mouse/keyboard selection, settings and append", () => {
   const f = fixture();
   const p = f.panel;
   p.handleInput("\x1b[B"); // hunk
@@ -147,21 +156,6 @@ test("Unicode/tabs/blank and short lines share visual offset without changing se
     const rendered = p.render(width);
     assert.ok(rendered.every(line => visibleWidth(line) <= width));
     assert.ok(!stripTerminalSequences(rendered[6]!).includes("\ufffd"));
-  }
-});
-
-test("lab-only A/B renderer keeps original context in TypeScript, Python and YAML hunks", () => {
-  const actions = { render() {}, close() {}, editor() {}, style: (_role: string, text: string) => text };
-  const a = new IndentationLabPanel(actions, false);
-  const b = new IndentationLabPanel(actions, true);
-  assert.ok(plain(a, 80).some(line => line.includes("            if (authorized)")));
-  assert.ok(plain(b, 80).some(line => line.includes(" if (authorized)")));
-  for (let file = 0; file < 3; file++) {
-    for (const p of [a, b]) { p.handleInput("\x1b[B"); p.handleInput("\r"); }
-    assert.equal(b.formatSelectedContext(), a.formatSelectedContext());
-    for (const p of [a, b]) { p.render(34); p.handleInput("l"); }
-    assert.equal(b.formatSelectedContext(), a.formatSelectedContext(), "pan never enters appended text");
-    for (const p of [a, b]) { p.handleInput("]"); }
   }
 });
 

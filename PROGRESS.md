@@ -1290,3 +1290,44 @@ nueva/CI nativa nueva NOT RUN; no declaración de DoD global ni avance a M4.
 - Archivos del commit delimitados por rutas explícitas: `src/index.ts`, `src/ui/diff-panel.ts`, `tests/diff-compaction.test.ts`, `tests/fixtures/compaction-fixtures.ts`, `PROGRESS.md`.
 - No push, no dependencias agregadas, no modificación de `/diff-settings`.
 - M4.2 permanece fuera de alcance hasta validación humana.
+
+### 2026-10-24 — M4.1 / cierre tras validación visual en Herdr
+
+**Decisión y cambio**
+- El usuario informó que el dock al 60% mejora considerablemente la legibilidad
+  en Herdr sin compactar la sangría: conservar A (original), retirar B.
+  Es evidencia humana reportada, no prueba física repetida por este agente;
+  sin captura, hora, dimensiones exactas ni terminal cliente aportados.
+- `src/ui/diff-panel.ts` y `src/index.ts`: eliminados el cálculo de sangría por
+  hunk, compactación visual, atajo `c`, `/diff a|b`, flags de entorno
+  `PI_DIFF_COMPACT`/`PI_DIFF_MODE` e indicador B del footer. `/diff` alterna
+  apertura/cierre sin modos experimentales; F6 y settings permanecen.
+- Eliminados tests/fixtures exclusivos A/B (`tests/diff-compaction.test.ts`,
+  `tests/fixtures/compaction-fixtures.ts`, `tests/fixtures/indentation-lab.ts`).
+  `tests/diff-horizontal.test.ts` conserva y prueba gutter contextual, números
+  On/Off, sangría original, pan por archivo, `«/»`, resize, mouse/teclado,
+  anexado íntegro y footer definitivo; sólo se retiró el caso lab A/B.
+- `M4.1.md`: decisión final y límites de la evidencia, sin borrar el protocolo
+  y los resultados históricos del experimento.
+- `scripts/lab-horizontal-diff.ts` fue inspeccionado: simulación A/B antigua
+  independiente del producto y candidata a eliminar, pero **untracked y de
+  procedencia desconocida**; preservada sin modificaciones ni staging.
+  `m4-test/` untracked también intacto. Ningún archivo ajeno eliminado.
+
+**Pruebas ejecutadas — 2026-10-24, Linux Arch, Node v26.12.0, Pi 1.4.0,
+Herdr 0.9.5 instalado**
+| Comando / caso | Resultado | Evidencia / límite |
+|---|---|---|
+| `npm run check` | PASS | tsc sin errores; 139/139 tests, 0 fallos/skips/cancelados, 6604 ms (gate final). Settings 30–60%, pan, selección, editor, CLI SDK y snapshots incluidos. |
+| `python3 tests/pty-smoke.py` | PASS | Pi real en PTY sintética aislada, `/diff`, F6, settings, borrador, reload, salida y reset mouse. No equivale a Herdr físico. |
+| `git diff --check`, status y cached | PASS inspección | Índice vacío inicialmente; sólo rutas tracked propias editadas/borradas; `scripts/` y `m4-test/` preservados sin seguimiento. |
+| Revisión arquitecto read-only | APROBADO condicionado a bitácora, satisfecha | Sin bloqueantes técnicos; solicitó registrar cierre en esta entrada y excluir untracked del commit. No ejecutó pruebas físicas. |
+| Nueva prueba física Kitty/Herdr por agente; CI macOS/Windows | NOT RUN | Evidencia visual limitada al informe humano Herdr de esta petición; CI anterior M1 no certifica UI nueva. |
+
+**Estado y parada**
+- **M4.1 cerrado** para la decisión y controles de este bloque, sin afirmar
+  completado M4 global ni DoD total del producto. M4.2 NOT STARTED.
+- Riesgos vigentes: matriz física completa y CI de UI nativa no repetidas;
+  límites de protocolo touchpad y casos pendientes ya documentados en M4.1.md.
+- Commit local Conventional Commits sólo de rutas tracked propias tras revisión
+  final de diff/staging y gate; no push.
