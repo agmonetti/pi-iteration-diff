@@ -1417,3 +1417,94 @@ No se declara compatibilidad física Herdr ni M4.2 certificado.
 **Riesgos / siguiente paso**
 - No equivaler PASS humano reportado al ensayo del fix posterior, ni runners de M1/`3c268e4` a CI actual. Drag literal FR-16, multi-hunk/Shift+Down, cambios concurrentes ABA y dependencia de layout Pi 1.4.0 pendientes. Revisión read-only por peer: aconseja conservar esa distinción; no aporta test independiente.
 - Para **comenzar M4.3**: confirmar manualmente en Herdr (y registrar Pi standalone si se busca su matriz) `/diff` enfocando tras fix, Esc y auto-open sin robo de foco; obtener autorización explícita para publicar y ejecutar CI sobre SHA final, registrar URL/run ID y resultados de cada SO. Para **cerrar M4.3** además se requieren sus casos de robustez pendientes y evidencia de sus propios cambios; no se infiere cierre por M4.2. No push ni M5.
+
+### 2026-10-24 — M4.3 / certificación CI del SHA publicado
+
+**Cambió**
+- Rama `test/m4-certification` creada desde HEAD `ec0f71ff4f4008231044e47e16c2590742ad3c1b` (`docs: record M4.2 verification and CI blocker`) y publicada con un solo `git push -u origin test/m4-certification`. El workflow existente sólo dispara automáticamente al publicar en main; se lanzó por `workflow_dispatch --ref test/m4-certification`. Sin push a main, PR, releases, tags, cambios de código/workflow/dependencias ni configuración remota.
+- `M4.2.md`, `M4.3.md`, `PROGRESS.md`: evidencia CI y reporte físico posterior al fix. Actualizaciones **locales posteriores al run**, no incluidas en el SHA certificado; sin commit nuevo ni push adicional. `scripts/`, `m4-test/` y otros untracked preservados.
+
+**Pruebas verificadas — GitHub Actions [run 40148421103](https://github.com/agmonetti/pi-iteration-diff/actions/runs/40148421103), 2026-10-25 00:52:59 UTC**
+
+| Job | SO/Node observado | Resultado | Skips / evidencia |
+|---|---|---|---|
+| `native (ubuntu-latest)` | linux x64, Node v26.12.1, WSL=false | PASS | 141/141, 0 fail/cancel/skip; checkout limpio; [job](https://github.com/agmonetti/pi-iteration-diff/actions/runs/40148421103/job/121034647921) |
+| `native (macos-latest)` | darwin arm64, Node v26.12.1, WSL=false | PASS | 140/141, 0 fail/cancel, 1 skip procfs Linux-only; checkout limpio; [job](https://github.com/agmonetti/pi-iteration-diff/actions/runs/40148421103/job/121034647870) |
+| `native (windows-latest)` | win32 x64, Node v26.12.1, WSL=false | PASS | 139/141, 0 fail/cancel, 2 skips procfs + M0 bash-abort PIDs POSIX; cancelación nativa PASS; checkout limpio; [job](https://github.com/agmonetti/pi-iteration-diff/actions/runs/40148421103/job/121034647642) |
+
+- Run `completed/success`, `headSha` y checkout de cada job: `ec0f71ff4f4008231044e47e16c2590742ad3c1b`. `npm ci --ignore-scripts --no-audit --no-fund`, `npm run check` (tsc + suite completa) y verificación de árbol intacto PASS en cada SO. Skips idénticos a los históricos M1, sin nuevas omisiones injustificadas. Avisos de deprecación de acciones Node 20/Node APIs y futura migración de ubuntu-latest no causaron FAIL; detalle en `M4.3.md`.
+- **Herdr físico, PASS reportado por el usuario tras el fix** (NO ejecutado por el agente): `/diff` manual enfoca explorador; `Esc` devuelve foco al editor; auto-open no roba foco. Sin captura, hora, terminal cliente ni dimensiones. No extender este PASS a Pi standalone ni a otros SO.
+- Gate local tras documentos (2026-10-24 21:56 UTC−03, Arch Linux, Node v26.12.0): `npm run check` PASS (tsc + 141/141, 0 fail/cancel/skip, 6274 ms), `git diff --check` PASS. `git ls-remote --heads origin refs/heads/test/m4-certification` coincide con HEAD certificado; índice vacío. Estos documentos no forman parte del checkout remoto probado.
+- Arquitecto peer read-only: aprueba el gate **CI CERTIFIED** para este SHA y exige separar ese dictamen del DoD global/manual; no ejecutó pruebas.
+
+**Estado / riesgos / próximo paso**
+- **M4.3 CI CERTIFIED para el SHA publicado (gate de tres runners cumplido); M4 global PARCIAL**, sin DoD global ni M5. Pi standalone físico nuevo, drag literal FR-16, detach/reattach, coexistencia de extensiones, selección multi-hunk/Shift+Down y riesgos de ABA/layout siguen abiertos. El workflow no ejecuta PTY humana.
+- Documentos quedan locales sin commit/push adicional para no cambiar el SHA certificado ni violar el límite de publicación. Esperar autorización antes de cualquier nueva publicación; continuar la matriz manual pendiente dentro de M4.
+
+### 2026-10-24 — M4.4 / ancho global de Diff
+
+**Cambió**
+- `src/ui/dock-width-store.ts`: archivo propio `<agent-dir>/iteration-diff.json` (Pi `getAgentDir()`), payload v1 de ancho y Remember, lectura estricta acotada y escritura atómica 0600 sólo tras cambio; otros settings siguen por rama.
+- `src/index.ts`: restaura global en nueva sesión/rama/proceso, migra ancho válido de rama M3.5 sólo si falta archivo; On persiste teclado, fin de drag y ajustes; Off conserva último ancho almacenado y vuelve a 45% en nuevas aperturas. Errores muestran aviso y no bloquean el dock.
+- `src/ui/diff-settings.ts`, `tests/diff-auto-open.test.ts`, `M3.5.md`, `RESEARCH.md`: ayuda, regresiones y ubicación/límites documentados. Documentos locales M4.3 preservados.
+
+**Pruebas ejecutadas — Arch Linux, Node v26.12.0, Pi 1.4.0, Herdr 0.9.5 instalado**
+| Comando / caso | Resultado | Evidencia / límite |
+|---|---|---|
+| `npm run check` final | PASS | tsc + 144/144, 0 fallos/skips/cancelados (6938 ms), incluye subproceso Node nuevo para recarga global. |
+| Test dirigido intermedio tras precisar semántica Off | FAIL 1 caso | Expectativa histórica de rama requería ancho anterior; Off ahora vuelve a default según M4.4; aserción actualizada. |
+| `npx --no-install tsx --test tests/diff-auto-open.test.ts` | PASS | 13/13; sesiones/proyectos simulados, migration, config inválida, drag sin escrituras intermedias. |
+| `python3 tests/pty-smoke.py` final | PASS | Pi real en PTY aislada; comandos, reload, salida/reset mouse. Sin mouse Herdr físico. |
+| Pi/Herdr físico y CI nativa del nuevo SHA | NOT RUN | Nueva certificación pendiente; test/m4-certification sigue en SHA M4.3. |
+
+**Fallos / riesgos / siguiente paso**
+- Pi 1.4.0 no expone configuración global arbitraria para extensiones; almacenamiento propio bajo directorio de agente, no `settings.json`. Sin watchers; procesos concurrentes: gana el último escritor. Layout terminal estrecho puede limitar ancho efectivo. Linux/Windows ACL y archivos protegidos/inaccesibles pueden impedir persistencia; el usuario recibe advertencia. Validación humana Herdr y runners nativos de este SHA pendientes.
+- Revisión arquitecto read-only detectó escritura sincrónica por drag y falta de mkdir; corregidas antes del gate final. No prueba física.
+- `M4.2.md`, `M4.3.md` y entradas previas de este archivo ya eran locales antes de M4.4: no se incluyen en el commit M4.4. No push, no M5. Próximo paso: certificar el nuevo SHA de manera independiente con autorización de publicación.
+
+### 2026-10-24 — M4.4 / preparación de rama para certificación
+
+**Cambió**
+- El usuario confirmó físicamente la persistencia global del ancho en Herdr (reporte humano; no repetido por este agente). Se creó sólo la rama local `test/m4.4-certification-882ca81` desde `882ca81c1e4e1e03b3edd3bb009535583bd9544a`; `test/m4-certification` conserva `ec0f71ff4f4008231044e47e16c2590742ad3c1b`, también en `origin`. Ningún commit, push, código, dependencia ni workflow modificado. Esta entrada permanece como cambio local y NO integra el SHA a certificar.
+- Cambios previos en `M4.2.md`, `PROGRESS.md`, `M4.3.md` y los untracked `fake-*`, `m4-test/`, `scripts/` preservados. Índice vacío antes y después del cambio de rama.
+
+**Pruebas — Arch Linux, Node v26.12.0, npm 12.2.1, Git 2.56.0; 2026-10-24 22:17 UTC−03**
+| Comando / caso | Resultado | Evidencia / límite |
+|---|---|---|
+| `npm run check` | PASS | tsc sin errores; 144/144 tests, 0 fail/skip/cancel (7197 ms), en checkout local del SHA con documentación y archivos untracked preexistentes. |
+| `git status --short --branch`, `git diff`, `git diff --cached`, `git rev-parse` y `git ls-remote --heads origin` | PASS inspección | Nueva rama apunta a 882ca81; rama histórica local/remota en ec0f71f; no staging; dirty previo no incluido en SHA. |
+| `.github/workflows/portability.yml` | PASS inspección | Matriz ubuntu/macos/windows-latest, `npm ci` y `npm run check`; sólo push a main, PR a main o `workflow_dispatch`. Publicar esta rama por sí solo no dispara la matriz. |
+| GitHub Actions ubuntu-latest / macos-latest / windows-latest sobre `882ca81` | NOT RUN | Rama aún local, sin push ni URL/run ID/logs. No certificar hasta ejecución y auditoría de los tres jobs sobre este SHA. |
+| PTY/Pi físico nuevo; Herdr físico por agente | NOT RUN | Informe humano de persistencia global en Herdr recibido, sin metadatos adicionales; no es evidencia CI. |
+
+**Estado / siguiente paso**
+- Rama lista localmente para solicitar autorización de publicación. Tras autorizar: publicar sólo esta rama, lanzar manualmente `portability.yml` con `workflow_dispatch` sobre ella y verificar `headSha`, plataforma nativa, suite y checkout limpio en cada job antes de declarar CI CERTIFIED. No publicar, commitear notas locales ni iniciar M5 por adelantado.
+- Arquitecto peer read-only aprobó el cierre preparatorio; su respuesta mencionó erróneamente `ci.yml` y PTY PASS en este bloque: se contrastó con el workflow real `portability.yml` y no se atribuye ejecución PTY nueva.
+
+### 2026-10-25 — M5 / empaquetado autónomo y distribución (v0.1.0 RC)
+
+**Cambió**
+- Rama `feat/m5-packaging-distribution` creada desde `882ca81`.
+- `package.json`: versión `0.1.0`, keywords `["pi-package"]`, manifiesto oficial `"pi": { "extensions": ["./src/index.ts"] }`, `main: "src/index.ts"`, `peerDependencies` para `@earendil-works/pi-coding-agent` y `@earendil-works/pi-tui` con `*`, lista de empaquetado `files: ["src", "README.md", "LICENSE", "package.json"]`, `private: true` removido. Cero dependencias externas en runtime.
+- `LICENSE`: licencia MIT creada.
+- `README.md`: guía completa de instalación nativa (`pi install git:...`), local y por proyecto, tabla de comandos (`/diff`, `/diff-settings`, `F6`), atajos de navegación y staging (`a`), persistencia global, actualización/desinstalación, compatibilidad y limitaciones conocidas.
+- `CHANGELOG.md`: registro bajo Keep a Changelog cubriendo M0 a M5 para la release candidate `v0.1.0`.
+- `M5.md`: reporte técnico completo de empaquetado, instalación nativa, validación y release candidate.
+- `tests/package-install.test.ts`: suite automatizada con 7 pruebas cubriendo manifiesto, `npm pack --dry-run`, instalación limpia aislada (`pi install`), preservación de `<agent-dir>/iteration-diff.json` en reinstalación/actualización, desinstalación segura (`pi remove`), tolerancia a fallos de configuración y soporte multi-proyecto.
+- `tests/pty-smoke.py`: actualizado para instalar el paquete de forma nativa en un `PI_CODING_AGENT_DIR` aislado y validar arranque, `/diff`, `/diff-settings`, `F6`, borrador nativo y `/reload` en TUI fullscreen real **sin flag `-e` ni `--no-extensions`**.
+
+**Pruebas ejecutadas — Arch Linux, Node v26.12.0, npm 12.2.1, Git 2.56.0; 2026-10-25**
+| Comando / caso | Resultado | Evidencia / límite |
+|---|---|---|
+| `npm run check` | PASS | tsc sin errores; 151/151 tests, 0 fail/skip/cancel (~7.1s), incluye los 7 tests nuevos de packaging. |
+| `python3 tests/pty-smoke.py` | PASS | Pi real en PTY fullscreen con instalación nativa previa; comandos `/diff` y `/diff-settings` descubiertos y funcionales sin `-e`. |
+| `npm pack --dry-run` | PASS | Tarball verificado: 13 archivos esenciales (src + package.json + LICENSE + README.md); excluye tests, scripts y docs de progreso. |
+| Persistencia y desinstalación | PASS | `<agent-dir>/iteration-diff.json` se preserva intacto tras updates y tras `pi remove`. Fallback seguro ante archivo corrupto o ausente. |
+| CI GitHub Actions sobre M5 | NOT RUN | Rama local `feat/m5-packaging-distribution`, sin push. CI de M4.3 sigue siendo la última ejecutada en remoto. |
+| Prueba física en Herdr | REPORTADA HISTÓRICA | Validada físicamente por usuario en M4.2/M4.4; M5 no altera la lógica interna de UI ni del dock adapter. |
+
+**Estado / siguiente paso**
+- **M5 COMPLETADO LOCALMENTE / Release Candidate v0.1.0 listo.**
+- Sin push, sin publicación en npm, sin creación de GitHub Release ni tag Git (límites estrictos respetados).
+- Cuando el usuario autorice: publicar rama, correr CI `portability.yml` con `workflow_dispatch`, taggear `v0.1.0` y habilitar distribución nativa.
+
