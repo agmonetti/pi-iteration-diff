@@ -1365,3 +1365,33 @@ No se declara compatibilidad física Herdr ni M4.2 certificado.
 - Próximo paso dentro de M4.2: operador ejecuta protocolo físico de `M4.2.md`
   en Pi standalone/Herdr y registra casos; CI nativa de este commit requiere
   ejecución externa autorizada. No iniciar M4.3/M5.
+
+### 2026-10-24 — M4.2 / corrección del foco al abrir `/diff`
+
+**Cambió**
+- `src/index.ts`: `/diff` cerrado monta y enfoca mediante el mismo `focusPanel()`
+  de F6, después de completar el montaje; `/diff` abierto sigue cerrando. La
+  apertura automática conserva el editor enfocado. Adaptador y layout intactos.
+- `tests/diff-auto-open.test.ts`: apertura manual y navegación inmediata con Enter,
+  F6 abrir/reenfocar, cierre, Esc, auto-open sin foco y borrador sin escrituras.
+  `tests/pty-smoke.py`: Esc explícito tras `/diff` para volver al editor antes de
+  enviar otro comando y antes del cierre nativo.
+
+**Pruebas — 2026-10-24, Arch Linux, Node v26.12.0, Pi 1.4.0, Herdr 0.9.5 instalado; NO_TTY**
+| Comando / caso | Resultado | Evidencia / límite |
+|---|---|---|
+| `npx --no-install tsx --test tests/diff-auto-open.test.ts` | PASS | 10/10; foco manual/F6, navegación por Enter y auto-open distinguidos. |
+| `npm run check` | PASS | tsc + 141/141, 0 fallos/skips/cancelados. |
+| Primer `python3 tests/pty-smoke.py` | FAIL esperado tras cambio de foco | `/diff-settings` se escribió mientras el panel retenía foco; smoke actualizado para Esc. |
+| Segundo `python3 tests/pty-smoke.py` | FAIL | Tras `/reload`, `/diff` enfocado interceptaba Ctrl+C/D; se añadió Esc antes de salida. |
+| `python3 tests/pty-smoke.py` final | PASS | Pi CLI real en PTY aislada, /diff, F6, settings, borrador, reload, salida 0 y reset mouse. Sin mouse Herdr físico. |
+| LSP activo en dos TS | PARCIAL | 1 clean, 2 warnings auxiliares preexistentes no-flag-argument en index; tsc PASS. |
+| Foco/navegación físicos Pi y Herdr | NOT RUN | Sin TTY humano; reporte previo detectó fallo antes del fix, no confirma este cambio. |
+
+**Límites / próximo paso**
+- No se tocaron snapshots, navegación/selección, settings, layout ni instalación.
+  Tests existentes cubren `a` y clic al pane nativo, pero no se repitió interacción
+  física. PTY sintética y test TUI no sustituyen aprobación física en Herdr.
+- Untracked preexistentes `fake-*`, `m4-test/`, `scripts/` excluidos del commit.
+  Próximo paso: operador verifica `/diff` y foco en Herdr/Pi reales siguiendo
+  M4.2; M4.3 no iniciado. Sin push.

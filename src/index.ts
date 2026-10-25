@@ -151,17 +151,18 @@ export default function iterationDiff(pi: ExtensionAPI): void {
         ctx.ui.notify(error instanceof Error ? error.message : "Failed to open diff", "warning");
       }
   };
+  const openAndFocus = async (ctx: ExtensionContext): Promise<void> => {
+    if (!dock) await open(ctx);
+    dock?.focusPanel();
+  };
   const command = {
     description: "Toggle the last observed iteration diff (F6 opens/focuses files)",
     handler: async (_args: string, ctx: ExtensionContext): Promise<void> => {
-      if (dock) manualDismiss();
-      else await open(ctx);
+      if (dock) { manualDismiss(); return; }
+      await openAndFocus(ctx);
     },
   };
-  pi.registerShortcut("f6", { description: "Open or focus diff", handler: async ctx => {
-    if (!dock) await open(ctx);
-    dock?.focusPanel();
-  } });
+  pi.registerShortcut("f6", { description: "Open or focus diff", handler: openAndFocus });
   const settingsCommand = {
     description: "Configure diff presentation and opt-in automatic opening",
     handler: async (_args: string, ctx: ExtensionContext): Promise<void> => {

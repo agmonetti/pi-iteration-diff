@@ -52,6 +52,7 @@ def main():
             assert b"DIFF:" not in output, "panel auto-opened"
             send(b"/diff\r")
             assert b"DIFF" in output, "sidebar did not render"
+            send(b"\x1b")  # /diff now focuses the dock; return to editor for the next command
             send(b"/diff-settings\r")
             assert b"Auto-open after iteration" in output, "six-preference settings UI did not render"
             send(b"\x1b")
@@ -67,6 +68,7 @@ def main():
             send(b"/diff\r")
             assert b"Failed to load extension" not in output
             assert b"Layout desconocido" not in output
+            send(b"\x1b")  # leave the focused dock before native clear/exit
             send(b"\x03")
             send(b"\x04")
             pump(2)

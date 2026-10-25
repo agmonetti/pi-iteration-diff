@@ -92,15 +92,27 @@ async function fixture(autoOpen: boolean) {
   };
 }
 
-test("auto-open defaults Off; F6 opens/focuses and /diff toggles without the removed alias", async () => {
+test("manual /diff focuses for keyboard navigation, closes to editor; F6 opens or refocuses", async () => {
   const f = await fixture(false);
   try {
     await f.begin(); await f.finish(); assert.equal(f.opens(), 0);
     assert.equal(f.commands.has("iteration-diff"), false);
+    await f.commands.get("diff")!.handler("", f.ctx);
+    const panel = f.tui.getFocusedComponent();
+    assert.ok(panel && panel !== f.editor);
+    panel.handleInput?.("\r");
+    assert.match(panel.render(50).join("\n"), /@@/, "Enter navigates the diff immediately");
     await f.shortcuts.get("f6")!(f.ctx);
-    assert.equal(f.opens(), 1); assert.notEqual(f.tui.getFocusedComponent(), f.editor);
+    assert.equal(f.opens(), 1); assert.equal(f.tui.getFocusedComponent(), panel);
+    f.tui.setFocus(f.editor);
+    await f.shortcuts.get("f6")!(f.ctx);
+    assert.equal(f.tui.getFocusedComponent(), panel, "F6 refocuses an open dock");
     await f.commands.get("diff")!.handler("", f.ctx);
     assert.equal(f.tui.getFocusedComponent(), f.editor);
+    await f.shortcuts.get("f6")!(f.ctx);
+    assert.equal(f.opens(), 2); assert.notEqual(f.tui.getFocusedComponent(), f.editor);
+    f.tui.getFocusedComponent()?.handleInput?.("\x1b");
+    assert.equal(f.tui.getFocusedComponent(), f.editor, "Esc returns to editor");
     assert.equal(f.writes(), 0); assert.equal(f.draft(), "existing draft");
   } finally { await f.close(); }
 });
@@ -111,7 +123,7 @@ test("opt-in opens only final individual results, preserves focus and respects m
     await f.begin(); assert.equal(f.opens(), 0);
     await f.finish(); assert.equal(f.opens(), 1);
     await f.finish(); assert.equal(f.opens(), 1, "duplicate settled does not replace an open dock");
-    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    assert.equal(f.tui.getFocusedComponent(), f.editor, "auto-open does not steal focus");
     await f.commands.get("diff")!.handler("", f.ctx);
     await f.finish(); assert.equal(f.opens(), 1);
     await f.begin();
@@ -178,6 +190,7 @@ test("manual open then close supersedes pending automatic open", async () => {
     await settled[0]!({ aborted: false } as never, f.ctx);
     const opening = settled[1]!({ aborted: false } as never, f.ctx);
     await f.commands.get("diff")!.handler("", f.ctx);
+    assert.notEqual(f.tui.getFocusedComponent(), f.editor);
     await f.commands.get("diff")!.handler("", f.ctx);
     await opening;
     await f.finish();
