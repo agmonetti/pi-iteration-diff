@@ -106,6 +106,34 @@ test("file header pans all its rows, independent offsets survive collapse and re
   assert.ok(plain(p, 34).slice(5, 7).every(line => !line.includes("«")));
 });
 
+test("collapsing a preceding file does not retarget a selected line", () => {
+  const f = fixture([{ kind: "added", newLine: 1, text: "first" }]);
+  const second = { ...f.view.files[0]!, path: "b.ts", getRows: () => [{ kind: "added" as const, newLine: 1, text: "second" }] };
+  const p = f.panel;
+  p.setView({ ...f.view, files: [...f.view.files, second] });
+  p.handleInput("]"); p.handleInput("\r"); // expand b.ts
+  const y = plain(p).findIndex(line => line.includes("+ second"));
+  assert.ok(y >= 3);
+  p.handleMouse({ type: "press", button: "left", x: 15, screenX: 15, y, screenY: y,
+    width: 80, height: 24, shift: false, alt: false, ctrl: false });
+  const selected = p.formatSelectedContext();
+  assert.equal(selected, "[b.ts | diff | new:1]\n+second");
+  p.handleMouse({ type: "press", button: "left", x: 15, screenX: 15, y: 3, screenY: 3,
+    width: 80, height: 24, shift: false, alt: false, ctrl: false }); // collapse a.ts without clearing selection
+  assert.equal(p.formatSelectedContext(), selected);
+  p.handleInput("a");
+  assert.equal(f.draft(), `existing draft\n\n${selected}`);
+});
+
+test("same-key replacement cannot append a selected stale row", () => {
+  const f = fixture([{ kind: "added", newLine: 1, text: "before" }]);
+  const p = f.panel;
+  p.handleInput("\x1b[B"); p.handleInput("\r");
+  assert.equal(p.formatSelectedContext(), "[a.ts | diff | new:1]\n+before");
+  p.setView({ ...f.view, files: [{ ...f.view.files[0]!, getRows: () => [{ kind: "added", newLine: 1, text: "after" }] }] });
+  assert.equal(p.hasSelection(), false);
+});
+
 test("pan clamps at both ends, width changes and numbers Off; fitting rows never pan", () => {
   const long = "0123456789".repeat(5);
   const { panel: p } = fixture([{ kind: "added", newLine: 12345, text: long }]);

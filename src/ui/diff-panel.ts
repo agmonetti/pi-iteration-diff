@@ -283,6 +283,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   setView(view: IterationView): void {
     const reset = this.view.key !== view.key;
+    if (view !== this.view && !reset) this.clearSelection(); // Same key with changed content cannot certify old row identity.
     this.view = view;
     if (reset) {
       this.expanded.clear();
@@ -307,6 +308,15 @@ export class DiffPanel extends VStack implements Component, Focusable {
   }
 
   private rebuild(): void {
+    const identity = (entry: Entry | undefined): string | undefined => {
+      if (!entry) return undefined;
+      if (entry.kind === "row") return `${entry.file.path}\0row\0${entry.rowIndex}`;
+      if (entry.kind === "hunk") return `${entry.file.path}\0hunk\0${entry.hunkIndex}`;
+      if (entry.kind === "file_header" || entry.kind === "file_path") return `${entry.file.path}\0${entry.kind}`;
+      return undefined;
+    };
+    const anchor = identity(this.diffEntries[this.selectionAnchor ?? -1]);
+    const focus = identity(this.diffEntries[this.selectionFocus ?? -1]);
     const entries: Entry[] = [];
     this.codeWidths.clear();
     this.numberWidths.clear();
@@ -368,6 +378,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
       entries.push({ kind: "notice", text: "No changes observed in this iteration." });
     }
     this.diffEntries = entries;
+    if (this.hasSelection()) {
+      this.selectionAnchor = anchor ? entries.findIndex(entry => identity(entry) === anchor) : -1;
+      this.selectionFocus = focus ? entries.findIndex(entry => identity(entry) === focus) : -1;
+      if (this.selectionAnchor < 0 || this.selectionFocus < 0) this.clearSelection();
+    }
     this.normalizeCursor();
     this.body.updateLayout(entries.length, this.body.viewportHeight, () => this.actions.render());
   }

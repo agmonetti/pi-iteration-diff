@@ -1331,3 +1331,37 @@ Herdr 0.9.5 instalado**
   límites de protocolo touchpad y casos pendientes ya documentados en M4.1.md.
 - Commit local Conventional Commits sólo de rutas tracked propias tras revisión
   final de diff/staging y gate; no push.
+
+### 2026-10-24 — M4.2 / auditoría local y selección tras rebuild
+
+**Estado: PARCIAL.** Matriz, defectos, límites y protocolo humano en `M4.2.md`.
+No se declara compatibilidad física Herdr ni M4.2 certificado.
+
+**Cambió**
+- `src/ui/diff-panel.ts`: reubica selección por identidad de fila tras rebuild;
+  descarta selecciones cuyo extremo desapareció o cuyo contenido cambió con la
+  misma key. Sin rediseño ni modificaciones al motor de captura/editor.
+- `tests/diff-horizontal.test.ts`: dos regresiones de selección/contexto.
+- `M4.2.md`: matriz PASS/NOT RUN, escenario físico reproducible y riesgos.
+
+**Evidencia — Arch Linux, Node v26.12.0, Pi 1.4.0, Herdr 0.9.5 instalado,
+2026-10-24; bash NO_TTY**
+| Comando / caso | Resultado | Evidencia / límite |
+|---|---|---|
+| Test dirigido antes del fix | FAIL esperado | Colapsar a.ts tras seleccionar b.ts devolvía undefined en lugar de fragmento b.ts; fixture corregido para colapsar mediante mouse sin limpiar selección por navegación. |
+| Test dirigido después | PASS | `npx --no-install tsx --test --test-name-pattern='collapsing a preceding' tests/diff-horizontal.test.ts`: 1/1. |
+| `npm run check` | PASS | tsc + 141/141 tests, 0 fail/skip/cancel, 6869 ms. |
+| `python3 tests/pty-smoke.py` | PASS PTY | Pi CLI aislado, `/diff`, F6, settings, borrador, reload y reset mouse; no modelo ni mouse Herdr físico. |
+| `git diff --check`, status/diff/cached | PASS inspección | Índice inicialmente vacío; sólo fuentes/test propios y documentación nueva; `scripts/`, `m4-test/` untracked excluidos. |
+| Revisión de arquitectura read-only (peer intercom) | APROBADO a nivel código | Sin bloqueantes en selección; no ejecutó validación física. |
+| Pi/Herdr físicos y CI sobre SHA actual (3 SO) | NOT RUN | Sin TTY humano ni ejecución del workflow para este diff. Run 40018853023 M1 y 40109386562 (`3c268e4`) son anteriores. |
+
+**Fallos, límites y siguiente paso**
+- Primera versión del test limpiaba selección con `[` antes de colapsar: FAIL
+  140/141 no atribuible al producto. Se reprodujo de nuevo con click de mouse
+  y código de producción anterior: FAIL dirigido; fix mínimo PASS.
+- Sin garantías nuevas de autoría, atomicidad, cursor/undo, drag literal,
+  multi-hunk o compatibilidad física. No incluir ni borrar laboratorios untracked.
+- Próximo paso dentro de M4.2: operador ejecuta protocolo físico de `M4.2.md`
+  en Pi standalone/Herdr y registra casos; CI nativa de este commit requiere
+  ejecución externa autorizada. No iniciar M4.3/M5.
