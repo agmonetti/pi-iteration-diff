@@ -10,6 +10,11 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
 const PI_CLI = resolve(ROOT, "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js");
+const PACKAGE_NAME: string = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).name;
+// Pi lists local installs by source path, not by the manifest's package name.
+const PACKAGE_SOURCE = ROOT;
+const NPM_CLI = process.env.npm_execpath;
+if (!NPM_CLI) throw new Error("Run packaging tests through npm test to locate the npm CLI");
 
 function runPi(args: string[], env: NodeJS.ProcessEnv, cwd = ROOT) {
   return spawnSync(process.execPath, [PI_CLI, ...args], {
@@ -45,12 +50,12 @@ test("package manifest conforms to official Pi packaging conventions", () => {
 });
 
 test("distribution tarball excludes test suites, documents, and non-distributable files", () => {
-  const output = execFileSync("npm", ["pack", "--dry-run", "--json"], {
+  const output = execFileSync(process.execPath, [NPM_CLI, "pack", "--dry-run", "--json"], {
     cwd: ROOT,
     encoding: "utf8",
   });
   const rawPack = JSON.parse(output);
-  const packEntry = Array.isArray(rawPack) ? rawPack[0] : (rawPack["pi-iteration-diff"] ?? Object.values(rawPack)[0]);
+  const packEntry = Array.isArray(rawPack) ? rawPack[0] : (rawPack[PACKAGE_NAME] ?? Object.values(rawPack)[0]);
   assert.ok(packEntry && Array.isArray(packEntry.files));
   const files: string[] = packEntry.files.map((f: { path: string }) => f.path);
 
@@ -80,14 +85,14 @@ test("clean installation via Pi CLI registers package and discovers extension wi
 
     const listRes = runPi(["list"], { PI_CODING_AGENT_DIR: tempAgent });
     assert.equal(listRes.status, 0, `list failed: ${listRes.stderr}`);
-    assert.match(listRes.stdout, /pi-diff/);
+    assert.ok(listRes.stdout.includes(PACKAGE_SOURCE), `package absent from pi list: ${listRes.stdout}`);
 
     const settingsPath = join(tempAgent, "settings.json");
     assert.ok(existsSync(settingsPath));
     const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
     assert.ok(Array.isArray(settings.packages));
     assert.ok(settings.packages.some((p: string | { source: string }) =>
-      (typeof p === "string" ? p : p.source).includes("pi-diff")
+      (typeof p === "string" ? p : p.source).includes(PACKAGE_SOURCE)
     ));
   } finally {
     rmSync(tempAgent, { recursive: true, force: true });
@@ -187,11 +192,11 @@ test("installed package resolves correctly when invoked across distinct workspac
     // Both projects can discover it through user settings
     const listA = runPi(["list"], { PI_CODING_AGENT_DIR: tempAgent }, tempProjectA);
     assert.equal(listA.status, 0);
-    assert.match(listA.stdout, /pi-diff/);
+    assert.ok(listA.stdout.includes(PACKAGE_SOURCE), `package absent from project A: ${listA.stdout}`);
 
     const listB = runPi(["list"], { PI_CODING_AGENT_DIR: tempAgent }, tempProjectB);
     assert.equal(listB.status, 0);
-    assert.match(listB.stdout, /pi-diff/);
+    assert.ok(listB.stdout.includes(PACKAGE_SOURCE), `package absent from project B: ${listB.stdout}`);
   } finally {
     rmSync(tempAgent, { recursive: true, force: true });
     rmSync(tempProjectA, { recursive: true, force: true });
