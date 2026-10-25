@@ -189,3 +189,32 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 - Execute human matrix of `M0.md` in common terminal and test Herdr, and log
   `/m0-events` for controlled run with tools/queues/retry/abort. Resolve
   iteration contract and confirm ADR before closing M1. No snapshots/M1 yet.
+
+### 2026-10-25 — M5 / real product screenshot for README
+
+**Changed**
+- `docs/assets/iteration-diff-demo.png`: authentic, unedited product screenshot of Pi inside Herdr (1920×1080) displaying the side-by-side dock with 4 files, expanded hunks, line numbers, active selection (`Sel: old:1-8, new:7-16 (10 lines)`), and appended diff excerpt in the native editor draft without modifying Git state.
+- `README.md`: added image reference `![pi-iteration-diff demo](docs/assets/iteration-diff-demo.png)` below initial description.
+- `docs/milestones/PROGRESS.md`: recorded screenshot artifact, test validation, and environment verification.
+
+**Environment**
+- Local date 2026-10-25 (UTC-03); Linux 7.2.11-arch1-1; Node v26.12.0; npm 12.2.1.
+- Pi 1.4.0; Herdr 0.9.5; Hyprland 0.56.2; Kitty terminal (1920×1080 monitor, scale 1.2).
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npm run check` | Node v26.12.0, Arch Linux | PASS | 151 tests pass, 0 fail; tsc clean (11.4s) |
+| `test -f docs/assets/iteration-diff-demo.png` | Arch Linux | PASS | File exists; 1920×1080 PNG, 866 KiB |
+| Real Pi inside Herdr session | Arch Linux / Herdr 0.9.5 | PASS | Live interactive execution in isolated demo workspace (`/home/agus-hy/Documentos/pi-diff-demo`), clean TUI fullscreen without third-party extensions, diff dock expanded with multiline selection and draft append |
+
+**Failures / limits / decisions**
+- Pi was launched with `--no-extensions --no-skills --no-mcp --no-context-files --no-prompt-templates` to eliminate visual noise from third-party plugins (ponytail, disambiguator, pi-lens linter warnings) and highlight core product functionality.
+- Screenshot was captured authentically directly from Herdr without simulated mockups or image tampering.
+
+**Pending Test**
+- None for documentation and assets.
+
+**Next Step**
+- Continue with M5 release checklist or tag preparation.
+

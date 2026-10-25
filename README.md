@@ -4,6 +4,8 @@ A lightweight diff viewer for [Pi Coding Agent](https://github.com/earendil-work
 
 Review the net changes from your last completed request in a side-by-side dock. Select lines and append them to your prompt without modifying Git state or sending your message automatically.
 
+![pi-iteration-diff demo](docs/assets/iteration-diff-demo.png)
+
 ## Install
 
 ```bash
