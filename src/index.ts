@@ -186,7 +186,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
         panel?.setPreferences(settings);
         dock?.setDockRatio(settings.dockWidth / 100);
         persist(ctx);
-        if (next.autoOpen !== previous.autoOpen || savedWidth?.autoOpen !== undefined) saveWidth(ctx, next.autoOpen);
+        saveWidth(ctx, next.autoOpen);
       });
       // A legacy branch may already have Auto-open On without a global choice.
       // Opening its settings and leaving it On adopts that consent locally.

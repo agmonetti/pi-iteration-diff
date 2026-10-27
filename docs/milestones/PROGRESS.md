@@ -2,6 +2,22 @@
 
 ### 2026-10-27 — Fix inherited Auto-open preference persistence
 
+### 2026-10-27 — Unconditional persistence on settings change
+
+**Changed**
+- `src/index.ts`: invoke `saveWidth(ctx, next.autoOpen)` on every settings change callback, ensuring toggling or confirming Auto-open updates `iteration-diff.json` even when transitioning from an inherited branch value.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npm run check` | Arch Linux, Node v26.12.0 | PASS | Typecheck and 157 tests passed |
+
+**Failures / limits / decisions**
+- Real Pi/Herdr restart and native macOS/Windows validation NOT RUN.
+
+**Next Step**
+- Retain the pending manual Pi/Herdr validation matrix.
+
 **Changed**
 - `src/index.ts`: when `/diff-settings` closes with inherited `Auto-open` still On and the local JSON lacks that field, save it locally. This preserves a branch's existing opt-in even when the user enters settings without changing the On/Off value.
 - `tests/diff-auto-open.test.ts`: cover legacy local JSON plus branch `Auto-open: On`, then verify that opening and closing settings adds `"autoOpen": true`.
