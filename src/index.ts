@@ -28,12 +28,13 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     try { pi.appendEntry(SETTINGS_ENTRY, { version: 1, ...settings }); }
     catch { ctx?.ui.notify("Diff settings could not be saved; changes apply only in memory", "warning"); }
   };
-  const saveWidth = (ctx = owner): void => {
+  const saveWidth = (ctx = owner, autoOpen = savedWidth?.autoOpen): void => {
     const value = { dockWidth: settings.rememberWidth ? settings.dockWidth : (savedWidth?.dockWidth ?? settings.dockWidth),
-      rememberWidth: settings.rememberWidth };
-    if (savedWidth?.dockWidth === value.dockWidth && savedWidth.rememberWidth === value.rememberWidth) return;
+      rememberWidth: settings.rememberWidth, ...(autoOpen !== undefined ? { autoOpen } : {}) };
+    if (savedWidth?.dockWidth === value.dockWidth && savedWidth.rememberWidth === value.rememberWidth &&
+        savedWidth.autoOpen === value.autoOpen) return;
     try { saveDockWidth(value); savedWidth = value; }
-    catch { ctx?.ui.notify("Global diff width could not be saved; changes apply only in memory", "warning"); }
+    catch { ctx?.ui.notify("Local diff preferences could not be saved; changes apply only in memory", "warning"); }
   };
   const rememberWidth = (): void => {
     if (!dock || !settings.rememberWidth) return;
@@ -178,13 +179,14 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     description: "Configure diff presentation and opt-in automatic opening",
     handler: async (_args: string, ctx: ExtensionContext): Promise<void> => {
       const version = settingsGeneration;
-      const previous = { dockWidth: settings.dockWidth, rememberWidth: settings.rememberWidth };
+      const previous = { dockWidth: settings.dockWidth, rememberWidth: settings.rememberWidth, autoOpen: settings.autoOpen };
       await showDiffSettings(ctx, settings, next => {
         if (version !== settingsGeneration) return;
         settings = next;
         panel?.setPreferences(settings);
         dock?.setDockRatio(settings.dockWidth / 100);
         persist(ctx);
+        if (next.autoOpen !== previous.autoOpen || savedWidth?.autoOpen !== undefined) saveWidth(ctx, next.autoOpen);
       });
       if (version === settingsGeneration) {
         if (!previous.rememberWidth && settings.rememberWidth &&
@@ -207,6 +209,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     if (loaded.status === "ok") {
       savedWidth = loaded.value;
       settings = { ...settings, rememberWidth: loaded.value.rememberWidth,
+        autoOpen: loaded.value.autoOpen ?? settings.autoOpen,
         dockWidth: loaded.value.rememberWidth ? loaded.value.dockWidth : DEFAULT_SETTINGS.dockWidth };
     } else {
       savedWidth = undefined;

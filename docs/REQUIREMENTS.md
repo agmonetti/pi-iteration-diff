@@ -191,6 +191,10 @@ Can be revised after spike. Include snapshot/diff identifier in a selection to d
 
 **Non-negotiable order:** do not skip M0 and implement a massive engine without demonstrating that TUI and editor support target interaction.
 
+### M3.5 preference persistence update (2026-10-27)
+
+An explicitly changed auto-open preference persists in the local Pi agent directory across sessions, branches, and projects. Existing local files without that preference retain legacy branch behavior until the user toggles it. The default remains Off.
+
 ## 9. Minimum Test Plan
 
 ### Unit / Automated

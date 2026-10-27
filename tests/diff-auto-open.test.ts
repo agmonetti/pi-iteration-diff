@@ -194,6 +194,31 @@ test("explicit SettingsList consent persists; Off during pending automatic openi
   } finally { await f.close(); }
 });
 
+test("auto-open persists locally across sessions and can be disabled", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "diff-auto-open-shared-"));
+  const toggle = Array(5).fill("\x1b[B").concat("\r");
+  try {
+    const first = await fixture(false, agentDir);
+    try {
+      await first.settings(toggle);
+      assert.equal(JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8")).autoOpen, true);
+    } finally { await first.close(); }
+    const second = await fixture(false, agentDir);
+    try {
+      await second.begin(); await second.finish();
+      assert.equal(second.opens(), 1);
+      assert.equal(second.tui.getFocusedComponent(), second.editor);
+      await second.settings(toggle);
+      assert.equal(JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8")).autoOpen, false);
+    } finally { await second.close(); }
+    const third = await fixture(true, agentDir);
+    try {
+      await third.begin(); await third.finish();
+      assert.equal(third.opens(), 0, "local opt-out overrides an older branch opt-in");
+    } finally { await third.close(); }
+  } finally { await rm(agentDir, { recursive: true, force: true }); }
+});
+
 test("manual open then close supersedes pending automatic open", async () => {
   const f = await fixture(true);
   try {
@@ -342,7 +367,7 @@ test("missing global config uses legacy branch; invalid or inaccessible config f
       assert.equal((f.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, 0.45);
       assert.ok(f.notifications.some(text => text.includes("invalid or inaccessible")));
       f.tui.getFocusedComponent()!.handleInput!(">");
-      assert.ok(f.notifications.some(text => text.includes("Global diff width could not be saved")));
+      assert.ok(f.notifications.some(text => text.includes("Local diff preferences could not be saved")));
     } finally { await f.close(); }
   } finally { await rm(agentDir, { recursive: true, force: true }); }
 });

@@ -53,7 +53,7 @@ Configure the dock using `/diff-settings`.
 | Dock width | 45% | 30–60% |
 | Remember dock width | On | On / Off |
 
-When enabled, **Remember dock width** saves your preferred width across Pi sessions, projects, and restarts.
+**Auto-open after iteration** is saved in `<agent-dir>/iteration-diff.json` across Pi sessions, projects, and restarts. When enabled, **Remember dock width** also saves your preferred width there.
 
 ## Compatibility
 

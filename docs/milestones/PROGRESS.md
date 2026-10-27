@@ -1,5 +1,24 @@
 # PROGRESS.md — Project Living Log
 
+### 2026-10-27 — Persist auto-open locally
+
+**Changed**
+- `src/ui/dock-width-store.ts`, `src/index.ts`: save explicitly toggled auto-open in the existing local agent preferences file; read legacy files and preserve branch fallback until toggled. Width changes retain the preference.
+- `tests/diff-auto-open.test.ts`: exercise opt-in and opt-out across fresh extension sessions and workspaces, including focus preservation and local precedence over an old branch.
+- `README.md`, `docs/REQUIREMENTS.md`, `docs/milestones/M3.5.md`: document the revised persistence scope.
+
+**Executed Tests**
+| Command | Environment | Result | Evidence |
+|---|---|---|---|
+| `npm run check` (first) | Arch Linux, Node v26.12.0 | FAIL | One test expected the previous storage warning text; assertion updated. |
+| `npm run check` (rerun and pre-commit) | Arch Linux, Node v26.12.0 | PASS | Typecheck; 152 tests passed on each run. |
+
+**Limits / next step**
+- Real Pi/Herdr manual restart NOT RUN; native macOS and Windows NOT RUN for this change.
+- Large-file capture and viewer limits remain unchanged; address separately.
+- Pre-existing untracked `scripts/` is outside this task and excluded from the commit.
+
+
 **Project:** `pi-iteration-diff`
 **Last Updated:** 2026-10-23
 **General Status:** `M1 ACCEPTED — CROSS-PLATFORM CI PASS`
