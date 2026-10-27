@@ -1,5 +1,21 @@
 # PROGRESS.md — Project Living Log
 
+### 2026-10-27 — Large diff investigation / initial measurement
+
+**Measured**
+- User-provided `documentacion-QA.html` in its original workspace: 205,838 bytes and 4,390 newline characters. The file was not copied into this repository or modified.
+- In-memory comparison with four synthetic edits near lines 76, 456, 981 and 1031: 205,838 / 205,910 bytes, 4,391 split lines; current viewer immediately returns the 256 KiB notice in 0.59 ms (Node v26.12.0, Arch Linux). This measures rejection, not comparison performance.
+- A separate in-memory bounded Myers **distance-only prototype** on those inputs found edit distance 8 with 4,430 counted operations in 0.40 ms. It does not generate hunks, test worst cases, measure allocations, or constitute production code.
+- Both versions together exceed the viewer byte limit and their combined line count exceeds its 2,000-line limit; the file itself is below the capture engine's 1 MiB per-file limit. The screenshot's `file-size-limit` notice does not establish that this particular file exceeded that capture limit.
+
+**Next step / limits**
+- Implemented bounded Myers fallback for dispersed edits; retain only generated hunks after comparison. Viewer limits are now 1 MiB and 12,000 lines for both endpoints combined; aggregate limits and work bounds remain. Snapshot capture remains limited to 1 MiB per file.
+- Real file with four synthetic in-memory edits: actual viewer produced 4 additions, 4 deletions, 4 hunks, 36 rows and exact old line numbers 76/456/981/1031 in 9.72 ms on Node v26.12.0 / Arch Linux. This is one local run, not a benchmark guarantee.
+- `npm run check` PASS (including pre-commit rerun): typecheck and 156 tests, including synthetic large-file capture integration, insertion/deletion, repeated lines against an independent LCS, and comparison/size limits.
+- Initial edit briefly produced TypeScript syntax errors during implementation; corrected before checks. The real before version and real interactive Pi/Herdr test were not measured; native macOS/Windows validation for this change NOT RUN. The 1 MiB capture and combined-view limits still reject larger files explicitly.
+- Architect review unavailable in this harness (no architect spawning tool); required independent review remains pending. Existing untracked `scripts/` is outside this change and excluded from the commit.
+
+
 ### 2026-10-27 — Persist auto-open locally
 
 **Changed**

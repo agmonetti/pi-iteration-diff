@@ -90,7 +90,7 @@ export function localizeNotice(text: string): string {
     return text.replace("Avisos de captura:", "Capture notices:");
   }
   if (text.startsWith("Límites del visor") || text.startsWith("Viewer limits")) {
-    return "Viewer limits: 64 files; 256 KiB and 2000 lines per file; 2 MiB and 16000 lines total; 32128 max rows; 3 context lines.";
+    return "Viewer limits: 64 files; 1 MiB and 12000 lines per file (both snapshots combined); 2 MiB and 16000 lines total; 32128 max rows; 3 context lines.";
   }
   if (text.startsWith("Límite de archivos:") || text.startsWith("File limit:")) {
     return text.replace("Límite de archivos: se muestran", "File limit: showing")
@@ -103,8 +103,14 @@ export function localizeNotice(text: string): string {
   if (text.startsWith("Diff no disponible: límite total de 16000 líneas")) {
     return "Diff unavailable: 16,000 total lines viewer limit.";
   }
-  if (text.startsWith("Diff no disponible: límite de 2000 líneas por archivo")) {
-    return "Diff unavailable: 2,000 lines per file limit.";
+  if (text.startsWith("Diff no disponible: límite de 12000 líneas por archivo")) {
+    return "Diff unavailable: 12,000 lines per file limit (both snapshots combined).";
+  }
+  if (text.startsWith("Diff no disponible: límite de 1 MiB")) {
+    return "Diff unavailable: 1 MiB per file limit (both snapshots combined).";
+  }
+  if (text.startsWith("Diff no disponible: límite total de 2 MiB")) {
+    return "Diff unavailable: 2 MiB total viewer limit.";
   }
   if (text.startsWith("Diff no disponible: límite de 250000 celdas")) {
     return "Diff unavailable: 250,000 comparison cells per file limit.";

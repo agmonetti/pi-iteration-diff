@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { mock, test } from "node:test";
 import { promisify } from "node:util";
 import { captureSnapshot, workspaceRoot } from "../src/snapshots/capture.js";
+import { createIterationView } from "../src/diffs/iteration-diff.js";
 import { compareSnapshots } from "../src/snapshots/model.js";
 import { workspace } from "./fixtures/workspace.js";
 
@@ -41,6 +42,27 @@ test("capture two net iterations with dirty/staged files, shell edits and intact
     assert.equal(compareSnapshots(await captureSnapshot(w.root), await captureSnapshot(w.root)).changes.length, 0);
     assert.deepEqual(await readFile(join(w.root, ".git/index")), index);
     assert.deepEqual(await w.git("rev-parse", "HEAD"), head);
+  } finally { await w.close(); }
+});
+
+test("capture and review dispersed edits in a large text file", async () => {
+  const w = await workspace();
+  try {
+    const lines = Array.from({ length: 4391 }, (_, i) => `line-${i} ${"x".repeat(40)}\n`);
+    await w.write("report.html", lines.join(""));
+    const before = await captureSnapshot(w.root);
+    for (const i of [75, 455, 980, 1030]) lines[i] = `changed-${i}\n`;
+    await w.write("report.html", lines.join(""));
+    const after = await captureSnapshot(w.root);
+    const delta = compareSnapshots(before, after);
+    assert.equal(delta.status, "complete");
+    const view = createIterationView({ state: "individual", window: {
+      id: { sessionId: "fixture", root: w.root, runtimeEpoch: "fixture", sequence: 1 },
+      status: "complete", attribution: "individual", inputCount: 1, before, after, delta,
+    } });
+    assert.equal(view.files[0].added, 4);
+    assert.equal(view.files[0].removed, 4);
+    assert.equal(view.files[0].getRows().filter(row => row.kind === "hunk").length, 4);
   } finally { await w.close(); }
 });
 

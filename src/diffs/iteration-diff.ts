@@ -28,9 +28,9 @@ export interface DiffRow {
 /** Endpoints share input limits. Merged hunks never repeat lines, bounding cached output to 2*lines + 2*files rows. */
 export const iterationDiffLimits = Object.freeze({
   files: 64,
-  fileBytes: 256 * 1024,
+  fileBytes: 1024 * 1024,
   bytes: 2 * 1024 * 1024,
-  fileLines: 2_000,
+  fileLines: 12_000,
   lines: 16_000,
   fileWork: 250_000,
   work: 1_000_000,
@@ -38,7 +38,7 @@ export const iterationDiffLimits = Object.freeze({
   rows: 32_128,
 });
 
-const limitsNotice = "Límites del visor: 64 archivos; 256 KiB y 2000 líneas por archivo (ambos extremos); " +
+const limitsNotice = "Límites del visor: 64 archivos; 1 MiB y 12000 líneas por archivo (ambos extremos); " +
   "2 MiB y 16000 líneas en total; 250000 celdas LCS por archivo y 1000000 en total; " +
   "salida máxima de 32128 filas; contexto de 3 líneas.";
 const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
@@ -101,6 +101,58 @@ function commonLines(pair: TextPair): number {
 
 interface Edit { kind: "context" | "added" | "removed"; token: string; oldLine: number; newLine: number }
 
+/** Bounded shortest edit path for large unchanged spans between dispersed edits. */
+function boundedMyers(pair: TextPair, limit: number): { script: Edit[]; work: number } | undefined {
+  const { old, next, prefix, suffix } = pair;
+  const n = old.length - prefix - suffix, m = next.length - prefix - suffix;
+  const trace: Map<number, number>[] = [];
+  let previous = new Map<number, number>([[1, 0]]);
+  let work = 0, distance = -1;
+  outer: for (let d = 0; d <= n + m; d++) {
+    trace.push(previous);
+    const current = new Map<number, number>();
+    for (let k = -d; k <= d; k += 2) {
+      if (++work > limit) return;
+      let x = k === -d || (k !== d && (previous.get(k - 1) ?? -1) < (previous.get(k + 1) ?? -1))
+        ? previous.get(k + 1)! : previous.get(k - 1)! + 1;
+      let y = x - k;
+      while (x < n && y < m) {
+        if (++work > limit) return;
+        if (old[prefix + x] !== next[prefix + y]) break;
+        x++; y++;
+      }
+      current.set(k, x);
+      if (x >= n && y >= m) { distance = d; break outer; }
+    }
+    previous = current;
+  }
+  if (distance < 0) return;
+  const reverse: Edit["kind"][] = [];
+  let x = n, y = m;
+  for (let d = distance; d >= 0; d--) {
+    const v = trace[d], k = x - y;
+    const previousK = k === -d || (k !== d && (v.get(k - 1) ?? -1) < (v.get(k + 1) ?? -1)) ? k + 1 : k - 1;
+    const previousX = v.get(previousK) ?? 0, previousY = previousX - previousK;
+    while (x > previousX && y > previousY) { reverse.push("context"); x--; y--; }
+    if (d > 0) {
+      if (x === previousX) { reverse.push("added"); y--; }
+      else { reverse.push("removed"); x--; }
+    }
+  }
+  const kinds: Edit["kind"][] = [
+    ...Array<Edit["kind"]>(prefix).fill("context"), ...reverse.reverse(),
+    ...Array<Edit["kind"]>(suffix).fill("context"),
+  ];
+  const script: Edit[] = [];
+  let i = 0, j = 0;
+  for (const kind of kinds) {
+    script.push({ kind, token: kind === "added" ? next[j] : old[i], oldLine: i + 1, newLine: j + 1 });
+    if (kind !== "added") i++;
+    if (kind !== "removed") j++;
+  }
+  return { script, work };
+}
+
 /** Runs only on expansion. The matrix fits in at most ~0.51 MiB per invocation. */
 function edits(pair: TextPair): Edit[] {
   const { old, next, prefix, suffix } = pair;
@@ -136,8 +188,7 @@ function edits(pair: TextPair): Edit[] {
   return result;
 }
 
-function unifiedRows(pair: TextPair): readonly DiffRow[] {
-  const script = edits(pair);
+function unifiedRows(pair: TextPair, script = edits(pair)): readonly DiffRow[] {
   const ranges: { start: number; end: number }[] = [];
   for (let index = 0; index < script.length; index++) {
     if (script[index].kind === "context") continue;
@@ -176,7 +227,7 @@ function createFile(file: FileDelta, budget: Budget): DiffFile {
     return unavailable(file, "Diff no disponible: falta contenido de un extremo de la captura.");
   }
   const size = (file.before?.length ?? 0) + (file.after?.length ?? 0);
-  if (size > iterationDiffLimits.fileBytes) return unavailable(file, "Diff no disponible: límite de 256 KiB por archivo.");
+  if (size > iterationDiffLimits.fileBytes) return unavailable(file, "Diff no disponible: límite de 1 MiB para ambos extremos del archivo.");
   if (size > budget.bytes) return unavailable(file, "Diff no disponible: límite total de 2 MiB del visor.");
   budget.bytes -= size;
   let old: string[] | undefined;
@@ -190,11 +241,25 @@ function createFile(file: FileDelta, budget: Budget): DiffFile {
     return unavailable(file, "Contenido no válido como UTF-8: diff textual no disponible.");
   }
   if (!old || !next) return unavailable(file, budget.lines < iterationDiffLimits.fileLines ?
-    "Diff no disponible: límite total de 16000 líneas del visor." : "Diff no disponible: límite de 2000 líneas por archivo.");
+    "Diff no disponible: límite total de 16000 líneas del visor." : "Diff no disponible: límite de 12000 líneas por archivo.");
   budget.lines -= old.length + next.length;
   const pair = matchingEdges(old, next);
   const work = (old.length - pair.prefix - pair.suffix) * (next.length - pair.prefix - pair.suffix);
-  if (work > iterationDiffLimits.fileWork) return unavailable(file, "Diff no disponible: límite de 250000 celdas de comparación por archivo.");
+  if (work > iterationDiffLimits.fileWork) {
+    const limit = Math.min(iterationDiffLimits.fileWork, budget.work);
+    const result = boundedMyers(pair, limit);
+    if (!result) {
+      budget.work -= limit;
+      return unavailable(file, limit < iterationDiffLimits.fileWork ?
+        "Diff no disponible: límite total de 1000000 celdas de comparación." :
+        "Diff no disponible: límite de 250000 celdas de comparación por archivo.");
+    }
+    budget.work -= result.work;
+    const added = result.script.filter(edit => edit.kind === "added").length;
+    const removed = result.script.filter(edit => edit.kind === "removed").length;
+    const rows = unifiedRows(pair, result.script);
+    return { path: file.path, kind: file.kind, added, removed, getRows: () => rows };
+  }
   if (work > budget.work) return unavailable(file, "Diff no disponible: límite total de 1000000 celdas de comparación.");
   budget.work -= work;
   const common = commonLines(pair);

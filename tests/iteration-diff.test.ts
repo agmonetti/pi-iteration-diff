@@ -194,17 +194,70 @@ test("file enumeration is capped without accessing omitted changes", () => {
 
 test("byte and line bounds accept exact boundaries and explicitly reject excess", () => {
   assert.equal(fileDiff(undefined, "x".repeat(iterationDiffLimits.fileBytes)).added, 1);
-  assertUnavailable(fileDiff(undefined, "x".repeat(iterationDiffLimits.fileBytes + 1)), /256 KiB/);
+  assertUnavailable(fileDiff(undefined, "x".repeat(iterationDiffLimits.fileBytes + 1)), /1 MiB/);
   const exact = fileDiff(undefined, "x\n".repeat(iterationDiffLimits.fileLines));
   assert.equal(exact.added, iterationDiffLimits.fileLines);
   assert.equal(exact.getRows().length, iterationDiffLimits.fileLines + 1);
-  assertUnavailable(fileDiff(undefined, "x\n".repeat(iterationDiffLimits.fileLines + 1)), /2000 líneas/);
-  for (const [content, pattern] of [["x".repeat(iterationDiffLimits.fileBytes), /2 MiB/], ["x\n".repeat(iterationDiffLimits.fileLines), /16000 líneas/]] as const) {
-    const after = snapshot(Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`f${i}`, i === 8 ? "last\n" : content])));
+  assertUnavailable(fileDiff(undefined, "x\n".repeat(iterationDiffLimits.fileLines + 1)), /12000 líneas/);
+  for (const [content, pattern, count] of [["x".repeat(iterationDiffLimits.fileBytes), /2 MiB/, 2], ["x\n".repeat(iterationDiffLimits.fileLines), /16000 líneas/, 1]] as const) {
+    const after = snapshot(Object.fromEntries(Array.from({ length: count + 1 }, (_, i) => [`f${i}`, content])));
     const view = createIterationView({ state: "individual", window: captured(snapshot({}), after) });
-    assert.ok(view.files.slice(0, 8).every(file => file.added !== undefined));
-    assertUnavailable(view.files[8], pattern);
+    assert.ok(view.files.slice(0, count).every(file => file.added !== undefined));
+    assertUnavailable(view.files[count], pattern);
     assert.ok(view.files.reduce((total, file) => total + file.getRows().length, 0) <= iterationDiffLimits.rows);
+  }
+});
+
+test("large file with four dispersed edits yields exact hunks and line numbers", () => {
+  const old = Array.from({ length: 4391 }, (_, i) => `line ${i} ${"x".repeat(40)}\n`);
+  const next = [...old];
+  for (const i of [75, 455, 980, 1030]) next[i] = `replacement ${i}\n`;
+  const file = fileDiff(old.join(""), next.join(""));
+  assert.equal(file.added, 4);
+  assert.equal(file.removed, 4);
+  const rows = file.getRows();
+  assert.equal(rows.filter(row => row.kind === "hunk").length, 4);
+  assert.deepEqual(rows.filter(row => row.kind === "removed").map(row => row.oldLine), [76, 456, 981, 1031]);
+  assert.deepEqual(rows.filter(row => row.kind === "added").map(row => row.newLine), [76, 456, 981, 1031]);
+  assert.ok(rows.length < 50);
+});
+
+test("large dispersed insertions and deletions retain side and line identity", () => {
+  const old = Array.from({ length: 1100 }, (_, i) => `unique-${i}\n`);
+  const next = [...old];
+  next.splice(850, 1);
+  next.splice(100, 0, "inserted\n");
+  const file = fileDiff(old.join(""), next.join(""));
+  assert.equal(file.added, 1);
+  assert.equal(file.removed, 1);
+  const rows = file.getRows();
+  assert.deepEqual(rows.filter(row => row.kind === "added").map(row => [row.newLine, row.text]), [[101, "inserted"]]);
+  assert.deepEqual(rows.filter(row => row.kind === "removed").map(row => [row.oldLine, row.text]), [[851, "unique-850"]]);
+});
+
+test("bounded large-file comparison matches an independent LCS on repeated lines", () => {
+  for (let seed = 0; seed < 8; seed++) {
+    const old = Array.from({ length: 620 }, (_, i) => `value-${(i * 7 + seed) % 11}\n`);
+    const next = [...old];
+    next[1] = `start-${seed}\n`;
+    next[618] = `end-${seed}\n`;
+    next.splice(300, 0, `insert-${seed}\n`);
+    const previous = new Uint16Array(next.length + 1);
+    for (const line of old) {
+      let diagonal = 0;
+      for (let j = 1; j <= next.length; j++) {
+        const above = previous[j];
+        previous[j] = line === next[j - 1] ? diagonal + 1 : Math.max(previous[j], previous[j - 1]);
+        diagonal = above;
+      }
+    }
+    const file = fileDiff(old.join(""), next.join(""));
+    assert.equal(file.removed, old.length - previous[next.length]);
+    assert.equal(file.added, next.length - previous[next.length]);
+    for (const row of file.getRows()) {
+      if (row.oldLine !== undefined) assert.equal(`${row.text}\n`, old[row.oldLine - 1]);
+      if (row.newLine !== undefined) assert.equal(`${row.text}\n`, next[row.newLine - 1]);
+    }
   }
 });
 
