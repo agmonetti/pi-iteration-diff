@@ -182,15 +182,16 @@ export default function iterationDiff(pi: ExtensionAPI): void {
       const previous = { dockWidth: settings.dockWidth, rememberWidth: settings.rememberWidth, autoOpen: settings.autoOpen };
       await showDiffSettings(ctx, settings, next => {
         if (version !== settingsGeneration) return;
+        if (!previous.rememberWidth && next.rememberWidth &&
+            next.dockWidth === DEFAULT_SETTINGS.dockWidth && savedWidth) {
+          next = { ...next, dockWidth: savedWidth.dockWidth };
+        }
         settings = next;
         panel?.setPreferences(settings);
         dock?.setDockRatio(settings.dockWidth / 100);
         persist(ctx);
-        saveWidth(ctx, next.autoOpen);
+        if (next.autoOpen !== previous.autoOpen) saveWidth(ctx, next.autoOpen);
       });
-      // A legacy branch may already have Auto-open On without a global choice.
-      // Opening its settings and leaving it On adopts that consent locally.
-      if (settings.autoOpen && savedWidth?.autoOpen === undefined) saveWidth(ctx, true);
       if (version === settingsGeneration) {
         if (!previous.rememberWidth && settings.rememberWidth &&
             settings.dockWidth === DEFAULT_SETTINGS.dockWidth && savedWidth) {
@@ -199,7 +200,11 @@ export default function iterationDiff(pi: ExtensionAPI): void {
           persist(ctx);
         }
         if (previous.rememberWidth !== settings.rememberWidth ||
-            (settings.rememberWidth && previous.dockWidth !== settings.dockWidth)) saveWidth(ctx);
+            (settings.rememberWidth && previous.dockWidth !== settings.dockWidth) ||
+            settings.autoOpen !== previous.autoOpen ||
+            (settings.autoOpen && savedWidth?.autoOpen === undefined)) {
+          saveWidth(ctx, settings.autoOpen);
+        }
         if (!settings.rememberWidth && !dock) settings = { ...settings, dockWidth: DEFAULT_SETTINGS.dockWidth };
       }
     },

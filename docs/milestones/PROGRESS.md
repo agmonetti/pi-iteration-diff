@@ -1,22 +1,23 @@
 # PROGRESS.md — Project Living Log
 
-### 2026-10-27 — Fix inherited Auto-open preference persistence
-
-### 2026-10-27 — Unconditional persistence on settings change
+### 2026-10-27 — Fix settings persistence regression and restore width on re-enabling Remember
 
 **Changed**
-- `src/index.ts`: invoke `saveWidth(ctx, next.autoOpen)` on every settings change callback, ensuring toggling or confirming Auto-open updates `iteration-diff.json` even when transitioning from an inherited branch value.
+- `src/index.ts`: when re-enabling `Remember dock width` (from Off to On) during settings adjustment, restore `savedWidth.dockWidth` immediately if at default (45%), preventing premature overwrites.
+- `src/index.ts`: gate live `saveWidth` during settings callbacks to explicit `autoOpen` changes; defer general width/remember persistence to settings confirmation/close. Fixes `0.45 !== 0.49` assertion failure in cross-session persistence test.
 
 **Executed Tests**
 | Command / case | Environment | Result | Evidence |
 |---|---|---|---|
-| `npm run check` | Arch Linux, Node v26.12.0 | PASS | Typecheck and 157 tests passed |
+| `npm run check` | Arch Linux, Node v26.12.0 | PASS | Typecheck and full suite: 157 tests passed, 0 failed |
 
 **Failures / limits / decisions**
 - Real Pi/Herdr restart and native macOS/Windows validation NOT RUN.
+- Local `~/.pi/agent/iteration-diff.json` reflects `@v0.1.0` installed in Pi; local workspace changes require package update or `-e` test to modify user agent dir.
 
 **Next Step**
 - Retain the pending manual Pi/Herdr validation matrix.
+
 
 **Changed**
 - `src/index.ts`: when `/diff-settings` closes with inherited `Auto-open` still On and the local JSON lacks that field, save it locally. This preserves a branch's existing opt-in even when the user enters settings without changing the On/Off value.
