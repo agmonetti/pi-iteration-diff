@@ -188,6 +188,9 @@ export default function iterationDiff(pi: ExtensionAPI): void {
         persist(ctx);
         if (next.autoOpen !== previous.autoOpen || savedWidth?.autoOpen !== undefined) saveWidth(ctx, next.autoOpen);
       });
+      // A legacy branch may already have Auto-open On without a global choice.
+      // Opening its settings and leaving it On adopts that consent locally.
+      if (settings.autoOpen && savedWidth?.autoOpen === undefined) saveWidth(ctx, true);
       if (version === settingsGeneration) {
         if (!previous.rememberWidth && settings.rememberWidth &&
             settings.dockWidth === DEFAULT_SETTINGS.dockWidth && savedWidth) {

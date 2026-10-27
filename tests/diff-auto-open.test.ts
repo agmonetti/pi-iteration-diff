@@ -218,6 +218,19 @@ test("auto-open persists locally across sessions and can be disabled", async () 
     } finally { await third.close(); }
   } finally { await rm(agentDir, { recursive: true, force: true }); }
 });
+test("settings adopts inherited Auto-open On when the local preference is legacy", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "diff-auto-open-legacy-"));
+  try {
+    await writeFile(join(agentDir, DOCK_WIDTH_FILE), JSON.stringify({
+      version: 1, dockWidth: 55.00000000000001, rememberWidth: true,
+    }));
+    const f = await fixture(true, agentDir);
+    try {
+      await f.settings([]);
+      assert.equal(JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8")).autoOpen, true);
+    } finally { await f.close(); }
+  } finally { await rm(agentDir, { recursive: true, force: true }); }
+});
 
 test("manual open then close supersedes pending automatic open", async () => {
   const f = await fixture(true);

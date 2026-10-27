@@ -1,5 +1,26 @@
 # PROGRESS.md — Project Living Log
 
+### 2026-10-27 — Fix inherited Auto-open preference persistence
+
+**Changed**
+- `src/index.ts`: when `/diff-settings` closes with inherited `Auto-open` still On and the local JSON lacks that field, save it locally. This preserves a branch's existing opt-in even when the user enters settings without changing the On/Off value.
+- `tests/diff-auto-open.test.ts`: cover legacy local JSON plus branch `Auto-open: On`, then verify that opening and closing settings adds `"autoOpen": true`.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `node --import tsx --test tests/diff-auto-open.test.ts` | Arch Linux, Node v26.12.0 | PASS | 15 tests passed, including legacy JSON migration |
+| `npm run check` | Arch Linux, Node v26.12.0 | PASS | Typecheck and full suite: 157 tests passed, 0 failed |
+
+**Failures / limits / decisions**
+- Real Pi/Herdr restart and native macOS/Windows validation NOT RUN.
+
+**Pending Test**
+- None for this automated regression; real Pi/Herdr persistence remains unverified.
+
+**Next Step**
+- Retain the pending manual Pi/Herdr validation matrix.
+
 ### 2026-10-27 — Large diff investigation / initial measurement
 
 **Measured**
