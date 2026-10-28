@@ -53,7 +53,7 @@ Configure the dock using `/diff-settings`.
 | Dock width | 45% | 30–60% |
 | Remember dock width | On | On / Off |
 
-**Auto-open after iteration** is saved in `<agent-dir>/iteration-diff.json` across Pi sessions, projects, and restarts. When enabled, **Remember dock width** also saves your preferred width there.
+**Auto-open after iteration** is saved in `<agent-dir>/iteration-diff.json` across Pi sessions, projects, and restarts. It opens a closed dock only for a complete individual iteration with net file changes; commit/push-only and conversation-only iterations do not open it. An already open dock remains open and refreshes, and `/diff` can always be opened manually to inspect an empty result. When enabled, **Remember dock width** also saves your preferred width there.
 
 ## Compatibility
 

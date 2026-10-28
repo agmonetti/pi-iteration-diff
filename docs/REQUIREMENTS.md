@@ -195,6 +195,10 @@ Can be revised after spike. Include snapshot/diff identifier in a selection to d
 
 An explicitly changed auto-open preference persists in the local Pi agent directory across sessions, branches, and projects. Existing local files without that preference retain legacy branch behavior until the user toggles it. The default remains Off.
 
+### Auto-open empty-iteration behavior (2026-10-28)
+
+Opt-in auto-open requires at least one observed net file change in a complete individual iteration. A commit/push of pre-existing content or a conversation-only request does not open a closed dock. An already open dock refreshes rather than closing, and manual `/diff` still displays the empty state. This narrows automatic interruption without changing capture, Git operations or manual review.
+
 ## 9. Minimum Test Plan
 
 ### Unit / Automated

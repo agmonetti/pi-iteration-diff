@@ -333,3 +333,25 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 
 **Next Step**
 - Request authorization for installed-extension update, then manually reload Pi and run a fresh dotfiles iteration with auto-open, editor focus and draft checks. Do not declare the live case resolved from automated evidence alone.
+
+### 2026-10-28 — Suppress empty opt-in auto-open
+
+**Changed**
+- `src/index.ts`: an automatic opening now additionally requires a nonempty net file delta; manual `/diff` and an already open dock retain their existing empty-result behavior.
+- `tests/diff-auto-open.test.ts`: a Git commit of staged pre-existing content and a conversation-only iteration keep a closed dock closed; manual empty review, existing dock refresh, later edits, editor focus and draft preservation are verified.
+- `README.md` and `docs/REQUIREMENTS.md`: document the new empty-iteration behavior and reason.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `node --import tsx --test tests/diff-auto-open.test.ts` before fix | Arch Linux, Node v26.12.0 | FAIL (expected) | Commit-only fixture opened 1 dock instead of 0 |
+| `node --import tsx --test tests/diff-auto-open.test.ts` after fix | Arch Linux, Node v26.12.0 | PASS | 19 tests, 0 failures |
+| `npm run check` | Arch Linux, Node v26.12.0 | PASS | Typecheck and 164 tests, 0 failures |
+
+**Failures / limits / decisions**
+- Push was not simulated: commit-only fixture proves Git metadata changes alone do not change the captured file contents. Screenshot behavior may include an already open panel; this change deliberately does not close it.
+- Interactive Pi/Herdr tests and native macOS/Windows CI for this change NOT RUN; installed extension not updated, no push. Existing user-modified progress header and untracked `scripts/` preserved.
+- Architect review unavailable: no architect spawning tool or peer in intercom.
+
+**Next Step**
+- After explicit authorization, install the new local commit and test a fresh commit/push-only request and a conversation request in Pi/Herdr, with both closed and already open dock states.

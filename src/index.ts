@@ -77,7 +77,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     const key = windowKey();
     if (!settings.autoOpen || dock || !key || key === closedWindow || key === attemptedWindow ||
         capture.state.state !== "individual" || capture.state.window.status !== "complete" ||
-        capture.state.window.attribution !== "individual") return;
+        capture.state.window.attribution !== "individual" || !capture.state.window.delta.changes.length) return;
     attemptedWindow = key;
     await open(ctx, true);
   });

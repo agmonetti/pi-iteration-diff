@@ -85,12 +85,12 @@ async function fixture(autoOpen: boolean, agentDir?: string) {
     entries: () => entries,
     failPersistence() { failPersistence = true; }, notifications,
     async settings(keys: string[]) { settingsKeys = keys; await commands.get("diff-settings")!.handler("", ctx); },
-    async begin(grouped = false) {
+    async begin(grouped = false, write = true) {
       await dispatch("input", { text: "request", source: "interactive" });
       await dispatch("before_agent_start", { messageType: "user", prompt: "request" });
       await dispatch("message_start", { message: { role: "user", content: "request" } });
       if (grouped) await dispatch("input", { text: "queued", source: "interactive", streamingBehavior: "followUp" });
-      await writeFile(join(w.root, "change.txt"), String(++sequence));
+      if (write) await writeFile(join(w.root, "change.txt"), String(++sequence));
     },
     async finish(aborted = false) { await dispatch("agent_settled", { aborted }); },
     setBranch(autoOpen: boolean) { entries = [{ type: "custom", customType: SETTINGS_ENTRY,
@@ -144,6 +144,43 @@ test("opt-in opens only final individual results, preserves focus and respects m
     await f.finish(); assert.equal(f.opens(), 2, "manual close while capturing suppresses automatic reopen");
     await f.begin(); await f.finish(); assert.equal(f.opens(), 3);
     assert.equal(f.writes(), 0); assert.equal(f.draft(), "existing draft");
+  } finally { await f.close(); }
+});
+
+test("commit-only and conversation iterations stay closed; manual empty view still works", async () => {
+  const f = await fixture(true);
+  try {
+    await writeFile(join(f.ctx.cwd, "README.md"), "pre-existing change\n");
+    execFileSync("git", ["-C", f.ctx.cwd, "add", "--", "README.md"]);
+    await f.begin(false, false);
+    execFileSync("git", ["-C", f.ctx.cwd, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "pre-existing change"]);
+    await f.finish();
+    assert.equal(f.opens(), 0, "committing existing content does not create an iteration delta");
+    await f.begin(false, false); await f.finish();
+    assert.equal(f.opens(), 0, "conversation without file changes does not auto-open");
+    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    assert.equal(f.writes(), 0); assert.equal(f.draft(), "existing draft");
+    await f.commands.get("diff")!.handler("", f.ctx);
+    assert.equal(f.opens(), 1, "manual /diff still opens the empty result");
+    assert.match(f.tui.getFocusedComponent()!.render(60).join("\n"), /No changes/);
+    await f.commands.get("diff")!.handler("", f.ctx);
+    await f.begin(); await f.finish();
+    assert.equal(f.opens(), 2, "a later text delta still auto-opens");
+    assert.equal(f.tui.getFocusedComponent(), f.editor);
+  } finally { await f.close(); }
+});
+
+test("already open dock remains open and refreshes after an empty iteration", async () => {
+  const f = await fixture(true);
+  try {
+    await f.begin(); await f.finish();
+    assert.equal(f.opens(), 1);
+    await f.begin(false, false); await f.finish();
+    assert.equal(f.opens(), 1);
+    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    assert.equal(f.writes(), 0); assert.equal(f.draft(), "existing draft");
+    await f.shortcuts.get("f6")!(f.ctx);
+    assert.match(f.tui.getFocusedComponent()!.render(60).join("\n"), /No changes/);
   } finally { await f.close(); }
 });
 
