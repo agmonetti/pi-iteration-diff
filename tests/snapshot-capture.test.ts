@@ -66,6 +66,33 @@ test("capture and review dispersed edits in a large text file", async () => {
   } finally { await w.close(); }
 });
 
+test("binary and non-UTF-8 omissions keep text capture complete but transitions remain partial", async () => {
+  const w = await workspace();
+  try {
+    await w.write("image.png", Buffer.from([137, 80, 78, 71, 0, 255]));
+    await w.write("legacy.dat", Buffer.from([255]));
+    await w.write("text.txt", "before\n");
+    const before = await captureSnapshot(w.root);
+    assert.deepEqual(before.issues, []);
+    for (const path of ["image.png", "legacy.dat"]) {
+      assert.equal(before.omitted.get(path), "binary-or-encoding");
+      assert.equal(before.files.has(path), false);
+    }
+    await w.write("text.txt", "after\n");
+    const delta = compareSnapshots(before, await captureSnapshot(w.root));
+    assert.equal(delta.status, "complete");
+    assert.deepEqual(delta.changes.map(change => change.path), ["text.txt"]);
+    await w.write("image.png", "now text\n");
+    const text = await captureSnapshot(w.root);
+    for (const [old, next] of [[before, text], [text, before]]) {
+      const transition = compareSnapshots(old, next);
+      assert.equal(transition.status, "partial");
+      assert.ok(transition.issues.includes("unknown-endpoint"));
+      assert.ok(!transition.changes.some(change => change.path === "image.png"));
+    }
+  } finally { await w.close(); }
+});
+
 test("filters ignored (even tracked), secrets, binary, links, subtrees and external paths", async () => {
   const w = await workspace();
   const external = await workspace();

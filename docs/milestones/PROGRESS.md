@@ -1,5 +1,24 @@
 # PROGRESS.md — Project Living Log
 
+### 2026-10-28 — Binary assets no longer block opt-in auto-open
+
+**Changed**
+- `src/snapshots/capture.ts`: preserve explicit binary/non-UTF-8 omissions without treating them as capture failures; all other error classifications and auto-open guards remain unchanged.
+- Regression tests cover binary assets with automatic opening, editor focus/draft preservation, text-only complete deltas, and partial text/binary transitions without invented additions/deletions.
+- `README.md` and `docs/RESEARCH.md`: document text-only completeness and omission limits.
+
+**Executed tests**
+- Before fix: two new targeted tests FAIL, reproducing the blocked opening and binary capture issue.
+- `npm run check`: PASS, typecheck and 159 tests, 0 failures; Arch Linux, Node v26.12.0.
+- Real repository snapshot: PASS, no capture issues, self-comparison complete, screenshot remains explicitly omitted as `binary-or-encoding`.
+- Active LSP diagnostics on three changed TypeScript files: no type errors; four existing auxiliary style findings in unchanged capture code.
+
+**Limits / next step**
+- Interactive Pi/Herdr and native macOS/Windows validation NOT RUN for this fix. Binary contents/changes remain outside text review.
+- Architect review BLOCKED: no architect spawning tool is exposed and intercom lists no peer sessions.
+- Installed extension and global preferences were not modified. Reload alone does not install workspace changes; update the installed package after this fix is available from its source.
+- Pre-existing untracked `scripts/` remains untouched and excluded.
+
 ### 2026-10-27 — Fix settings persistence regression and restore width on re-enabling Remember
 
 **Changed**

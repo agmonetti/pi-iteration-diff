@@ -147,6 +147,20 @@ test("opt-in opens only final individual results, preserves focus and respects m
   } finally { await f.close(); }
 });
 
+test("auto-open tolerates binary assets without stealing focus or changing the draft", async () => {
+  const f = await fixture(true);
+  try {
+    await writeFile(join(f.ctx.cwd, "image.png"), Buffer.from([137, 80, 78, 71, 0, 255]));
+    await f.begin();
+    assert.equal(f.opens(), 0);
+    await f.finish();
+    assert.equal(f.opens(), 1);
+    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    assert.equal(f.writes(), 0);
+    assert.equal(f.draft(), "existing draft");
+  } finally { await f.close(); }
+});
+
 for (const outcome of ["grouped", "aborted", "failed"] as const) {
   test(`auto-open rejects ${outcome} windows`, async () => {
     const f = await fixture(true);

@@ -192,7 +192,8 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
         if (!observed && (error as NodeJS.ErrnoException).code === "ENOENT") continue;
         const reason = error instanceof Error && !('code' in error) ? error.message : "file-unavailable";
         omitted.set(path, reason);
-        issues.add(reason);
+        // Binary/non-UTF-8 content is outside text review; keep its omission explicit.
+        if (reason !== "binary-or-encoding") issues.add(reason);
       } finally { await handle?.close(); }
     }
     check();
