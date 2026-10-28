@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -144,6 +144,28 @@ test("opt-in opens only final individual results, preserves focus and respects m
     await f.finish(); assert.equal(f.opens(), 2, "manual close while capturing suppresses automatic reopen");
     await f.begin(); await f.finish(); assert.equal(f.opens(), 3);
     assert.equal(f.writes(), 0); assert.equal(f.draft(), "existing draft");
+  } finally { await f.close(); }
+});
+
+test("auto-open with oversized PNG and internal config link retains editor and draft", async () => {
+  const f = await fixture(true);
+  try {
+    await writeFile(join(f.ctx.cwd, "wallpaper.png"), Buffer.concat([
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.alloc(1024 * 1024),
+    ]));
+    await writeFile(join(f.ctx.cwd, "theme.conf"), "theme\n");
+    await symlink("theme.conf", join(f.ctx.cwd, "active.conf"));
+    await f.begin();
+    assert.equal(f.opens(), 0);
+    await f.finish();
+    assert.equal(f.opens(), 1);
+    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    assert.equal(f.writes(), 0);
+    assert.equal(f.draft(), "existing draft");
+    await f.commands.get("diff")!.handler("", f.ctx);
+    await writeFile(join(f.ctx.cwd, "too-large.txt"), "x".repeat(1024 * 1024 + 1));
+    await f.begin(); await f.finish();
+    assert.equal(f.opens(), 1, "oversized text must still block opening");
   } finally { await f.close(); }
 });
 

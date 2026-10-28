@@ -66,8 +66,9 @@ Configure the dock using `/diff-settings`.
 
 - Drag-to-editor behavior depends on terminal capabilities. Use `a` to append selected changes reliably.
 - Changes made by external processes may appear in the iteration diff and are not guaranteed to originate from the agent.
-- Binary and non-UTF-8 files are explicitly omitted from text review and do not block opt-in automatic opening. Their changes are not reviewed. Text/binary transitions remain partial because one endpoint is unknown.
-- Files changed or deleted during capture may produce partial results. Capture currently limits each file to 1 MiB; the viewer limits the combined before/after contents of each file to 1 MiB and 12,000 lines, with additional total and comparison-work limits. Exceeding a limit is reported rather than presented as a complete diff.
+- Binary and non-UTF-8 files are omitted from text review. Oversized files with a verified PNG signature are also omitted after bounded, identity-checked reads; oversized text and unknown formats still produce partial captures. Binary/text transitions remain partial.
+- Internal symlinks to text files captured separately in the same snapshot are omitted from content review; changes to their targets appear under the target path. Retargeting, creation, deletion, external/unreadable links, hardlinks, and special files remain partial rather than claiming a complete delta. Link metadata changes without retargeting are not reviewed.
+- Files changed or deleted during capture may produce partial results. Capture limits text files to 1 MiB each; the viewer limits the combined before/after contents of each file to 1 MiB and 12,000 lines, with additional total and comparison-work limits. Exceeding a limit on eligible text is reported rather than presented as a complete diff.
 
 ## License
 

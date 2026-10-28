@@ -93,6 +93,73 @@ test("binary and non-UTF-8 omissions keep text capture complete but transitions 
   } finally { await w.close(); }
 });
 
+test("oversized PNG assets and internal links to captured text are scoped omissions", async () => {
+  const w = await workspace();
+  try {
+    await w.write("style.css", "before\n");
+    await w.write("theme.conf", "theme\n");
+    await symlink("theme.conf", join(w.root, "active.conf"));
+    await w.write("wallpaper.png", Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.alloc(1024 * 1024)]));
+    const before = await captureSnapshot(w.root);
+    assert.deepEqual(before.issues, []);
+    assert.equal(before.omitted.get("wallpaper.png"), "binary-or-encoding");
+    assert.equal(before.omitted.get("active.conf"), "symlink:theme.conf");
+    await w.write("style.css", "after\n");
+    const after = await captureSnapshot(w.root);
+    assert.deepEqual(compareSnapshots(before, after).changes.map(c => c.path), ["style.css"]);
+    assert.equal(compareSnapshots(before, after).status, "complete");
+    await rm(join(w.root, "active.conf"));
+    await symlink("style.css", join(w.root, "active.conf"));
+    const retargeted = compareSnapshots(after, await captureSnapshot(w.root));
+    assert.equal(retargeted.status, "partial");
+    assert.ok(retargeted.issues.includes("unknown-endpoint"));
+    assert.ok(!retargeted.changes.some(c => c.path === "active.conf"));
+    await rm(join(w.root, "active.conf"));
+    const removedLink = compareSnapshots(after, await captureSnapshot(w.root));
+    assert.equal(removedLink.status, "partial", "link disappearance is not a proven deletion");
+    assert.ok(!removedLink.changes.some(c => c.path === "active.conf"));
+    await w.write("active.conf", "now a regular file\n");
+    const textLinkTransition = compareSnapshots(after, await captureSnapshot(w.root));
+    assert.equal(textLinkTransition.status, "partial");
+    assert.ok(!textLinkTransition.changes.some(c => c.path === "active.conf"));
+    await w.write("wallpaper.png", "text".repeat(300_000));
+    const oversizedText = await captureSnapshot(w.root);
+    assert.ok(oversizedText.issues.includes("file-size-limit"));
+    assert.equal(compareSnapshots(after, oversizedText).status, "partial");
+    assert.ok(!compareSnapshots(after, oversizedText).changes.some(c => c.path === "wallpaper.png"));
+  } finally { await w.close(); }
+});
+
+test("uncaptured symlink targets and link races remain partial", async () => {
+  const w = await workspace();
+  let mocked: ReturnType<typeof mock.method> | undefined;
+  try {
+    await w.write("target.conf", "text\n");
+    await symlink("target.conf", join(w.root, "active.conf"));
+    await w.write(".gitignore", "target.conf\n");
+    const missing = await captureSnapshot(w.root);
+    assert.equal(missing.omitted.get("active.conf"), "unsupported-file-type");
+    assert.ok(missing.issues.includes("unsupported-file-type"));
+    await w.write(".gitignore", "");
+    const original = fs.readlink;
+    mocked = mock.method(fs, "readlink", async (...args: Parameters<typeof fs.readlink>) => {
+      if (args[0] === join(w.root, "active.conf")) {
+        await rm(args[0]);
+        await symlink("target.conf", args[0]);
+      }
+      return original(...args);
+    });
+    syncBuiltinESMExports();
+    const raced = await captureSnapshot(w.root);
+    assert.equal(raced.omitted.get("active.conf"), "file-raced");
+    assert.ok(raced.issues.includes("file-raced"));
+  } finally {
+    mocked?.mock.restore();
+    syncBuiltinESMExports();
+    await w.close();
+  }
+});
+
 test("filters ignored (even tracked), secrets, binary, links, subtrees and external paths", async () => {
   const w = await workspace();
   const external = await workspace();
@@ -117,6 +184,8 @@ test("filters ignored (even tracked), secrets, binary, links, subtrees and exter
     assert.equal(capture.omitted.get("ignored.txt"), "policy");
     for (const path of [".env", ".envrc", ".environment", ".env-local"]) assert.equal(capture.omitted.get(path), "policy");
     assert.ok(!capture.files.has("external/outside.txt"));
+    assert.equal(capture.omitted.get("symbol.txt"), "unsupported-file-type");
+    assert.ok(capture.issues.includes("unsupported-file-type"), "external link remains partial");
     assert.equal(capture.files.get("text.txt")?.toString(), "é\r\n😀\t");
     assert.equal(compareSnapshots(capture, capture).status, "partial");
     await assert.rejects(captureSnapshot(w.root, { exclude: ["../outside"] }));

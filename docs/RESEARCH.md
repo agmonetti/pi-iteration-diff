@@ -157,6 +157,10 @@ Classic failure example:
 
 Binary and invalid UTF-8 content, detected only after the existing bounded and identity-validated read, remain explicit `binary-or-encoding` omissions but no longer add a capture issue. Completeness describes eligible text, not binary review. This prevents unchanged image assets from blocking opt-in auto-open. Unknown endpoints in text/binary transitions still produce partial deltas; read, identity, cancellation and limit failures remain issues.
 
+### Dotfiles auto-open follow-up (2026-10-28)
+
+Metadata-only inspection of `~/Documentos/dotfiles` identified 12 PNG files above the 1 MiB per-file limit (10 under `assets/wallpapers/`, two under `yazi/.config/yazi/flavors/`) and two internal relative symlinks (`kitty/.config/kitty/themes/active.conf` and `micro/.config/micro/colorschemes/kitty-sync.micro`). A bounded PNG signature probe now occurs only after safe open and descriptor/path/parent checks, with post-probe verification; any other oversized file still raises `file-size-limit`. Internal relative symlinks are eligible for omission only if their target is independently captured as text in the same snapshot; link metadata/parents are checked without following the link. Retargeted, created or removed links yield `unknown-endpoint` at comparison; external links, uncaptured targets, hardlinks and special files still raise `unsupported-file-type`. This is a content-review scope decision, not symlink diff support or an authorship guarantee. It does not prove the live Pi/Herdr iteration auto-opens; that requires a consented installed-extension update and manual run.
+
 ## 9. Provisional ADRs
 
 - **ADR-001 — Runtime:** TypeScript as Pi extension; no Electron/WebView or new resident process. Provisional.

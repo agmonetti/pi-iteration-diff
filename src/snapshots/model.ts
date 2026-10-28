@@ -36,6 +36,12 @@ export function compareSnapshots(before: Snapshot, after: Snapshot): NetDelta {
       return snapshot.omitted.has(prefix) || snapshot.omitted.has(`${prefix}/`);
     });
   };
+  for (const path of new Set([...before.omitted.keys(), ...after.omitted.keys()])) {
+    const old = before.omitted.get(path);
+    const next = after.omitted.get(path);
+    if ((old?.startsWith("symlink:") || next?.startsWith("symlink:")) && old !== next &&
+        !issues.includes("unknown-endpoint")) issues.push("unknown-endpoint");
+  }
   for (const path of new Set([...before.files.keys(), ...after.files.keys()])) {
     const old = before.files.get(path);
     const next = after.files.get(path);

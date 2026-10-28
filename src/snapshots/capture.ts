@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { constants, type BigIntStats } from "node:fs";
-import { lstat, open, realpath } from "node:fs/promises";
+import { lstat, open, readlink, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join, parse, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import type { Snapshot } from "./model.js";
 
 export interface CaptureLimits {
@@ -110,6 +110,7 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
   const files = new Map<string, Buffer>();
   const omitted = new Map<string, string>(limits.exclude.map(p => [p, "policy"]));
   const issues = new Set<string>();
+  const links = new Map<string, string>();
   let enumerationComplete = false;
   let bytes = 0;
   const check = (): void => { if (signal.aborted) throw new Error("capture-cancelled-or-timeout"); };
@@ -152,10 +153,19 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
         if (!local || isAbsolute(local) || local === ".." || local.startsWith(`..${sep}`)) throw new Error("unsupported-path");
         const metadata = await lstat(absolute, { bigint: true });
         observed = true;
+        if (metadata.isSymbolicLink() && metadata.ino !== 0n) {
+          const target = await readlink(absolute);
+          await verifyParents(parents);
+          const current = await lstat(absolute, { bigint: true });
+          if (!sameIdentity(metadata, current) || !current.isSymbolicLink() || metadata.size !== current.size ||
+              metadata.mtimeNs !== current.mtimeNs || metadata.ctimeNs !== current.ctimeNs) throw new Error("file-raced");
+          const linked = relative(root, resolve(dirname(absolute), target)).split(sep).join("/");
+          if (!isAbsolute(target) && validPath(linked)) links.set(path, linked);
+          else throw new Error("unsupported-file-type");
+          continue;
+        }
         if (!metadata.isFile() || metadata.nlink !== 1n) throw new Error("unsupported-file-type");
         if (metadata.ino === 0n) throw new Error("unverifiable-file-identity");
-        if (metadata.size > BigInt(limits.maxFileBytes)) throw new Error("file-size-limit");
-        if (BigInt(bytes) + metadata.size > BigInt(limits.maxBytes)) throw new Error("memory-limit");
         check();
         // Windows does not implement POSIX no-follow/non-blocking open flags.
         const flags = process.platform === "win32" ? constants.O_RDONLY : constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK;
@@ -167,6 +177,20 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
         await verifyParents(parents);
         await verifyPath(root, absolute, before);
         check();
+        if (before.size > BigInt(limits.maxFileBytes)) {
+          const signature = Buffer.alloc(8);
+          const { bytesRead } = await handle.read(signature, 0, 8, 0);
+          const after = await handle.stat({ bigint: true });
+          await verifyParents(parents);
+          await verifyPath(root, absolute, before);
+          check();
+          if (!sameFile(before, after)) throw new Error("file-raced");
+          if (bytesRead === 8 && signature.equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+            omitted.set(path, "binary-or-encoding"); continue;
+          }
+          throw new Error("file-size-limit");
+        }
+        if (BigInt(bytes) + before.size > BigInt(limits.maxBytes)) throw new Error("memory-limit");
         const buffer = Buffer.alloc(Number(before.size) + 1);
         let read = 0;
         while (read < buffer.length) {
@@ -197,6 +221,10 @@ export async function captureSnapshot(root: string, options: Partial<CaptureLimi
       } finally { await handle?.close(); }
     }
     check();
+    for (const [path, target] of links) {
+      if (files.has(target)) omitted.set(path, `symlink:${target}`);
+      else { omitted.set(path, "unsupported-file-type"); issues.add("unsupported-file-type"); }
+    }
   } catch (error) {
     enumerationComplete = false;
     issues.add(error instanceof Error && !('code' in error) ? error.message : "capture-unavailable");

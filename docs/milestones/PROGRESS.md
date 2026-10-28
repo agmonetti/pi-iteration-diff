@@ -310,3 +310,26 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 **Next Step**
 - Continue with M5 release checklist or tag preparation.
 
+### 2026-10-28 — Dotfiles auto-open scope regression
+
+**Changed**
+- Metadata-only inspection in `~/Documentos/dotfiles` found 12 oversized PNG files (10 in `assets/wallpapers/`, two in `yazi/.config/yazi/flavors/`) and two internal symlinks (`kitty/.config/kitty/themes/active.conf`, `micro/.config/micro/colorschemes/kitty-sync.micro`). No contents were printed and the repository was not modified.
+- `src/snapshots/capture.ts`: bounded PNG signature probe after verified open, with post-read identity/parent checks; links count as scoped omissions only when their internal relative target was independently captured as text. All other size/type/read/identity/cancellation failures remain partial.
+- `src/snapshots/model.ts`: symlink creation/removal/retargeting and link-to-text transitions remain unknown endpoints, not confirmed creations/deletions. Regression tests in `tests/snapshot-capture.test.ts` and `tests/diff-auto-open.test.ts` cover the paths, focus/draft, oversized text, external/uncaptured links and a link replacement race. `README.md` and `docs/RESEARCH.md` record scope and limits.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `node --import tsx --test tests/snapshot-capture.test.ts tests/diff-auto-open.test.ts tests/snapshot-model.test.ts` | Arch Linux, Node v26.12.0 | PASS | 30 tests; targeted pre-final run |
+| `npm run check` | Arch Linux, Node v26.12.0; Pi 1.4.0, Herdr 0.9.5 installed | PASS | Typecheck and 162 tests, 0 failures |
+| Two read-only snapshot comparisons of dotfiles (`maxMs: 10000`) | Arch Linux | PASS | Both `issues=[]`; 121 captured text paths; identical delta `complete`, 0 changes; no code contents logged |
+| Live Pi/Herdr request with changed `style.css` and opt-in auto-open | Installed checkout still c672f1a | NOT RUN | Installation update requires explicit authorization and Pi reload/restart |
+| Native macOS / Windows on this change | Local Linux host | NOT RUN | No CI run for this change |
+
+**Failures / limits / decisions**
+- Existing user modification at the top of this log (local-installation note) and untracked `scripts/` were present before this block and preserved. No global preferences, installed extension, Herdr integration, Git index in dotfiles, or push changed.
+- PNG magic establishes a binary (non-UTF-8) prefix, not a complete PNG parser; those file changes and symlink metadata changes without retargeting are outside text review. Node identity checks do not guarantee exclusion of adversarial ABA races.
+- Architect review not available: intercom listed no architect peer and no spawn tool exposed. Manual Pi/Herdr focus/resize/closure and real dotfiles iteration NOT RUN; automated focus and draft checks are not physical interaction evidence.
+
+**Next Step**
+- Request authorization for installed-extension update, then manually reload Pi and run a fresh dotfiles iteration with auto-open, editor focus and draft checks. Do not declare the live case resolved from automated evidence alone.
