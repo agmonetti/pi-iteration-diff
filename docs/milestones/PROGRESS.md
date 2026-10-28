@@ -355,3 +355,21 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 
 **Next Step**
 - After explicit authorization, install the new local commit and test a fresh commit/push-only request and a conversation request in Pi/Herdr, with both closed and already open dock states.
+
+### 2026-10-28 — Authorized push and installed checkout update
+
+**Changed**
+- User explicitly authorized a Conventional Commit, push, and installation update. Implementation already committed in `bf6d5af` and `63fd238`; pushed `main` from `1e30bf9` to `63fd238` on `origin` without force.
+- Installed Git checkout at `~/.pi/agent/git/github.com/agmonetti/pi-iteration-diff` fast-forwarded from `c672f1a` to `63fd238` via local development repo. Existing modified installed `package-lock.json` and global `iteration-diff.json` preferences retained identical SHA-256 values before and after; no Herdr integration touched.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npm run check` | Arch Linux, Node v26.12.0 | PASS | Typecheck; 164 tests, 0 failures, before push |
+| `git ls-remote origin refs/heads/main`; `git push origin main` | GitHub remote | PASS | Remote matched local tracking SHA `1e30bf9` before push; non-force fast-forward to `63fd238` |
+| `git fetch <development checkout> main`; `git merge --ff-only FETCH_HEAD` in installed checkout | Pi 1.4.0 package checkout | PASS | Detached installed HEAD advanced `c672f1a` → `63fd238`; only pre-existing modified lockfile remains |
+| Interactive Pi `/reload` and real dotfiles iteration | Running user session | NOT RUN | Checkout update alone does not reload already running Pi; manual validation needed |
+
+**Failures / limits / next step**
+- No installed dependencies changed. The installed checkout has no `tsx` development dependency: installed-checkout test suite NOT RUN; development checkout gate passed. Native macOS/Windows CI and Pi/Herdr manual matrix NOT RUN for these changes.
+- Existing user-modified header in this log and untracked `scripts/` remain outside commits. Ask user to `/reload` or restart Pi, then validate a fresh dotfiles edit, commit/push-only iteration and conversation, confirming focus and draft preservation. Do not infer the live behavior from checks alone.
