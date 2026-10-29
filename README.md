@@ -70,6 +70,15 @@ Configure the dock using `/diff-settings`.
 - Internal symlinks to text files captured separately in the same snapshot are omitted from content review; changes to their targets appear under the target path. Retargeting, creation, deletion, external/unreadable links, hardlinks, and special files remain partial rather than claiming a complete delta. Link metadata changes without retargeting are not reviewed.
 - Files changed or deleted during capture may produce partial results. Capture limits text files to 1 MiB each; the viewer limits the combined before/after contents of each file to 1 MiB and 12,000 lines, with additional total and comparison-work limits. Exceeding a limit on eligible text is reported rather than presented as a complete diff.
 
+## Next steps
+- Add colapsable lines as a config option
+- Add as an option to drop down the line in order for a full read. eg:
+  ```bash
+  40 print("Hello Worl
+    ! Nice to see you")
+  41 print("Hi")
+  ```
+
 ## License
 
 [MIT](LICENSE) © 2026 Agustin Monetti
