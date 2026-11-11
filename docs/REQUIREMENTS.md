@@ -53,6 +53,7 @@ If another extension modifies files between snapshots, third-party changes may a
 | FR-21 | P1 | Persistence or controlled recovery. | Defined policy for `/reload`, crash/resume, and without unauthorized code exposure. |
 | FR-22 | P2 | Optional metadata for Herdr. | "Review ready" without overwriting official states; disabled by default. |
 | FR-23 | P2 | Comments per file/global diff and templates. | Feedback remains compact, editable, non-automatic. |
+| FR-24 | P2 | Maximized full view via `/diff-settings`. | Opt-in (default Off, persisted per user like `Auto-open`): while the dock holds focus it occupies the full Pi viewport; `Esc`/editor focus restores the native layout with the stored width. Below 90 columns the native fallback wins. In Herdr the ceiling is the Pi pane; Herdr's own zoom covers the rest of the window. |
 
 **MVP success criteria:** FR-01 to FR-15. **Full product success:** MVP + FR-16 to FR-21, or a documented exception approved by the user for a real drag-and-drop blockage. FR-22/23 are nice-to-have.
 

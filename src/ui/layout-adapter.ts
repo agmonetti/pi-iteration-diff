@@ -18,16 +18,32 @@ export interface DockHandle {
   getDockWidth(): number;
   getDockRatio(): number;
   setDockRatio(ratio: number): void;
+  setMaximized(on: boolean): void;
 }
 
 export class ResizableDockRoot extends HStack {
   private ratio: number;
+  private maximized: boolean;
+  /** Live probe installed by mountDock; without it maximized never applies (fail closed). */
+  panelFocused: () => boolean = () => false;
   private lastTerminalWidth?: number;
 
-  constructor(children: StackChild[], initialRatio = 0.45, private readonly focusNative?: () => void) {
+  constructor(children: StackChild[], initialRatio = 0.45, private readonly focusNative?: () => void,
+      initialMaximized = false) {
     super(children);
     this.ratio = 0.45;
     this.dockRatio = initialRatio;
+    this.maximized = initialMaximized;
+    // The native column hides only while the panel holds focus in maximized mode,
+    // so returning focus to the editor always restores a visible conversation.
+    const nativeEntry = this.entries[0];
+    if (nativeEntry) nativeEntry.visible = (viewport: { width: number }) =>
+      !this.effectiveMaximized(viewport.width);
+  }
+
+  /** Maximized applies only while the dock is visible; narrow terminals keep the native fallback. */
+  private effectiveMaximized(width: number): boolean {
+    return this.maximized && width >= 90 && this.panelFocused();
   }
 
   override handleMouse(event: TuiMouseEvent): undefined {
@@ -48,7 +64,16 @@ export class ResizableDockRoot extends HStack {
       }
     }
   }
+  get isMaximized(): boolean { return this.maximized; }
+  setMaximized(on: boolean): void {
+    if (this.maximized === on) return;
+    this.maximized = on;
+    if (this.lastTerminalWidth !== undefined) {
+      this.updateDockBasis(this.lastTerminalWidth);
+    }
+  }
   getDockWidth(width: number): number {
+    if (this.effectiveMaximized(width)) return width;
     return Math.max(34, Math.min(Math.max(34, width - 46), Math.round(width * this.ratio)));
   }
 
@@ -60,12 +85,14 @@ export class ResizableDockRoot extends HStack {
   }
 
   resizeBy(deltaCols: number, totalWidth: number): void {
+    if (this.effectiveMaximized(totalWidth)) return;
     const currentCols = this.getDockWidth(totalWidth);
     const newCols = Math.max(34, Math.min(totalWidth - 46, currentCols + deltaCols));
     this.dockRatio = newCols / Math.max(1, totalWidth);
     this.updateDockBasis(totalWidth);
   }
   setDockWidth(cols: number, totalWidth: number): void {
+    if (this.effectiveMaximized(totalWidth)) return;
     const clamped = Math.max(34, Math.min(totalWidth - 46, cols));
     this.dockRatio = clamped / Math.max(1, totalWidth);
     this.updateDockBasis(totalWidth);
@@ -76,7 +103,7 @@ export class ResizableDockRoot extends HStack {
   }
 }
 
-export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45): DockHandle {
+export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45, initialMaximized = false): DockHandle {
   if (!isViewportTUI(tui) || !("layoutRoot" in tui) ||
       !("getFocusedComponent" in tui) || typeof tui.getFocusedComponent !== "function") {
     throw new Error("El diff requiere Pi fullscreen con layout compatible (probado en 1.4.0)");
@@ -101,8 +128,12 @@ export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45): Dock
         return width >= 90;
       } },
   ], initialRatio, () => {
-    if (ownsRoot()) tui.setFocus(previousFocus);
-  });
+    if (ownsRoot()) {
+      tui.setFocus(previousFocus);
+      tui.requestRender();
+    }
+  }, initialMaximized);
+  root.panelFocused = () => internal.getFocusedComponent() === panel;
   root.updateDockBasis(tui.terminal.columns);
   tui.setLayoutRoot(root);
   // Pi 1.4.0 consumes page/line shortcuts before extension input listeners.
@@ -122,8 +153,18 @@ export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45): Dock
   const ownsRoot = (): boolean => !closed && internal.layoutRoot === root;
   if (viewport && scrollPanel.scrollBy) viewport.scrollBy = routedScroll;
   return {
-    focusPanel() { if (ownsRoot() && tui.terminal.columns >= 90) tui.setFocus(panel); },
-    focusEditor() { if (ownsRoot()) tui.setFocus(previousFocus); },
+    focusPanel() {
+      if (ownsRoot() && tui.terminal.columns >= 90) {
+        tui.setFocus(panel);
+        tui.requestRender();
+      }
+    },
+    focusEditor() {
+      if (ownsRoot()) {
+        tui.setFocus(previousFocus);
+        tui.requestRender();
+      }
+    },
     resizeBy(deltaCols: number) {
       if (!ownsRoot()) return;
       root.resizeBy(deltaCols, tui.terminal.columns);
@@ -142,6 +183,13 @@ export function mountDock(tui: TUI, panel: Component, initialRatio = 0.45): Dock
     setDockRatio(ratio) {
       if (!ownsRoot()) return;
       root.dockRatio = ratio;
+      root.updateDockBasis(tui.terminal.columns);
+      root.invalidate();
+      tui.requestRender();
+    },
+    setMaximized(on) {
+      if (!ownsRoot()) return;
+      root.setMaximized(on);
       root.updateDockBasis(tui.terminal.columns);
       root.invalidate();
       tui.requestRender();

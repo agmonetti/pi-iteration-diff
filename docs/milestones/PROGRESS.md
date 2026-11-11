@@ -373,3 +373,33 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 **Failures / limits / next step**
 - No installed dependencies changed. The installed checkout has no `tsx` development dependency: installed-checkout test suite NOT RUN; development checkout gate passed. Native macOS/Windows CI and Pi/Herdr manual matrix NOT RUN for these changes.
 - Existing user-modified header in this log and untracked `scripts/` remain outside commits. Ask user to `/reload` or restart Pi, then validate a fresh dotfiles edit, commit/push-only iteration and conversation, confirming focus and draft preservation. Do not infer the live behavior from checks alone.
+### 2026-11-10 — Maximized full view via `/diff-settings` (FR-24)
+
+**Changed**
+- `src/ui/layout-adapter.ts`: `ResizableDockRoot` gains an opt-in maximized state and a focus probe installed by `mountDock`; while the dock holds focus and the terminal is at least 90 columns, the native column is hidden (`visible` callback) and the dock basis spans the full width. `resizeBy`/`setDockWidth` are inert while maximized; the stored 30–60% ratio is never rewritten. `focusPanel`/`focusEditor`/native-focus now request a render so the layout switches immediately.
+- `src/ui/diff-settings.ts`: new `maximized` preference (default Off) with item, toggle and arrow handling; `parseSettings` accepts legacy payloads without the field and rejects non-boolean values.
+- `src/ui/dock-width-store.ts`: `SavedDockWidth` persists optional `maximized` with validation; legacy files load unchanged.
+- `src/index.ts`: `mountDock` receives the initial maximized state; settings changes apply it live, persist it in the branch entry and in the local JSON alongside `Auto-open`; `restore()` adopts the saved value across branches and sessions.
+- `tests/diff-maximized.test.ts` (new): full-width rendering while focused with Esc restore, narrow fallback below 90 columns, effective-state gating and inert resizing, legacy/invalid settings payloads, settings UI toggle, and store round trip including legacy and invalid files.
+- `tests/diff-auto-open.test.ts`: end-to-end opt-in through `/diff-settings`, JSON persistence, focus-linked full view with draft preservation, and survival across branches.
+- `README.md`, `CHANGELOG.md`, `docs/REQUIREMENTS.md` (FR-24): document the behavior, persistence, and the Herdr ceiling (Pi pane; Herdr zoom covers the rest of the window).
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npx tsc --noEmit` | Arch Linux, Node v26.13.0 | PASS | Typecheck clean |
+| `node --import tsx --test tests/diff-maximized.test.ts tests/diff-auto-open.test.ts` | Arch Linux, Node v26.13.0 | PASS | 26 tests, 0 failures (including the new end-to-end case) |
+| `npm run check` | Arch Linux, Node v26.13.0 | PASS | Typecheck and full suite: 171 tests passed, 0 failures |
+
+**Failures / limits / decisions**
+- Design decision: maximized applies only while the dock holds focus; `Esc` or editor focus always restores a visible conversation and editor. An always-full layout would leave the editor focused but hidden, so keystrokes would land in an invisible draft.
+- Mouse clicks on the hidden native area are impossible while maximized (no native columns remain), so native focus is reached only via `Esc`, matching the existing focus contract.
+- In Herdr the maximum is the full Pi pane; Herdr's sidebar, tabs, and status bar belong to Herdr, and its own zoom feature covers the rest of the window. Documented in README/FR-24.
+- Interactive Pi/Herdr manual validation for this feature NOT RUN; native macOS/Windows CI for this change NOT RUN.
+- Architect review unavailable in this harness (no architect spawning tool), consistent with previous entries.
+
+**Pending Test**
+- Manual matrix: Pi fullscreen and Pi inside Herdr with `Maximized full view` On — F6 focus fills the pane, `Esc` restores layout and draft, `/diff-settings` toggle round trip, resize below/above 90 columns, and Herdr zoom coexistence.
+
+**Next Step**
+- User validates interactively after `/reload`; push/install of this change requires explicit authorization per the established policy.

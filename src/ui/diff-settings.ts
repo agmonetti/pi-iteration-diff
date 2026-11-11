@@ -16,11 +16,12 @@ export interface DiffSettings {
   collapseFiles: boolean;
   rememberWidth: boolean;
   autoOpen: boolean;
+  maximized: boolean;
 }
 export const SETTINGS_ENTRY = "iteration-diff-settings";
 export const DEFAULT_SETTINGS: Readonly<DiffSettings> = {
   dockWidth: 45, lineNumbers: true, filePaths: "Smart", collapseFiles: true,
-  rememberWidth: true, autoOpen: false,
+  rememberWidth: true, autoOpen: false, maximized: false,
 };
 
 /** Invalid or future payloads cannot grant automatic-opening consent. */
@@ -31,10 +32,11 @@ export function parseSettings(data: unknown): DiffSettings | undefined {
       d.dockWidth < 30 || d.dockWidth > 60 ||
       typeof d.lineNumbers !== "boolean" || typeof d.collapseFiles !== "boolean" ||
       typeof d.rememberWidth !== "boolean" || typeof d.autoOpen !== "boolean" ||
+      (d.maximized !== undefined && typeof d.maximized !== "boolean") ||
       typeof d.filePaths !== "string" || !["Smart", "Full", "Filename"].includes(d.filePaths)) return;
   return { dockWidth: d.dockWidth, lineNumbers: d.lineNumbers,
     filePaths: d.filePaths as DiffSettings["filePaths"], collapseFiles: d.collapseFiles,
-    rememberWidth: d.rememberWidth, autoOpen: d.autoOpen };
+    rememberWidth: d.rememberWidth, autoOpen: d.autoOpen, maximized: d.maximized ?? false };
 }
 
 export function restoreSettings(entries: readonly { type: string; customType?: string; data?: unknown }[]): DiffSettings {
@@ -54,6 +56,7 @@ export const SETTING_ITEMS = [
   { id: "collapseFiles", label: "Collapse files by default" },
   { id: "rememberWidth", label: "Remember dock width" },
   { id: "autoOpen", label: "Auto-open after iteration" },
+  { id: "maximized", label: "Maximized full view" },
 ] as const;
 
 export class DiffSettingsComponent implements Component {
@@ -113,6 +116,9 @@ export class DiffSettingsComponent implements Component {
         valueStr = isSelected ? this.theme.fg("accent", raw) : this.theme.fg("muted", raw);
       } else if (item.id === "rememberWidth") {
         const raw = this.settings.rememberWidth ? "On" : "Off";
+        valueStr = isSelected ? this.theme.fg("accent", raw) : this.theme.fg("muted", raw);
+      } else if (item.id === "maximized") {
+        const raw = this.settings.maximized ? "On" : "Off";
         valueStr = isSelected ? this.theme.fg("accent", raw) : this.theme.fg("muted", raw);
       } else {
         const raw = this.settings.autoOpen ? "On" : "Off";
@@ -228,6 +234,12 @@ export class DiffSettingsComponent implements Component {
         this.tui.requestRender();
         return;
       }
+      if (this.selectedIndex === 6) {
+        this.settings = { ...this.settings, maximized: !this.settings.maximized };
+        this.onChange(this.settings);
+        this.tui.requestRender();
+        return;
+      }
       return;
     }
 
@@ -263,6 +275,12 @@ export class DiffSettingsComponent implements Component {
       }
       if (this.selectedIndex === 5) {
         this.settings = { ...this.settings, autoOpen: !this.settings.autoOpen };
+        this.onChange(this.settings);
+        this.tui.requestRender();
+        return;
+      }
+      if (this.selectedIndex === 6) {
+        this.settings = { ...this.settings, maximized: !this.settings.maximized };
         this.onChange(this.settings);
         this.tui.requestRender();
         return;

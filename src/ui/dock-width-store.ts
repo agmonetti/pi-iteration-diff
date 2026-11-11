@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
-export interface SavedDockWidth { dockWidth: number; rememberWidth: boolean; autoOpen?: boolean }
+export interface SavedDockWidth { dockWidth: number; rememberWidth: boolean; autoOpen?: boolean; maximized?: boolean }
 export type WidthLoad = { status: "missing" | "invalid" | "error" } | { status: "ok"; value: SavedDockWidth };
 export const DOCK_WIDTH_FILE = "iteration-diff.json";
 
@@ -18,9 +18,11 @@ export function loadDockWidth(): WidthLoad {
     const value = data as Record<string, unknown>;
     if (value.version !== 1 || typeof value.dockWidth !== "number" || !Number.isFinite(value.dockWidth) ||
         value.dockWidth < 30 || value.dockWidth > 60 || typeof value.rememberWidth !== "boolean" ||
-        (value.autoOpen !== undefined && typeof value.autoOpen !== "boolean")) return { status: "invalid" };
+        (value.autoOpen !== undefined && typeof value.autoOpen !== "boolean") ||
+        (value.maximized !== undefined && typeof value.maximized !== "boolean")) return { status: "invalid" };
     return { status: "ok", value: { dockWidth: value.dockWidth, rememberWidth: value.rememberWidth,
-      ...(value.autoOpen !== undefined ? { autoOpen: value.autoOpen } : {}) } };
+      ...(value.autoOpen !== undefined ? { autoOpen: value.autoOpen } : {}),
+      ...(value.maximized !== undefined ? { maximized: value.maximized } : {}) } };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return { status: "missing" };
     if (error instanceof SyntaxError) return { status: "invalid" };

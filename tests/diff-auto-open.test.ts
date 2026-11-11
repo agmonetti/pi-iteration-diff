@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import { initTheme, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, ScrollView, TuiAltScreen, VStack, type Component, type Terminal, type TuiMouseEvent } from "@earendil-works/pi-tui";
+import { Container, ScrollView, TuiAltScreen, VStack, stripTerminalSequences,
+  type Component, type Terminal, type TuiMouseEvent } from "@earendil-works/pi-tui";
 import iterationDiff from "../src/index.js";
 import { DEFAULT_SETTINGS, SETTINGS_ENTRY } from "../src/ui/diff-settings.js";
 import { DOCK_WIDTH_FILE } from "../src/ui/dock-width-store.js";
@@ -405,6 +406,34 @@ test("width and Remember follow the user across branches, sessions, projects and
       assert.equal((third.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.dockRatio, configured);
     } finally { await third.close(); }
   } finally { await rm(agentDir, { recursive: true, force: true }); }
+});
+
+test("Maximized full view persists per user and hides the native column only while the dock holds focus", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "diff-maximized-e2e-"));
+  const f = await fixture(false, agentDir);
+  f.tui.start();
+  try {
+    await f.settings([...Array(6).fill("\x1b[B"), "\r"]); // Maximized: On
+    assert.equal(f.entries().at(-1)!.data.maximized, true, "branch entry records the opt-in");
+    assert.equal(JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8")).maximized, true);
+    await f.shortcuts.get("f6")!(f.ctx);
+    const root = (f.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot;
+    assert.equal(root.dockRatio, 0.45, "maximized never rewrites the stored width");
+    assert.equal(root.getDockWidth(120), 120, "focused dock takes the full view");
+    f.tui.renderNow(true);
+    const screen = (): string[] => f.tui.getScreenLines().map(stripTerminalSequences);
+    assert.ok(!screen().some(line => line.includes("draft")), "maximized hides the editor while focused");
+    f.tui.getFocusedComponent()?.handleInput?.("\x1b");
+    f.tui.renderNow(true);
+    assert.ok(screen().some(line => line.includes("draft")), "Esc restores the native layout");
+    f.tui.getFocusedComponent()?.handleInput?.("q");
+    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    f.setBranch(false);
+    await f.dispatch("session_tree");
+    await f.shortcuts.get("f6")!(f.ctx);
+    assert.equal((f.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot.isMaximized, true,
+      "maximized follows the user across branches");
+  } finally { f.tui.stop(); await f.close(); await rm(agentDir, { recursive: true, force: true }); }
 });
 
 test("separator drag writes once on release, not on each motion", async () => {
