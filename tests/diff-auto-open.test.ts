@@ -436,6 +436,26 @@ test("Maximized full view persists per user and hides the native column only whi
   } finally { f.tui.stop(); await f.close(); await rm(agentDir, { recursive: true, force: true }); }
 });
 
+test("auto-open with Maximized full view opens focused on the full-width dock", async () => {
+  const f = await fixture(true);
+  try {
+    f.setBranch(true); // Auto-open: On
+    f.entries()[0]!.data.maximized = true;
+    await f.dispatch("session_tree");
+    await f.begin(); await f.finish();
+    assert.equal(f.opens(), 1);
+    assert.notEqual(f.tui.getFocusedComponent(), f.editor, "maximized auto-open takes dock focus by consent");
+    const root = (f.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot;
+    assert.equal(root.getDockWidth(120), 120, "auto-opened dock fills the pane immediately");
+    assert.equal(root.dockRatio, 0.45, "stored width survives the maximized opening");
+    f.tui.getFocusedComponent()?.handleInput?.("\x1b");
+    assert.equal(f.tui.getFocusedComponent(), f.editor, "Esc returns to the editor");
+    assert.equal(root.getDockWidth(120), 54, "editor focus restores the stored width");
+    assert.equal(f.writes(), 0);
+    assert.equal(f.draft(), "existing draft");
+  } finally { await f.close(); }
+});
+
 test("separator drag writes once on release, not on each motion", async () => {
   const agentDir = await mkdtemp(join(tmpdir(), "diff-width-mouse-"));
   const f = await fixture(false, agentDir);

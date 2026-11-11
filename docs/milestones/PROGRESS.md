@@ -404,6 +404,31 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 **Next Step**
 - User validates interactively after `/reload`; push/install of this change requires explicit authorization per the established policy.
 
+### 2026-11-11 — Auto-open + Maximized opens the dock focused on the full view
+
+**Changed**
+- `src/index.ts`: `open()` returns the mounted handle; when `Auto-open after iteration` fires with `Maximized full view` enabled, the auto-opened dock takes panel focus so the full view applies immediately. Rationale recorded in code: without the focus move, the maximized layout would hide a still-focused editor and keystrokes would land in an invisible draft. Manual `/diff`/`F6` behavior is unchanged (they already focus the dock), and with Maximized Off auto-open still never steals focus.
+- `tests/diff-auto-open.test.ts`: new case — branch entry with `maximized: true` and Auto-open On; auto-open focuses the dock at full width (stored ratio untouched), `Esc` returns to the editor at the stored width, draft preserved.
+- `README.md`, `CHANGELOG.md`, `docs/REQUIREMENTS.md` (FR-24): document the auto-open interaction.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npx tsc --noEmit` | Arch Linux, Node v26.13.0 | PASS | Typecheck clean |
+| `node --import tsx --test tests/diff-auto-open.test.ts tests/diff-maximized.test.ts` | Arch Linux, Node v26.13.0 | PASS | 27 tests, 0 failures |
+| `npm run check` | Arch Linux, Node v26.13.0 | PASS | Typecheck and full suite: 172 tests passed, 0 failures |
+
+**Failures / limits / decisions**
+- Design decision: the maximized auto-open focus move is a deliberate exception to "auto-open does not steal focus", consented by the explicit Maximized opt-in; with Maximized Off the original invariant holds unchanged.
+- First user report (`/diff-settings` overlay showed the dock un-maximized) was the focus-linked design working as implemented; this change addresses the auto-open gap the user identified. F6/click maximization was not yet independently confirmed in the user's live Pi/Herdr environment.
+- Native macOS/Windows CI for this change NOT RUN.
+
+**Pending Test**
+- Live user validation: fresh auto-opened iteration fills the pane, Esc restores editor and draft, F6 toggling, Herdr zoom/mouse coexistence.
+
+**Next Step**
+- Commit, fast-forward the installed checkout again, and ask the user to `/reload` and validate.
+
 ### 2026-11-10 — Local installed-checkout update for maximized full view testing
 
 - User authorized a local installation update to test the new feature; push remains deferred until explicit approval.

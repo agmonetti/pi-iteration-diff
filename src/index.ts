@@ -80,12 +80,15 @@ export default function iterationDiff(pi: ExtensionAPI): void {
         capture.state.state !== "individual" || capture.state.window.status !== "complete" ||
         capture.state.window.attribution !== "individual" || !capture.state.window.delta.changes.length) return;
     attemptedWindow = key;
-    await open(ctx, true);
+    const opened = await open(ctx, true);
+    // Maximized opt-in consents to the auto-opened dock taking focus; without it the
+    // full view would hide a still-focused editor and keystrokes would land invisibly.
+    if (settings.maximized) opened?.focusPanel();
   });
   pi.on("session_shutdown", () => { settingsGeneration++; dismiss(); });
 
-  const open = async (ctx: ExtensionContext, automatic = false): Promise<void> => {
-      if (dock) return;
+  const open = async (ctx: ExtensionContext, automatic = false): Promise<DockHandle | undefined> => {
+      if (dock) return dock;
       if (ctx.mode !== "tui") {
         ctx.ui.notify("Diff requires Pi TUI fullscreen", "warning"); return;
       }
@@ -163,6 +166,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
         dismiss();
         ctx.ui.notify(error instanceof Error ? error.message : "Failed to open diff", "warning");
       }
+      return dock;
   };
   const openAndFocus = async (ctx: ExtensionContext): Promise<void> => {
     if (!dock) await open(ctx);
