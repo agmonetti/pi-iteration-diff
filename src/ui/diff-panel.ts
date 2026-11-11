@@ -30,6 +30,7 @@ export interface DiffPanelPreferences {
   filePaths: DiffFilePathMode;
   collapseFiles: boolean;
   maximized: boolean;
+  wrapLines: boolean;
 }
 
 export const DEFAULT_DIFF_PREFERENCES: Readonly<DiffPanelPreferences> = {
@@ -37,6 +38,7 @@ export const DEFAULT_DIFF_PREFERENCES: Readonly<DiffPanelPreferences> = {
   filePaths: "Smart",
   collapseFiles: true,
   maximized: false,
+  wrapLines: false,
 };
 
 export type Actions = {
@@ -237,6 +239,13 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private readonly codeWidths = new Map<string, number>();
   private readonly numberWidths = new Map<string, number>();
   private viewportWidth = 0;
+  // Wrapped-row accounting: logical entries expand into one or more display rows.
+  // displayRows[i] counts the rows of entry i; rowStart[i] is the first display row
+  // of entry i (rowStart has one extra sentinel slot). Identity when wrap is off.
+  private displayRows: number[] = [];
+  private rowStart: number[] = [];
+  private displayTotal = 0;
+  private layoutWidth = -1;
   private inspecting = false;
   private showDetails = false;
   private preferences: DiffPanelPreferences;
@@ -254,9 +263,10 @@ export class DiffPanel extends VStack implements Component, Focusable {
       filePaths: preferences?.filePaths ?? DEFAULT_DIFF_PREFERENCES.filePaths,
       collapseFiles: preferences?.collapseFiles ?? DEFAULT_DIFF_PREFERENCES.collapseFiles,
       maximized: preferences?.maximized ?? DEFAULT_DIFF_PREFERENCES.maximized,
+      wrapLines: preferences?.wrapLines ?? DEFAULT_DIFF_PREFERENCES.wrapLines,
     };
-    this.body = new VirtualDiffScroll(() => this.diffEntries.length, (index, width) => this.entryLine(index, width),
-      width => { this.viewportWidth = width; });
+    this.body = new VirtualDiffScroll(() => this.rowTotal(), (row, width) => this.displayLine(row, width),
+      width => { this.onViewportWidth(width); });
     this.addChild({ invalidate() {}, render: width => this.heading(width) }, { basis: 3, shrink: 0, minSize: 3 });
     this.addChild(this.body, { basis: 0, grow: 1, shrink: 1, minSize: 0 });
     this.addChild({ invalidate() {}, render: width => [this.footer(width)] }, { basis: 1, shrink: 0, minSize: 1 });
@@ -268,12 +278,16 @@ export class DiffPanel extends VStack implements Component, Focusable {
   }
 
   setPreferences(preferences: Partial<DiffPanelPreferences>): void {
+    const wrapChanged = preferences.wrapLines !== undefined && preferences.wrapLines !== this.preferences.wrapLines;
     this.preferences = {
       lineNumbers: preferences.lineNumbers ?? this.preferences.lineNumbers,
       filePaths: preferences.filePaths ?? this.preferences.filePaths,
       collapseFiles: preferences.collapseFiles ?? this.preferences.collapseFiles,
       maximized: preferences.maximized ?? this.preferences.maximized,
+      wrapLines: preferences.wrapLines ?? this.preferences.wrapLines,
     };
+    // Horizontal pan state is meaningless while long rows wrap instead of scrolling.
+    if (wrapChanged) this.offsets.clear();
     this.rebuild();
     this.invalidate();
     this.actions.render();
@@ -394,7 +408,69 @@ export class DiffPanel extends VStack implements Component, Focusable {
       if (this.selectionAnchor < 0 || this.selectionFocus < 0) this.clearSelection();
     }
     this.normalizeCursor();
-    this.body.updateLayout(entries.length, this.body.viewportHeight, () => this.actions.render());
+    this.relayout();
+    this.body.updateLayout(this.displayTotal, this.body.viewportHeight, () => this.actions.render());
+  }
+
+  /**
+   * Recompute the logical-entry → display-row mapping for the current viewport
+   * width. Only code rows expand (one row per `codeWidth` column segment);
+   * every other entry stays a single row, and the mapping is identity when
+   * wrapping is off or the width is not yet known.
+   */
+  private relayout(): void {
+    const width = this.viewportWidth;
+    const wrap = this.preferences.wrapLines && width > 0;
+    this.displayRows = new Array<number>(this.diffEntries.length);
+    this.rowStart = new Array<number>(this.diffEntries.length + 1);
+    let total = 0;
+    for (let index = 0; index < this.diffEntries.length; index++) {
+      this.rowStart[index] = total;
+      let rows = 1;
+      const entry = this.diffEntries[index];
+      if (wrap && entry?.kind === "row") {
+        const available = this.codeWidth(entry.file.path, width);
+        if (available > 0) rows = Math.max(1, Math.ceil(visibleWidth(safeText(entry.row.text)) / available));
+      }
+      this.displayRows[index] = rows;
+      total += rows;
+    }
+    this.rowStart[this.diffEntries.length] = total;
+    this.displayTotal = total;
+    this.layoutWidth = width;
+  }
+
+  /** Display rows the body should present (logical entries expanded by wrapping). */
+  private rowTotal(): number {
+    return this.displayRows.length === this.diffEntries.length ? this.displayTotal : this.diffEntries.length;
+  }
+
+  /** Logical entry index that owns a display row, or -1 outside the mapping. */
+  private entryAtRow(row: number): number {
+    if (row < 0 || row >= this.rowTotal() || this.diffEntries.length === 0) return -1;
+    let low = 0;
+    let high = this.diffEntries.length - 1;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if ((this.rowStart[mid] ?? 0) <= row) low = mid;
+      else high = mid - 1;
+    }
+    return low;
+  }
+
+  /** Display-row distance between two logical entry indices under the current mapping. */
+  private displayDelta(from: number, to: number): number {
+    const start = this.rowStart[from];
+    const end = this.rowStart[to];
+    return start !== undefined && end !== undefined ? end - start : to - from;
+  }
+
+  private onViewportWidth(width: number): void {
+    this.viewportWidth = width;
+    if (width === this.layoutWidth) return;
+    this.relayout();
+    // Keep the scroll model's content height in sync with the expanded row count.
+    this.body.updateLayout(this.displayTotal, this.body.viewportHeight, () => this.actions.render());
   }
 
   // Selection helpers
@@ -640,7 +716,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private panFile(delta: number): void {
     const entry = this.diffEntries[this.cursor];
     const path = entry && "file" in entry ? entry.file?.path : undefined;
-    if (!path || !this.expanded.has(path) || this.viewportWidth <= 0) return;
+    // Wrapping makes every column reachable, so horizontal pan is inert.
+    if (!path || !this.expanded.has(path) || this.preferences.wrapLines || this.viewportWidth <= 0) return;
     const offset = this.fileOffset(path, this.viewportWidth);
     this.offsets.set(path, Math.max(0, Math.min(offset + delta, this.maxOffset(path, this.viewportWidth))));
     this.invalidate();
@@ -673,7 +750,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
     }
 
     const path = active && "file" in active ? active.file?.path : undefined;
-    const panX = path ? this.fileOffset(path, width) : 0;
+    const panX = path && !this.preferences.wrapLines ? this.fileOffset(path, width) : 0;
     const panStr = panX > 0 ? ` [pan +${panX}]` : "";
     const escHint = this.preferences.maximized ? "Esc: close" : "Esc: editor";
     let text: string;
@@ -685,6 +762,47 @@ export class DiffPanel extends VStack implements Component, Focusable {
       text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · ${escHint} · d: details`;
     }
     return this.actions.style("muted", truncateToWidth(text, width, "…"));
+  }
+
+  /** Map a display row to its logical entry and render the right segment. */
+  private displayLine(row: number, width: number): string {
+    const entryIndex = this.entryAtRow(row);
+    if (entryIndex < 0) return "";
+    const segment = row - (this.rowStart[entryIndex] ?? row);
+    if (segment <= 0) return this.entryLine(entryIndex, width);
+    const entry = this.diffEntries[entryIndex];
+    if (!entry || entry.kind !== "row") return this.entryLine(entryIndex, width);
+    return this.continuationLine(entry, segment, width, entryIndex);
+  }
+
+  /**
+   * Continuation of a wrapped code row: blank line-number gutter, a `│`
+   * marker under the +/- sign column, and the next column segment of code.
+   */
+  private continuationLine(entry: Entry & { kind: "row" }, segment: number, width: number, index: number): string {
+    const selected = this.isIndexSelected(index);
+    const border = this.actions.style("border", "▏");
+    const prefix = `${border}  `;
+
+    let numStr = "";
+    if (this.preferences.lineNumbers) {
+      numStr = `${this.actions.style("dim", "".padStart(this.numberWidths.get(entry.file.path) ?? 4))} `;
+    }
+    const markStr = this.actions.style("dim", "│");
+
+    const available = this.codeWidth(entry.file.path, width);
+    const { row } = entry;
+    const codePart = available > 0 ? sliceByColumn(safeText(row.text), segment * available, available, true) : "";
+    const codeStyled = row.kind === "added" ? this.actions.style("added", codePart)
+      : row.kind === "removed" ? this.actions.style("removed", codePart)
+      : this.actions.style("text", codePart);
+
+    const content = `${numStr}${markStr} ${codeStyled}`;
+    if (selected) {
+      const styledContent = this.actions.style("selectedBg", truncateToWidth(`${content}`, Math.max(0, width - 2), "…"));
+      return `${prefix}${styledContent}`;
+    }
+    return truncateToWidth(`${prefix}${content}`, Math.max(0, width), "…");
   }
 
   private entryLine(index: number, width: number): string {
@@ -793,15 +911,23 @@ export class DiffPanel extends VStack implements Component, Focusable {
       : mark;
 
     const rawCode = safeText(entry.row.text);
-    const panX = this.fileOffset(entry.file.path, width);
     const available = this.codeWidth(entry.file.path, width);
-    const overflow = visibleWidth(rawCode) > panX + available;
-    const textWidth = Math.max(0, available - (overflow ? 1 : 0));
-    let codePart = sliceByColumn(rawCode, panX, textWidth, true);
-    if (overflow && available > 0) {
-      codePart += " ".repeat(Math.max(0, textWidth - visibleWidth(codePart))) + "»";
+    let codePart: string;
+    let sep = " ";
+    if (this.preferences.wrapLines && available > 0) {
+      // Wrapped mode: segment 0 is the head of the row; continuations carry the
+      // rest, so horizontal panning and overflow markers are disabled.
+      codePart = sliceByColumn(rawCode, 0, available, true);
+    } else {
+      const panX = this.fileOffset(entry.file.path, width);
+      const overflow = visibleWidth(rawCode) > panX + available;
+      const textWidth = Math.max(0, available - (overflow ? 1 : 0));
+      codePart = sliceByColumn(rawCode, panX, textWidth, true);
+      if (overflow && available > 0) {
+        codePart += " ".repeat(Math.max(0, textWidth - visibleWidth(codePart))) + "»";
+      }
+      sep = panX > 0 && visibleWidth(rawCode) > 0 ? this.actions.style("dim", "«") : " ";
     }
-    const sep = panX > 0 && visibleWidth(rawCode) > 0 ? this.actions.style("dim", "«") : " ";
     const codeStyled = row.kind === "added" ? this.actions.style("added", codePart)
       : row.kind === "removed" ? this.actions.style("removed", codePart)
       : this.actions.style("text", codePart);
@@ -817,7 +943,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   override render(width: number): string[] {
     if (width <= 0) return [];
-    this.viewportWidth = width;
+    // Keep the wrapped-row mapping synced to the actual panel width at render
+    // time; body.visible() bypasses the scroll content's own render (prepare).
+    this.onViewportWidth(width);
     const lines = [...this.heading(width), ...this.body.visible(width), this.footer(width)];
     const verticalBorder = this.actions.style(this.focused ? "accent" : "dim", "▏");
     lines.forEach((line, index) => {
@@ -832,8 +960,10 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   private reveal(): void {
     const height = Math.max(1, this.body.viewportHeight || 22);
-    if (this.cursor < this.body.scrollTop) this.body.scrollTo(this.cursor);
-    else if (this.cursor >= this.body.scrollTop + height) this.body.scrollTo(this.cursor - height + 1);
+    const top = this.rowStart[this.cursor] ?? this.cursor;
+    const bottom = top + (this.displayRows[this.cursor] ?? 1) - 1;
+    if (top < this.body.scrollTop) this.body.scrollTo(top);
+    else if (bottom >= this.body.scrollTop + height) this.body.scrollTo(Math.max(top, bottom - height + 1));
   }
 
   private toggle(): void {
@@ -957,11 +1087,16 @@ export class DiffPanel extends VStack implements Component, Focusable {
     else if (matchesKey(data, "left") || data === "h") { this.panFile(-8); return; }
     else if (matchesKey(data, "pageDown")) {
       if (this.hasSelection()) this.clearSelection();
-      this.cursor += Math.max(1, this.body.viewportHeight - 1);
+      // Advance one viewport of display rows, landing on the owning logical entry.
+      const rows = Math.max(1, this.body.viewportHeight - 1);
+      const target = this.entryAtRow((this.rowStart[this.cursor] ?? this.cursor) + rows);
+      this.cursor = target >= 0 ? target : this.diffEntries.length - 1;
     }
     else if (matchesKey(data, "pageUp")) {
       if (this.hasSelection()) this.clearSelection();
-      this.cursor -= Math.max(1, this.body.viewportHeight - 1);
+      const rows = Math.max(1, this.body.viewportHeight - 1);
+      const target = this.entryAtRow((this.rowStart[this.cursor] ?? this.cursor) - rows);
+      this.cursor = target >= 0 ? target : 0;
     }
     else if (matchesKey(data, "home") || data === "0") {
       if (this.hasSelection()) this.clearSelection();
@@ -992,8 +1127,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
   scrollBy(lines: number): void {
     if (!Number.isFinite(lines)) return;
     const step = Math.trunc(lines);
-    this.cursor = Math.max(0, Math.min(this.diffEntries.length - 1, this.cursor + step));
-    this.body.scrollBy(step);
+    const from = this.cursor;
+    this.cursor = Math.max(0, Math.min(this.diffEntries.length - 1, from + step));
+    this.body.scrollBy(from === this.cursor ? step : this.displayDelta(from, this.cursor));
     this.reveal();
     this.actions.render();
   }
@@ -1056,9 +1192,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
     if (event.button !== "left") return;
 
-    // Line click and range dragging
+    // Line click and range dragging (screen rows map back to logical entries)
     if (event.y >= 3 && event.y < event.height - 1) {
-      const targetIndex = Math.max(0, Math.min(this.diffEntries.length - 1, this.body.scrollTop + event.y - 3));
+      const displayRow = Math.max(0, Math.min(this.rowTotal() - 1, this.body.scrollTop + event.y - 3));
+      const mapped = this.entryAtRow(displayRow);
+      const targetIndex = Math.max(0, Math.min(this.diffEntries.length - 1, mapped < 0 ? displayRow : mapped));
       if (event.type === "press") {
         this.pressed = true;
         this.cursor = targetIndex;

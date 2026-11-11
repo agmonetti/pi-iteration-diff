@@ -17,11 +17,12 @@ export interface DiffSettings {
   rememberWidth: boolean;
   autoOpen: boolean;
   maximized: boolean;
+  wrapLines: boolean;
 }
 export const SETTINGS_ENTRY = "iteration-diff-settings";
 export const DEFAULT_SETTINGS: Readonly<DiffSettings> = {
   dockWidth: 45, lineNumbers: true, filePaths: "Smart", collapseFiles: true,
-  rememberWidth: true, autoOpen: false, maximized: false,
+  rememberWidth: true, autoOpen: false, maximized: false, wrapLines: false,
 };
 
 /** Invalid or future payloads cannot grant automatic-opening consent. */
@@ -33,10 +34,12 @@ export function parseSettings(data: unknown): DiffSettings | undefined {
       typeof d.lineNumbers !== "boolean" || typeof d.collapseFiles !== "boolean" ||
       typeof d.rememberWidth !== "boolean" || typeof d.autoOpen !== "boolean" ||
       (d.maximized !== undefined && typeof d.maximized !== "boolean") ||
+      (d.wrapLines !== undefined && typeof d.wrapLines !== "boolean") ||
       typeof d.filePaths !== "string" || !["Smart", "Full", "Filename"].includes(d.filePaths)) return;
   return { dockWidth: d.dockWidth, lineNumbers: d.lineNumbers,
     filePaths: d.filePaths as DiffSettings["filePaths"], collapseFiles: d.collapseFiles,
-    rememberWidth: d.rememberWidth, autoOpen: d.autoOpen, maximized: d.maximized ?? false };
+    rememberWidth: d.rememberWidth, autoOpen: d.autoOpen, maximized: d.maximized ?? false,
+    wrapLines: d.wrapLines ?? false };
 }
 
 export function restoreSettings(entries: readonly { type: string; customType?: string; data?: unknown }[]): DiffSettings {
@@ -57,6 +60,7 @@ export const SETTING_ITEMS = [
   { id: "rememberWidth", label: "Remember dock width" },
   { id: "autoOpen", label: "Auto-open after iteration" },
   { id: "maximized", label: "Maximized full view" },
+  { id: "wrapLines", label: "Wrap long lines" },
 ] as const;
 
 export class DiffSettingsComponent implements Component {
@@ -119,6 +123,9 @@ export class DiffSettingsComponent implements Component {
         valueStr = isSelected ? this.theme.fg("accent", raw) : this.theme.fg("muted", raw);
       } else if (item.id === "maximized") {
         const raw = this.settings.maximized ? "On" : "Off";
+        valueStr = isSelected ? this.theme.fg("accent", raw) : this.theme.fg("muted", raw);
+      } else if (item.id === "wrapLines") {
+        const raw = this.settings.wrapLines ? "On" : "Off";
         valueStr = isSelected ? this.theme.fg("accent", raw) : this.theme.fg("muted", raw);
       } else {
         const raw = this.settings.autoOpen ? "On" : "Off";
@@ -240,6 +247,12 @@ export class DiffSettingsComponent implements Component {
         this.tui.requestRender();
         return;
       }
+      if (this.selectedIndex === 7) {
+        this.settings = { ...this.settings, wrapLines: !this.settings.wrapLines };
+        this.onChange(this.settings);
+        this.tui.requestRender();
+        return;
+      }
       return;
     }
 
@@ -281,6 +294,12 @@ export class DiffSettingsComponent implements Component {
       }
       if (this.selectedIndex === 6) {
         this.settings = { ...this.settings, maximized: !this.settings.maximized };
+        this.onChange(this.settings);
+        this.tui.requestRender();
+        return;
+      }
+      if (this.selectedIndex === 7) {
+        this.settings = { ...this.settings, wrapLines: !this.settings.wrapLines };
         this.onChange(this.settings);
         this.tui.requestRender();
         return;

@@ -51,12 +51,15 @@ Configure the dock using `/diff-settings`.
 | Line numbers | On | On / Off |
 | File paths | Smart | Smart / Full / Filename |
 | Collapse files | On | On / Off |
+| Wrap long lines | Off | On / Off |
 | Dock width | 45% | 30–60% |
 | Remember dock width | On | On / Off |
 
 **Auto-open after iteration** is saved in `<agent-dir>/iteration-diff.json` across Pi sessions, projects, and restarts. It opens a closed dock only for a complete individual iteration with net file changes; commit/push-only and conversation-only iterations do not open it. An already open dock remains open and refreshes, and `/diff` can always be opened manually to inspect an empty result. When enabled, **Remember dock width** also saves your preferred width there.
 
 **Maximized full view** is saved in the same file. While the diff dock holds focus (F6 or a click on it), it occupies the entire Pi viewport instead of the configured dock width. In maximized mode `Esc` dismisses the dock entirely — only Pi's conversation and editor remain — and `F6` reopens it maximized; with the setting Off, `Esc` keeps the side dock open and returns focus to the editor as before. It never changes the saved dock width, and in narrow terminals (below 90 columns) the normal fallback still applies. With **Auto-open after iteration** also enabled, an auto-opened dock takes focus and fills the view immediately. Inside Herdr the maximized dock fills the whole Pi pane; Herdr's own sidebar, tabs, and status bar belong to Herdr, and its zoom feature covers the remaining window.
+
+**Wrap long lines** (per branch, like the other presentation settings) shows the full content of long diff rows instead of truncating them: a row longer than the available width continues on the following display row, which keeps the line-number gutter blank and marks the continuation with `│` under the `+`/`-` sign column. Cursor, selection, and mouse targeting stay per logical line, so a click on any continuation selects that whole row. While wrapping is On, horizontal pan (`←`/`→`/`h`/`l`) is inert because every column is already reachable; turning it Off restores the previous truncation and pan behavior. Hunk and file headers are always kept to a single row.
 
 ## Compatibility
 
@@ -75,12 +78,6 @@ Configure the dock using `/diff-settings`.
 
 ## Next steps
 - Add colapsable lines as a config option
-- Add as an option to drop down the line in order for a full read. eg:
-  ```bash
-  40 print("Hello Worl
-    ! Nice to see you")
-  41 print("Hi")
-  ```
 
 ## License
 

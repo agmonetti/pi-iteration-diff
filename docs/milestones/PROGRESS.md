@@ -487,3 +487,30 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 - SHA-256 checks confirm the installed `src/index.ts`, `src/ui/layout-adapter.ts`, `src/ui/diff-settings.ts`, `src/ui/dock-width-store.ts`, and `tests/diff-maximized.test.ts` match the development checkout. The pre-existing modified installed `package-lock.json` was preserved unchanged; no dependencies added or removed.
 - Development checkout gate remains PASS (`npm run check`: 171 tests, 0 failures, Node v26.13.0, Arch Linux). Installed checkout has no `tsx` development dependency; installed-checkout test suite NOT RUN, consistent with previous updates.
 - User must `/reload` or restart Pi before testing. Manual validation matrix for maximized mode (F6 fills the pane, Esc restores layout and draft, settings toggle round trip, narrow resize, Herdr zoom coexistence) NOT RUN and pending.
+
+### 2026-11-11 — Configurable wrapping of long diff lines (FR-25)
+
+**Changed**
+- `src/ui/diff-panel.ts`: `DiffPanelPreferences` gains `wrapLines` (default Off). A logical-entry → display-row mapping (`displayRows`/`rowStart` prefix sums) is recomputed on `rebuild()` and whenever the panel width changes (`onViewportWidth`, guarded by a layout-width cache, also re-syncing the scroll model's content height). `VirtualDiffScroll` now counts and renders display rows: code rows longer than `codeWidth` expand into a head segment plus continuation rows — blank line-number gutter, a dim `│` marker under the `+`/`-` sign column, and the next column segment of the original text (sliced column-exactly, never splitting wide graphemes). Cursor navigation, selection, hunk/file jumps, `reveal()`, `scrollBy()` (mapped display delta), PageUp/PageDown (one viewport of display rows, landing on the owning logical entry), and mouse hit-testing (screen row → logical entry) all go through the mapping; identity when wrap is Off, so legacy behavior is bit-identical. While wrapping, horizontal pan and its `«`/`»` markers are inert and pan offsets are cleared on toggle; `DiffPanel.render()` syncs the mapping because `body.visible()` bypasses the scroll content's own render (prepare) — otherwise the mapping would go stale in real Pi.
+- `src/ui/diff-settings.ts`: `DiffSettings` gains `wrapLines` (optional boolean in `parseSettings`, legacy payloads default Off), `SETTING_ITEMS` index 7 `Wrap long lines` with Enter and arrow toggles, rendered like the other On/Off items. Flows into the panel through the existing wholesale `settings` → `DiffPanel` wiring; no `src/index.ts` change needed.
+- `tests/diff-wrap.test.ts` (new): wrap Off truncates with `»` and no continuations; wrap On expands into head + `│` continuations holding the full text with no ellipsis; Unicode column exactness (emoji/wide/combining, several widths, no row over the viewport); `setPreferences` toggle round trip; cursor navigation and mouse clicks on continuations resolving to the logical row (`formatSelectedContext` carries the full original text); PageDown/PageUp travel one viewport of display rows in the mounted TUI harness (logical paging would overshoot to the last entry); pan inert while wrapping and restored after; settings payload validation and `DiffSettingsComponent` item at index 7 with Enter/arrow toggles.
+- `README.md` (config table, usage paragraph, "Next steps" wrap item resolved), `CHANGELOG.md`, `docs/REQUIREMENTS.md` (FR-25): documented.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npx tsc --noEmit` | Arch Linux, Node v26.13.0 | PASS | Typecheck clean |
+| `node --import tsx --test tests/diff-wrap.test.ts` | Arch Linux, Node v26.13.0 | PASS | 8 tests, 0 failures (after fixing fixture double-expand and `»`-vs-`…` expectations) |
+| `npm run check` | Arch Linux, Node v26.13.0 | PASS | Typecheck and full suite: 181 tests passed, 0 failures (173 prior + 8 new) |
+
+**Failures / limits / decisions**
+- Design decisions: wrapping applies only to code rows (headers, hunk headers and notices stay single-row, truncating as before); continuation rows render `│` (dim) in the sign column per the user's mockup; cursor and selection remain logical (a selection spans all segments of its row; the `>` cursor shows on the head segment); PageUp/PageDown/`scrollBy` are display-row-accurate under wrapping via the same mapping.
+- Initial failures were test-side only: the fixture expanded the file twice (auto-expand + explicit `\r`), wrap-off truncation uses the `»` pan marker rather than `…`, and screen-line assertions in the mounted harness must `includes` rather than `startsWith` (dock renders right of the native column). No production-code failures.
+- Width-exactness invariant preserved: `tests/diff-horizontal.test.ts` ("one visual row per original row", per-width overflow checks) passes unchanged with wrap Off, confirming the identity mapping.
+- Real interactive Pi/Herdr validation NOT RUN yet; native macOS/Windows CI NOT RUN.
+
+**Pending Test**
+- User `/reload`, enable `Wrap long lines` in `/diff-settings` on a diff with a long row: continuation rows with `│`, full text readable, click/drag on continuations selects the row, `←`/`→` inert while On, Off restores truncation and pan.
+
+**Next Step**
+- Commit, fast-forward the installed checkout, ask the user to retest.
