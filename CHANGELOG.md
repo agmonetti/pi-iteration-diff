@@ -5,11 +5,17 @@ All notable changes to `pi-iteration-diff` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-11-11
 
 ### Added
-- **Wrap long lines** (`/diff-settings` → `Wrap long lines`, default Off, persisted per branch like the other presentation settings): long diff rows expand into continuation rows instead of being truncated, breaking between words at whitespace — never mid-word (a token longer than the whole line, such as a long URL, still splits by columns). Continuation rows keep a blank line-number gutter and mark themselves with `│` under the `+`/`-` sign column; cursor, selection, and mouse targeting remain per logical line, and horizontal pan is inert while wrapping (every column is already visible). Turning it Off restores truncation (`»` overflow marker) and pan. Hunk and file headers always stay on one row.
-- **Maximized full view** (`/diff-settings` → `Maximized full view`, default Off, persisted per user in `<agent-dir>/iteration-diff.json`): while the diff dock holds focus it occupies the entire Pi viewport (the full Pi pane inside Herdr); `Esc` dismisses the dock entirely and `F6` reopens it maximized (with the setting Off, `Esc` keeps the side dock and returns focus to the editor). With `Auto-open after iteration` also enabled, the auto-opened dock takes focus and fills the view immediately. Narrow terminals (below 90 columns) keep the existing fallback, and the stored dock width is never rewritten by maximized rendering.
+
+- **Maximized full view** (`/diff-settings` → `Maximized full view`, default Off, persisted per user in `<agent-dir>/iteration-diff.json`). While the diff dock holds keyboard focus (F6 or a click on it), it occupies the entire Pi viewport instead of the configured dock width. In maximized mode `Esc` dismisses the dock entirely, leaving only Pi's conversation and editor, and `F6` reopens it maximized; with the setting Off, `Esc` keeps the side dock open and returns focus to the editor. With `Auto-open after iteration` also enabled, the auto-opened dock takes focus and fills the view immediately. Narrow terminals (below 90 columns) keep the existing layout fallback, and maximized rendering never rewrites the stored dock width. Inside Herdr the ceiling is the Pi pane; Herdr's own zoom covers the rest of the window.
+- **Wrap long lines** (`/diff-settings` → `Wrap long lines`, default Off, persisted per branch). Long diff rows expand into continuation rows instead of being truncated. Breaks fall between words at whitespace, never mid-word; a single token wider than the whole line, such as a long URL, splits by columns so no content is lost. Continuation rows keep the line-number gutter blank and carry a `│` marker under the `+`/`-` sign column. Cursor navigation, selection, page keys, and mouse targeting remain per logical line, so interacting with any continuation selects the whole row. While wrapping is On, horizontal pan is inert because every column is already visible; turning the option Off restores truncation and pan. Hunk and file headers always remain single rows.
+
+### Fixed
+
+- The dock's width is now computed at layout time from live focus and viewport state, not at render time. Previously, after a focus change, the layout used a stale basis: the native column hid while the dock stayed narrow with dead space to the right.
+- An auto-opened dock now takes focus and fills the view immediately when `Maximized full view` is enabled, instead of opening unfocused at the stored width.
 
 ## [0.1.0] - 2026-10-25
 

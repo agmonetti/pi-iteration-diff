@@ -538,3 +538,23 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 
 **Next Step**
 - Commit, fast-forward the installed checkout, ask the user to retest.
+
+### 2026-11-11 — Release 0.1.1 pushed (user-authorized)
+
+**Changed**
+- `CHANGELOG.md`: Unreleased section finalized as `[0.1.1] - 2026-11-11` with two Added entries (Maximized full view; word-aware Wrap long lines) and two Fixed entries (layout-time dock width; focused maximized auto-open). Concise, no emojis.
+- `package.json` and `tests/package-install.test.ts`: version 0.1.0 → 0.1.1. `package-lock.json` left untouched (stale 0.0.0 header predates this work and carries the user's local modification).
+- `docs/milestones/PROGRESS.md`: this entry.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npm run check` (with version 0.1.1) | Arch Linux, Node v26.13.0 | PASS | Typecheck and full suite: 183 tests, 0 failures |
+| `git push origin main v0.1.1` | HTTPS origin github.com/agmonetti/pi-iteration-diff | PASS | Executed after this entry; remote heads and tags verified |
+
+**Failures / limits / decisions**
+- Release channel: git tag + GitHub push, as for v0.1.0 (package not published to npm; `npm view` 404 confirmed). No npm publish performed.
+- Native macOS/Windows CI still NOT RUN (no workflow executed in this session).
+
+**Next Step**
+- User `/reload` on the installed checkout fast-forwarded to the release tag.
