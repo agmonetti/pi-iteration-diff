@@ -29,12 +29,14 @@ export interface DiffPanelPreferences {
   lineNumbers: boolean;
   filePaths: DiffFilePathMode;
   collapseFiles: boolean;
+  maximized: boolean;
 }
 
 export const DEFAULT_DIFF_PREFERENCES: Readonly<DiffPanelPreferences> = {
   lineNumbers: true,
   filePaths: "Smart",
   collapseFiles: true,
+  maximized: false,
 };
 
 export type Actions = {
@@ -251,6 +253,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       lineNumbers: preferences?.lineNumbers ?? DEFAULT_DIFF_PREFERENCES.lineNumbers,
       filePaths: preferences?.filePaths ?? DEFAULT_DIFF_PREFERENCES.filePaths,
       collapseFiles: preferences?.collapseFiles ?? DEFAULT_DIFF_PREFERENCES.collapseFiles,
+      maximized: preferences?.maximized ?? DEFAULT_DIFF_PREFERENCES.maximized,
     };
     this.body = new VirtualDiffScroll(() => this.diffEntries.length, (index, width) => this.entryLine(index, width),
       width => { this.viewportWidth = width; });
@@ -269,6 +272,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
       lineNumbers: preferences.lineNumbers ?? this.preferences.lineNumbers,
       filePaths: preferences.filePaths ?? this.preferences.filePaths,
       collapseFiles: preferences.collapseFiles ?? this.preferences.collapseFiles,
+      maximized: preferences.maximized ?? this.preferences.maximized,
     };
     this.rebuild();
     this.invalidate();
@@ -671,13 +675,14 @@ export class DiffPanel extends VStack implements Component, Focusable {
     const path = active && "file" in active ? active.file?.path : undefined;
     const panX = path ? this.fileOffset(path, width) : 0;
     const panStr = panX > 0 ? ` [pan +${panX}]` : "";
+    const escHint = this.preferences.maximized ? "Esc: close" : "Esc: editor";
     let text: string;
     if (width < 50) {
-      text = `▏ Enter: expand${panStr} · a: append · Esc: editor`;
+      text = `▏ Enter: expand${panStr} · a: append · ${escHint}`;
     } else if (width < 75) {
-      text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor`;
+      text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · ${escHint}`;
     } else {
-      text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · Esc: editor · d: details`;
+      text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · ${escHint} · d: details`;
     }
     return this.actions.style("muted", truncateToWidth(text, width, "…"));
   }
@@ -898,7 +903,14 @@ export class DiffPanel extends VStack implements Component, Focusable {
   }
 
   handleInput(data: string): void {
-    if (matchesKey(data, "escape") || matchesKey(data, "tab")) { this.actions.editor(); return; }
+    if (matchesKey(data, "escape")) {
+      // Maximized is a fullscreen mode: Esc dismisses the dock entirely, so the
+      // editor is never left focused behind a hidden or narrowed panel.
+      if (this.preferences.maximized) { this.actions.close(); return; }
+      this.actions.editor();
+      return;
+    }
+    if (matchesKey(data, "tab")) { this.actions.editor(); return; }
     if (data === "q") { this.actions.close(); return; }
     if (data === "d") { this.showDetails = !this.showDetails; this.rebuild(); this.actions.render(); return; }
     if (data === "i") { this.inspecting = !this.inspecting; this.actions.render(); return; }

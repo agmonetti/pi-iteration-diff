@@ -83,6 +83,7 @@ async function fixture(autoOpen: boolean, agentDir?: string) {
   let sequence = 0;
   return { ctx, tui, editor, commands, shortcuts, handlers, dispatch,
     opens: () => opens, writes: () => writes, draft: () => draft,
+    widgetOpen: () => widget !== undefined,
     entries: () => entries,
     failPersistence() { failPersistence = true; }, notifications,
     async settings(keys: string[]) { settingsKeys = keys; await commands.get("diff-settings")!.handler("", ctx); },
@@ -426,8 +427,7 @@ test("Maximized full view persists per user and hides the native column only whi
     f.tui.getFocusedComponent()?.handleInput?.("\x1b");
     f.tui.renderNow(true);
     assert.ok(screen().some(line => line.includes("draft")), "Esc restores the native layout");
-    f.tui.getFocusedComponent()?.handleInput?.("q");
-    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    assert.equal(f.widgetOpen(), false, "Esc dismisses the maximized dock entirely");
     f.setBranch(false);
     await f.dispatch("session_tree");
     await f.shortcuts.get("f6")!(f.ctx);
@@ -449,10 +449,15 @@ test("auto-open with Maximized full view opens focused on the full-width dock", 
     assert.equal(root.getDockWidth(120), 120, "auto-opened dock fills the pane immediately");
     assert.equal(root.dockRatio, 0.45, "stored width survives the maximized opening");
     f.tui.getFocusedComponent()?.handleInput?.("\x1b");
-    assert.equal(f.tui.getFocusedComponent(), f.editor, "Esc returns to the editor");
-    assert.equal(root.getDockWidth(120), 54, "editor focus restores the stored width");
+    assert.equal(f.tui.getFocusedComponent(), f.editor, "Esc closes the maximized dock to the editor");
+    assert.equal(f.widgetOpen(), false, "Esc dismisses the dock entirely");
     assert.equal(f.writes(), 0);
     assert.equal(f.draft(), "existing draft");
+    await f.shortcuts.get("f6")!(f.ctx);
+    assert.equal(f.opens(), 2, "F6 reopens the dock maximized");
+    assert.notEqual(f.tui.getFocusedComponent(), f.editor);
+    const reopened = (f.tui as unknown as { layoutRoot: ResizableDockRoot }).layoutRoot;
+    assert.equal(reopened.getDockWidth(120), 120, "F6 toggles the maximized view back");
   } finally { await f.close(); }
 });
 

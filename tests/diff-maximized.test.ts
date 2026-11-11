@@ -57,7 +57,7 @@ function fixture(initialMaximized: boolean) {
     editor: () => dock?.focusEditor(),
     close: () => dock?.close(),
     style: (role, text) => role === "accent" ? `\x1b[36m${text}\x1b[39m` : text,
-  });
+  }, { maximized: initialMaximized });
   panel.setView({ key: "fixture-iteration", title: "DIFF: iteración", notices: [], files: [{
     path: "fixture.ts", kind: "modified", added: 1, removed: 1,
     getRows: () => [{ kind: "hunk", text: "@@ -1 +1 @@" },
@@ -91,7 +91,27 @@ test("enabled maximized fills the view while the dock holds focus and restores t
     f.terminal.input("\x1b");
     f.tui.renderNow(true);
     assert.ok(f.tui.getScreenLines().some(line => line.includes("native conversation")),
-      "Esc returns a visible conversation and editor");
+      "Esc closes the dock and restores the full Pi layout");
+    assert.ok(!f.tui.getScreenLines().some(line => stripTerminalSequences(line).includes("DIFF")),
+      "no diff panel remains after Esc");
+    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    assert.equal(f.draft(), "existing draft");
+  } finally { dock.close(); f.tui.stop(); }
+});
+
+test("with maximized disabled Esc keeps the side dock open and returns focus to the editor", () => {
+  const f = fixture(false);
+  const dock = f.mount();
+  f.tui.start();
+  try {
+    f.tui.renderNow(true);
+    dock.focusPanel();
+    f.tui.renderNow(true);
+    f.terminal.input("\x1b");
+    f.tui.renderNow(true);
+    assert.equal(f.tui.getFocusedComponent(), f.editor);
+    assert.ok(f.tui.getScreenLines().some(line => stripTerminalSequences(line).includes("DIFF")),
+      "classic side dock survives Esc");
     assert.equal(dock.getDockWidth(), 54);
     assert.equal(f.draft(), "existing draft");
   } finally { dock.close(); f.tui.stop(); }

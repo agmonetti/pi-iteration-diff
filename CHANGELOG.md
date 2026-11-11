@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Maximized full view** (`/diff-settings` → `Maximized full view`, default Off, persisted per user in `<agent-dir>/iteration-diff.json`): while the diff dock holds focus it occupies the entire Pi viewport (the full Pi pane inside Herdr); `Esc` or editor focus restores the conversation and editor at the stored dock width. With `Auto-open after iteration` also enabled, the auto-opened dock takes focus and fills the view immediately. Narrow terminals (below 90 columns) keep the existing fallback, and the stored dock width is never rewritten by maximized rendering.
+- **Maximized full view** (`/diff-settings` → `Maximized full view`, default Off, persisted per user in `<agent-dir>/iteration-diff.json`): while the diff dock holds focus it occupies the entire Pi viewport (the full Pi pane inside Herdr); `Esc` dismisses the dock entirely and `F6` reopens it maximized (with the setting Off, `Esc` keeps the side dock and returns focus to the editor). With `Auto-open after iteration` also enabled, the auto-opened dock takes focus and fills the view immediately. Narrow terminals (below 90 columns) keep the existing fallback, and the stored dock width is never rewritten by maximized rendering.
 
 ## [0.1.0] - 2026-10-25
 

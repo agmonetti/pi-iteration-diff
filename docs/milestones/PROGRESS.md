@@ -454,6 +454,32 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 **Next Step**
 - Commit, fast-forward the installed checkout, ask the user to retest.
 
+### 2026-11-11 — Esc dismisses the maximized dock entirely
+
+**Changed**
+- `src/ui/diff-panel.ts`: `DiffPanelPreferences` gains `maximized` (default false, fed from the extension settings already passed at construction and via `setPreferences`). With maximized enabled, `Esc` in the dock calls the close action (full manual dismissal, including auto-open suppression for that iteration) instead of returning focus to the editor behind a narrowed panel; `Tab` still moves focus to the editor. The footer hint shows `Esc: close` in maximized mode and `Esc: editor` otherwise.
+- `tests/diff-maximized.test.ts`: the fixture passes the maximized preference into the panel; the maximized Esc case now asserts complete dismissal (no diff panel rendered, editor focused, draft intact) and a new case verifies that with maximized Off the side dock survives Esc at the stored width.
+- `tests/diff-auto-open.test.ts`: fixture exposes `widgetOpen()`; the maximized auto-open case asserts Esc closes the widget and `F6` reopens it focused at full width.
+- `README.md` (usage table and maximized paragraph), `CHANGELOG.md`, `docs/REQUIREMENTS.md` (FR-24): document the behavior.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npx tsc --noEmit` | Arch Linux, Node v26.13.0 | PASS | Typecheck clean |
+| `node --import tsx --test` over maximized, auto-open, panel, feasibility, native-pane-focus | Arch Linux, Node v26.13.0 | PASS | 78 tests, 0 failures |
+| `npm run check` | Arch Linux, Node v26.13.0 | PASS | Typecheck and full suite: 173 tests passed, 0 failures |
+
+**Failures / limits / decisions**
+- Design decision: with Maximized On, `Esc` dismisses the dock (matching the user's fullscreen-model request); with Maximized Off, the classic side-dock behavior (`Esc` → editor, dock stays) is unchanged. Manual dismissal semantics (closed window suppression, draft preservation) are reused, not reimplemented.
+- Initial test run caught the fixture not feeding `maximized` into the panel — fixed in the fixture, mirroring the real `index.ts` wiring.
+- Real interactive Pi/Herdr validation of this behavior NOT RUN yet; native macOS/Windows CI NOT RUN.
+
+**Pending Test**
+- User `/reload`: Esc from the maximized dock must show only Pi (no diff panel); F6 reopens maximized; Auto-open still opens maximized on the next iteration.
+
+**Next Step**
+- Commit, fast-forward the installed checkout, ask the user to retest.
+
 ### 2026-11-10 — Local installed-checkout update for maximized full view testing
 
 - User authorized a local installation update to test the new feature; push remains deferred until explicit approval.
