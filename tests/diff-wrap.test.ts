@@ -63,8 +63,9 @@ test("wrap on expands a long row into a head plus │ continuations holding the 
   const panel = fixture([{ kind: "added", newLine: 1, text: LONG }]);
   const lines = plain(panel, 60);
   const continuations = lines.filter(line => line.includes("│"));
-  // codeWidth(60) = 60 - 5 - (4+1) = 50 columns; 122 visible columns → 3 segments.
-  assert.equal(continuations.length, 2, "one continuation per extra segment");
+  // codeWidth(60) = 50 columns; chunks "print("Hello " + "World! " fill 20 columns
+  // and the 122-column x-run token hard-splits 50/50/22 → 4 segments.
+  assert.equal(continuations.length, 3, "one continuation per extra segment");
   const joined = lines.join("\n");
   assert.ok(joined.includes(`print("Hello World!`), "head segment keeps the statement start");
   assert.ok(joined.includes(LONG.slice(-6)), "the final segment shows the tail");
@@ -91,7 +92,7 @@ test("toggling wrap lines via setPreferences re-expands and re-collapses in plac
   assert.equal(plain(panel).filter(line => line.includes("│")).length, 0);
   panel.setPreferences({ wrapLines: true });
   const expanded = plain(panel);
-  assert.equal(expanded.filter(line => line.includes("│")).length, 2);
+  assert.equal(expanded.filter(line => line.includes("│")).length, 3);
   panel.setPreferences({ wrapLines: false });
   const collapsed = plain(panel);
   assert.equal(collapsed.filter(line => line.includes("│")).length, 0);
@@ -166,6 +167,28 @@ test("horizontal pan is inert while wrapping and recovers after turning wrap off
   panel.handleInput("l");
   const panned = plain(panel);
   assert.ok(panned.some(line => line.includes("«")), "pan resumes with wrap off");
+});
+
+test("wrapping breaks at word boundaries, never mid-word", () => {
+  const text = "uno dos tres cuatro cinco seis siete ocho nueve diez";
+  const panel = fixture([{ kind: "added", newLine: 1, text }]);
+  const lines = plain(panel, 60); // codeWidth 50: naive column split would cut "nueve"
+  const continuations = lines.filter(line => line.includes("│"));
+  assert.equal(continuations.length, 1, "breaks once, before the word that does not fit");
+  const code = continuations[0]!.split("│ ")[1] ?? "";
+  assert.equal(code.trim(), "diez", "continuation starts at a whole word");
+  const head = lines.find(line => line.includes("+ uno"))!;
+  assert.ok(head.endsWith("nueve "), "head ends exactly at a word boundary");
+});
+
+test("a token longer than the whole line hard-splits by columns", () => {
+  const url = `see https://ejemplo.com/${"a".repeat(200)} end`;
+  const panel = fixture([{ kind: "added", newLine: 1, text: url }]);
+  const lines = plain(panel, 60);
+  assert.ok(lines.every(line => visibleWidth(line) <= 60), "no row exceeds the width");
+  const joined = lines.join(" ");
+  assert.ok(joined.includes("https://ejemplo.com/"), "URL head is visible");
+  assert.ok(joined.includes("end"), "the trailing word survives the oversized token");
 });
 
 test("settings payload and component expose Wrap long lines (per-branch, default Off)", () => {

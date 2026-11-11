@@ -514,3 +514,27 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 
 **Next Step**
 - Commit, fast-forward the installed checkout, ask the user to retest.
+
+### 2026-11-11 — Wrap long lines now breaks between words (FR-25 refinement)
+
+**Changed**
+- `src/ui/diff-panel.ts`: user feedback — the first wrapping implementation cut at a fixed column count, splitting words mid-word (e.g. "coincidenc/ia" in a real diff). Added `wrapByColumns()`, a greedy word-aware wrapper measured in terminal columns: chunks end after whitespace, so breaks fall between words exactly like a school-style line fill; a single chunk wider than the whole line (long URL or identifier) hard-splits by columns as a fallback so no content is lost. `relayout()` now computes and caches per-row `WrapSegment[]` ranges (`wrappedSegments`, keyed `path\0rowIndex`) and counts display rows from them; `entryLine` (head) and `continuationLine` render the cached column ranges via `sliceByColumn` instead of assuming uniform `available`-column segments. Continuation rows now have a ragged right edge, as word wrap does.
+- `tests/diff-wrap.test.ts`: updated the two segment-count assertions (the x-run token now hard-splits into 3 continuations), added "wrapping breaks at word boundaries, never mid-word" (naive split would cut "nueve"; continuation is exactly "diez") and "a token longer than the whole line hard-splits by columns" (220-column URL fully visible, no row over width).
+- `README.md`, `CHANGELOG.md`, `docs/REQUIREMENTS.md` (FR-25): document word-boundary breaking and the oversized-token fallback.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npx tsc --noEmit` | Arch Linux, Node v26.13.0 | PASS | Typecheck clean |
+| `node --import tsx --test tests/diff-wrap.test.ts tests/diff-horizontal.test.ts` | Arch Linux, Node v26.13.0 | PASS | 18 tests, 0 failures |
+| `npm run check` | Arch Linux, Node v26.13.0 | PASS | Typecheck and full suite: 183 tests passed, 0 failures (181 prior + 2 new) |
+
+**Failures / limits / decisions**
+- Decision: break opportunities are whitespace only (no syllable hyphenation and no breaks inside punctuation runs); oversized single tokens hard-split by columns. This matches the user's request ("catalo-go or cata-logo") for prose without inventing language-specific hyphenation rules.
+- Real interactive Pi/Herdr validation of word-boundary wrapping NOT RUN yet; native macOS/Windows CI NOT RUN.
+
+**Pending Test**
+- User `/reload`: long prose rows must wrap between words (no mid-word cuts like "coincidenc/ia"); long URLs still fully visible; selection/pan/page behavior unchanged.
+
+**Next Step**
+- Commit, fast-forward the installed checkout, ask the user to retest.

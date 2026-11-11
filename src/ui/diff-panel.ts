@@ -10,6 +10,56 @@ const MAX_CONTENT_ROWS = 12_000;
 const MAX_NOTICES = 32;
 const MAX_TEXT_LENGTH = 16_384;
 
+/** Column range of one wrapped segment within a row's original text. */
+interface WrapSegment {
+  start: number;
+  width: number;
+}
+
+/**
+ * Greedy word-aware wrap measured in terminal columns: chunks end after
+ * whitespace, so breaks fall between words instead of mid-word. A single
+ * chunk wider than the whole line (a long URL or identifier) hard-splits
+ * by columns as a fallback so no content is lost.
+ */
+function wrapByColumns(text: string, width: number): WrapSegment[] {
+  if (width <= 0 || text.length === 0) return [{ start: 0, width: 0 }];
+  const segments: WrapSegment[] = [];
+  let segStart = 0;
+  let segWidth = 0;
+  let column = 0;
+  for (const chunk of text.split(/(?<=\s)/)) {
+    if (chunk === "") continue;
+    const chunkWidth = visibleWidth(chunk);
+    if (chunkWidth > width) {
+      // Oversized chunk: flush the pending segment, then hard-split by columns.
+      if (segWidth > 0) {
+        segments.push({ start: segStart, width: segWidth });
+        segWidth = 0;
+      }
+      let taken = 0;
+      while (taken < chunkWidth) {
+        const part = sliceByColumn(chunk, taken, width, true);
+        const partWidth = visibleWidth(part);
+        if (partWidth <= 0) break;
+        segments.push({ start: column + taken, width: partWidth });
+        taken += partWidth;
+      }
+      segStart = column + taken;
+    } else {
+      if (segWidth > 0 && segWidth + chunkWidth > width) {
+        segments.push({ start: segStart, width: segWidth });
+        segWidth = 0;
+      }
+      if (segWidth === 0) segStart = column;
+      segWidth += chunkWidth;
+    }
+    column += chunkWidth;
+  }
+  if (segWidth > 0) segments.push({ start: segStart, width: segWidth });
+  return segments.length > 0 ? segments : [{ start: 0, width: 0 }];
+}
+
 export type Role =
   | "accent"
   | "muted"
@@ -246,6 +296,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private rowStart: number[] = [];
   private displayTotal = 0;
   private layoutWidth = -1;
+  /** Word-wrap segments per code row (key: `${path}\0${rowIndex}`), recomputed by relayout(). */
+  private wrappedSegments = new Map<string, WrapSegment[]>();
   private inspecting = false;
   private showDetails = false;
   private preferences: DiffPanelPreferences;
@@ -421,6 +473,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
   private relayout(): void {
     const width = this.viewportWidth;
     const wrap = this.preferences.wrapLines && width > 0;
+    this.wrappedSegments.clear();
     this.displayRows = new Array<number>(this.diffEntries.length);
     this.rowStart = new Array<number>(this.diffEntries.length + 1);
     let total = 0;
@@ -430,7 +483,11 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const entry = this.diffEntries[index];
       if (wrap && entry?.kind === "row") {
         const available = this.codeWidth(entry.file.path, width);
-        if (available > 0) rows = Math.max(1, Math.ceil(visibleWidth(safeText(entry.row.text)) / available));
+        if (available > 0) {
+          const segments = wrapByColumns(safeText(entry.row.text), available);
+          this.wrappedSegments.set(`${entry.file.path}\0${entry.rowIndex}`, segments);
+          rows = segments.length;
+        }
       }
       this.displayRows[index] = rows;
       total += rows;
@@ -438,6 +495,12 @@ export class DiffPanel extends VStack implements Component, Focusable {
     this.rowStart[this.diffEntries.length] = total;
     this.displayTotal = total;
     this.layoutWidth = width;
+  }
+
+  /** Wrap segments for a code row at the current width (recomputed if not cached). */
+  private rowWrapSegments(entry: Entry & { kind: "row" }, available: number): WrapSegment[] {
+    return this.wrappedSegments.get(`${entry.file.path}\0${entry.rowIndex}`)
+      ?? wrapByColumns(safeText(entry.row.text), available);
   }
 
   /** Display rows the body should present (logical entries expanded by wrapping). */
@@ -792,7 +855,10 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
     const available = this.codeWidth(entry.file.path, width);
     const { row } = entry;
-    const codePart = available > 0 ? sliceByColumn(safeText(row.text), segment * available, available, true) : "";
+    const segmentSpan = this.rowWrapSegments(entry, available)[segment]
+      ?? { start: segment * available, width: available };
+    const codePart = segmentSpan.width > 0
+      ? sliceByColumn(safeText(row.text), segmentSpan.start, segmentSpan.width, true) : "";
     const codeStyled = row.kind === "added" ? this.actions.style("added", codePart)
       : row.kind === "removed" ? this.actions.style("removed", codePart)
       : this.actions.style("text", codePart);
@@ -916,8 +982,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
     let sep = " ";
     if (this.preferences.wrapLines && available > 0) {
       // Wrapped mode: segment 0 is the head of the row; continuations carry the
-      // rest, so horizontal panning and overflow markers are disabled.
-      codePart = sliceByColumn(rawCode, 0, available, true);
+      // rest at word boundaries, so pan and overflow markers are disabled.
+      const head = this.rowWrapSegments(entry, available)[0] ?? { start: 0, width: available };
+      codePart = sliceByColumn(rawCode, head.start, head.width, true);
     } else {
       const panX = this.fileOffset(entry.file.path, width);
       const overflow = visibleWidth(rawCode) > panX + available;
