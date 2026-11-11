@@ -403,3 +403,11 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 
 **Next Step**
 - User validates interactively after `/reload`; push/install of this change requires explicit authorization per the established policy.
+
+### 2026-11-10 — Local installed-checkout update for maximized full view testing
+
+- User authorized a local installation update to test the new feature; push remains deferred until explicit approval.
+- Installed Git checkout at `~/.pi/agent/git/github.com/agmonetti/pi-iteration-diff` fast-forwarded from `1009f84` to `c57a3df` (`feat(ui): add maximized full view setting to the diff dock`) by fetching from the local development repository; non-force, no remote access.
+- SHA-256 checks confirm the installed `src/index.ts`, `src/ui/layout-adapter.ts`, `src/ui/diff-settings.ts`, `src/ui/dock-width-store.ts`, and `tests/diff-maximized.test.ts` match the development checkout. The pre-existing modified installed `package-lock.json` was preserved unchanged; no dependencies added or removed.
+- Development checkout gate remains PASS (`npm run check`: 171 tests, 0 failures, Node v26.13.0, Arch Linux). Installed checkout has no `tsx` development dependency; installed-checkout test suite NOT RUN, consistent with previous updates.
+- User must `/reload` or restart Pi before testing. Manual validation matrix for maximized mode (F6 fills the pane, Esc restores layout and draft, settings toggle round trip, narrow resize, Herdr zoom coexistence) NOT RUN and pending.
