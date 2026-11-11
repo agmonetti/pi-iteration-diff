@@ -373,6 +373,7 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 **Failures / limits / next step**
 - No installed dependencies changed. The installed checkout has no `tsx` development dependency: installed-checkout test suite NOT RUN; development checkout gate passed. Native macOS/Windows CI and Pi/Herdr manual matrix NOT RUN for these changes.
 - Existing user-modified header in this log and untracked `scripts/` remain outside commits. Ask user to `/reload` or restart Pi, then validate a fresh dotfiles edit, commit/push-only iteration and conversation, confirming focus and draft preservation. Do not infer the live behavior from checks alone.
+
 ### 2026-11-10 — Maximized full view via `/diff-settings` (FR-24)
 
 **Changed**
@@ -428,6 +429,30 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 
 **Next Step**
 - Commit, fast-forward the installed checkout again, and ask the user to `/reload` and validate.
+
+### 2026-11-11 — Maximized pane now truly fills the width (stale basis fix)
+
+**Changed**
+- `src/ui/layout-adapter.ts`: root cause found — Pi's layout engine (`pi-tui/dist/layout.js`) resolves stacks via `getLayoutNode`, evaluating `visible` flags and consuming each entry's `basis` directly, and never calls `Stack.render()`. The previous per-render basis recomputation therefore never ran in real Pi: after a focus change the layout used a stale basis (the user's stored 60%), hiding the native column while leaving the dock narrow and left-aligned with dead space to the right. The dock basis is now refreshed inside the native column's `visible` callback, which the engine always evaluates before allocation, so maximized/full/narrow widths are computed from live focus and viewport state at layout time.
+- `tests/diff-maximized.test.ts`: the full-width test now asserts the rendered heading starts at column 0 and its file count sits at the full-width right edge (`> 100` at 120 columns); regression verified by temporarily removing the sync (test FAIL, stale 54-column dock) and passing again with the fix.
+- `docs/milestones/PROGRESS.md`: this entry.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `node --import tsx --test tests/diff-maximized.test.ts` without the sync (temporary revert) | Arch Linux, Node v26.13.0 | FAIL (expected) | Heading count at stale position; reproduces the user screenshot |
+| `npx tsc --noEmit` + `node --import tsx --test tests/diff-maximized.test.ts` with the fix | Arch Linux, Node v26.13.0 | PASS | 6 tests, 0 failures |
+| `npm run check` | Arch Linux, Node v26.13.0 | PASS | Typecheck and full suite: 172 tests passed, 0 failures |
+
+**Failures / limits / decisions**
+- Earlier maximized screen assertions only checked content presence/absence and the extension's own `getDockWidth()`, not the panel's allocated on-screen width, which is why the first maximized build passed the suite while showing the user a narrow dock. Width assertions are now part of the suite.
+- Real interactive Pi/Herdr validation of this specific fix NOT RUN yet (user reported the bug from `912fcbf`); native macOS/Windows CI NOT RUN.
+
+**Pending Test**
+- User `/reload`, fresh auto-opened iteration must fill the entire Pi pane width; Esc/F6 round trip unchanged.
+
+**Next Step**
+- Commit, fast-forward the installed checkout, ask the user to retest.
 
 ### 2026-11-10 — Local installed-checkout update for maximized full view testing
 

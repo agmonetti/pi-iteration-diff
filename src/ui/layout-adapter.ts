@@ -34,11 +34,16 @@ export class ResizableDockRoot extends HStack {
     this.ratio = 0.45;
     this.dockRatio = initialRatio;
     this.maximized = initialMaximized;
+    // Pi's layout engine reads stack entries directly (getLayoutNode) and never calls
+    // render(), so the dock basis must be refreshed at layout time. The native
+    // visibility probe always runs before allocation, making it the authoritative hook.
     // The native column hides only while the panel holds focus in maximized mode,
     // so returning focus to the editor always restores a visible conversation.
     const nativeEntry = this.entries[0];
-    if (nativeEntry) nativeEntry.visible = (viewport: { width: number }) =>
-      !this.effectiveMaximized(viewport.width);
+    if (nativeEntry) nativeEntry.visible = (viewport: { width: number }) => {
+      this.updateDockBasis(viewport.width);
+      return !this.effectiveMaximized(viewport.width);
+    };
   }
 
   /** Maximized applies only while the dock is visible; narrow terminals keep the native fallback. */

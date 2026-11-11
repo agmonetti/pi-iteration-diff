@@ -80,6 +80,11 @@ test("enabled maximized fills the view while the dock holds focus and restores t
     f.tui.renderNow(true);
     assert.ok(!f.tui.getScreenLines().some(line => line.includes("native conversation")),
       "maximized hides the native column");
+    const heading = f.tui.getScreenLines().map(stripTerminalSequences)
+      .find(line => line.includes("DIFF"));
+    assert.ok(heading, "dock heading is rendered");
+    assert.equal(heading.indexOf("▏"), 0, "maximized dock starts at the left edge");
+    assert.ok(heading.indexOf("1 file") > 100, "heading count sits at the full-width right edge");
     assert.ok(f.tui.getScreenLines().some(line => stripTerminalSequences(line).includes("M fixture.ts")));
     assert.equal(dock.getDockWidth(), 120, "dock spans the full terminal width");
     assert.equal(dock.getDockRatio(), 0.45, "stored width survives maximized rendering");
