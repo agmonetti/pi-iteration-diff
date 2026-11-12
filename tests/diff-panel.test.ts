@@ -770,6 +770,36 @@ test("technical notices are omitted in normal view and toggled under demand via 
   assert.ok(lines.some(l => l.includes("Net diff between")));
 });
 
+test("empty iteration view renders clean notice without routine technical notices unless details is toggled", () => {
+  const p = panel().panel;
+  p.setView({
+    key: "empty-view-notices",
+    title: "Última iteración",
+    notices: [
+      "Diff neto entre snapshots de la ventana; no demuestra autoría ni conserva escrituras intermedias.",
+      "Rutas omitidas en los snapshots: 14 antes; 14 después.",
+      "Sin cambios netos observados en esta ventana.",
+      "Límites del visor: 64 archivos; 1 MiB y 12000 líneas por archivo...",
+    ],
+    files: [],
+  });
+
+  // 1. In normal view: routine technical notices are not rendered, only the clean empty message
+  let lines = p.render(100);
+  assert.ok(!lines.some(l => l.includes("Net diff between")));
+  assert.ok(!lines.some(l => l.includes("Viewer limits")));
+  assert.ok(!lines.some(l => l.includes("Omitted paths")));
+  assert.ok(lines.some(l => l.includes("No net changes observed in this iteration.")));
+
+  // 2. Press 'd': details enabled, technical notices are visible
+  p.handleInput("d");
+  lines = p.render(100);
+  assert.ok(lines.some(l => l.includes("Net diff between")));
+  assert.ok(lines.some(l => l.includes("Viewer limits")));
+  assert.ok(lines.some(l => l.includes("Omitted paths in snapshots: 14 before; 14 after.")));
+  assert.ok(lines.some(l => l.includes("No net changes observed in this iteration.")));
+});
+
 test("differentiates intentional path omissions from partial captures in header and details", () => {
   const p = panel().panel;
 

@@ -396,10 +396,9 @@ export class DiffPanel extends VStack implements Component, Focusable {
     const entries: Entry[] = [];
     this.codeWidths.clear();
     this.numberWidths.clear();
-    const hasFiles = this.view.files.length > 0;
 
     for (const text of this.view.notices.slice(0, MAX_NOTICES)) {
-      if (hasFiles && !this.showDetails) {
+      if (!this.showDetails) {
         if (text.startsWith("Diff neto entre snapshots") ||
             text.startsWith("Net diff between") ||
             text.startsWith("Límites del visor") ||
