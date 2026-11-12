@@ -1,6 +1,6 @@
 {
   "name": "pi-iteration-diff",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Side-by-side net iteration diff viewer and selective prompt feedback for Pi Coding Agent",
   "keywords": [
     "pi-package"

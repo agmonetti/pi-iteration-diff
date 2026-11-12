@@ -29,7 +29,7 @@ test("package manifest conforms to official Pi packaging conventions", () => {
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
 
   assert.equal(pkg.name, "pi-iteration-diff");
-  assert.equal(pkg.version, "0.1.1");
+  assert.equal(pkg.version, "0.1.2");
   assert.equal(pkg.type, "module");
   assert.equal(pkg.main, "src/index.ts");
   assert.deepEqual(pkg.pi?.extensions, ["./src/index.ts"]);

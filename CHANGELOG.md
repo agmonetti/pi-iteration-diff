@@ -5,6 +5,17 @@ All notable changes to `pi-iteration-diff` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-11-12
+
+### Added
+
+- **Auto-close dock on user message**: When the diff dock is open in split mode, submitting a new message in Pi immediately dismisses the dock (`pi.on("input")`), returning full terminal width to the conversation and editor during the run.
+- **Per-user persistence for Wrap long lines**: The `Wrap long lines` preference is now persisted per user across sessions and workspaces in `<agent-dir>/iteration-diff.json`, matching the behavior of `Auto-open after iteration` and `Maximized full view`.
+
+### Fixed
+
+- **Empty-state presentation in diff viewer**: Reviewing an iteration with zero net changes now presents a clean, compact notice (`No net changes observed in this iteration.`) instead of a full screen of routine technical notices (viewer limits, net snapshot disclaimers, omitted path counts). Technical details remain available on demand via `d`.
+
 ## [0.1.1] - 2026-11-11
 
 ### Added

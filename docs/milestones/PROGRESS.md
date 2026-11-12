@@ -1,5 +1,30 @@
 # PROGRESS.md — Project Living Log
 
+### 2026-11-12 — Release 0.1.2: Resolve Issues #1, #2, and #3
+
+**Changed**
+- `src/ui/diff-panel.ts`: omit routine technical notices (net snapshot disclaimer, viewer limits, omitted paths count) in normal view (`!this.showDetails`) so empty iterations render a clean, concise notice (`No net changes observed in this iteration.`). Details remain accessible on demand via `d` or title-bar click (Issue #1).
+- `src/ui/dock-width-store.ts`, `src/index.ts`: persist `Wrap long lines` (`wrapLines`) per user in `<agent-dir>/iteration-diff.json` across sessions and workspaces, with fail-closed validation for legacy/corrupted files (Issue #2).
+- `src/index.ts`: auto-close the open dock immediately upon receiving user input (`pi.on("input")`), reclaiming full conversation width for the next agent run (Issue #3).
+- `package.json`, `CHANGELOG.md`, `README.md`, `docs/REQUIREMENTS.md`: bump version to `0.1.2`, document auto-close behavior and per-user wrapping persistence.
+- `tests/diff-panel.test.ts`, `tests/diff-auto-open.test.ts`, `tests/diff-maximized.test.ts`: add comprehensive tests for clean empty-state notices, cross-session `wrapLines` persistence, and auto-dismissal on user message.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `npm run check` | Linux, Node v26.13.0 | PASS | Typecheck clean; full suite: 186 tests passed, 0 failed |
+
+**Next Step**
+- Commit and tag v0.1.2, close GitHub issues #1, #2, #3, and publish release.
+
+### 2026-10-28 — Install local auto-open fix for user validation
+
+- User authorized installation update, with push deferred until explicit approval.
+- Installed Git checkout fast-forwarded from `1e30bf9` to local `c672f1a` using the development repository as fetch source; no push performed.
+- Verified installed capture source matches its commit. SHA-256 checks confirm existing modified `package-lock.json` and global preferences were preserved unchanged.
+- Installed-checkout regression execution BLOCKED: development dependency `tsx` is not installed there; no dependencies added. Development checkout already passed typecheck and all 159 tests.
+- User must `/reload` or restart Pi before testing a fresh iteration. Interactive validation pending; do not run a remote package update before this local commit is published.
+
 ### 2026-10-28 — Binary assets no longer block opt-in auto-open
 
 **Changed**
@@ -558,3 +583,10 @@ Do not replace historical evidence with general phrases like "tests OK." Do not 
 
 **Next Step**
 - User `/reload` on the installed checkout fast-forwarded to the release tag.
+
+### 2026-11-11 — Issues filed (no code changes)
+
+- [Issue #1](https://github.com/agmonetti/pi-iteration-diff/issues/1): dock opens for an iteration without net changes and renders only notices (auto-open gating vs. empty-state presentation, under investigation). Evidence: user screenshot on v0.1.1, maximized mode inside Herdr.
+- [Issue #2](https://github.com/agmonetti/pi-iteration-diff/issues/2): persist the `Wrap long lines` setting per user in `<agent-dir>/iteration-diff.json` (currently per branch only).
+- Filed at the user's request; both are backlog items, not scheduled for the current session.
+- [Issue #3](https://github.com/agmonetti/pi-iteration-diff/issues/3): enhancement — auto-close the split-mode dock immediately when the user sends a new message (scope and maximized-mode behavior open for discussion). No README changes; documentation deferred until the behavior is agreed.
