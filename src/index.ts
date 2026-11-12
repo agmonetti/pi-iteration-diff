@@ -28,12 +28,14 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     try { pi.appendEntry(SETTINGS_ENTRY, { version: 1, ...settings }); }
     catch { ctx?.ui.notify("Diff settings could not be saved; changes apply only in memory", "warning"); }
   };
-  const saveWidth = (ctx = owner, autoOpen = savedWidth?.autoOpen, maximized = savedWidth?.maximized): void => {
+  const saveWidth = (ctx = owner, autoOpen = savedWidth?.autoOpen, maximized = savedWidth?.maximized, wrapLines = savedWidth?.wrapLines): void => {
     const value = { dockWidth: settings.rememberWidth ? settings.dockWidth : (savedWidth?.dockWidth ?? settings.dockWidth),
       rememberWidth: settings.rememberWidth, ...(autoOpen !== undefined ? { autoOpen } : {}),
-      ...(maximized !== undefined ? { maximized } : {}) };
+      ...(maximized !== undefined ? { maximized } : {}),
+      ...(wrapLines !== undefined ? { wrapLines } : {}) };
     if (savedWidth?.dockWidth === value.dockWidth && savedWidth.rememberWidth === value.rememberWidth &&
-        savedWidth.autoOpen === value.autoOpen && savedWidth.maximized === value.maximized) return;
+        savedWidth.autoOpen === value.autoOpen && savedWidth.maximized === value.maximized &&
+        savedWidth.wrapLines === value.wrapLines) return;
     try { saveDockWidth(value); savedWidth = value; }
     catch { ctx?.ui.notify("Local diff preferences could not be saved; changes apply only in memory", "warning"); }
   };
@@ -70,7 +72,10 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     panel.setView(createIterationView(shownState));
   };
   // Registered after the capture handlers: asynchronous capture finishes first.
-  pi.on("input", refresh);
+  pi.on("input", () => {
+    if (dock) manualDismiss();
+    refresh();
+  });
   pi.on("before_agent_start", refresh);
   pi.on("message_start", refresh);
   pi.on("agent_settled", async (_event, ctx) => {
@@ -185,7 +190,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
     handler: async (_args: string, ctx: ExtensionContext): Promise<void> => {
       const version = settingsGeneration;
       const previous = { dockWidth: settings.dockWidth, rememberWidth: settings.rememberWidth,
-        autoOpen: settings.autoOpen, maximized: settings.maximized };
+        autoOpen: settings.autoOpen, maximized: settings.maximized, wrapLines: settings.wrapLines };
       await showDiffSettings(ctx, settings, next => {
         if (version !== settingsGeneration) return;
         if (!previous.rememberWidth && next.rememberWidth &&
@@ -197,8 +202,8 @@ export default function iterationDiff(pi: ExtensionAPI): void {
         dock?.setDockRatio(settings.dockWidth / 100);
         dock?.setMaximized(settings.maximized);
         persist(ctx);
-        if (next.autoOpen !== previous.autoOpen || next.maximized !== previous.maximized) {
-          saveWidth(ctx, next.autoOpen, next.maximized);
+        if (next.autoOpen !== previous.autoOpen || next.maximized !== previous.maximized || next.wrapLines !== previous.wrapLines) {
+          saveWidth(ctx, next.autoOpen, next.maximized, next.wrapLines);
         }
       });
       if (version === settingsGeneration) {
@@ -212,8 +217,9 @@ export default function iterationDiff(pi: ExtensionAPI): void {
             (settings.rememberWidth && previous.dockWidth !== settings.dockWidth) ||
             settings.autoOpen !== previous.autoOpen ||
             settings.maximized !== previous.maximized ||
+            settings.wrapLines !== previous.wrapLines ||
             (settings.autoOpen && savedWidth?.autoOpen === undefined)) {
-          saveWidth(ctx, settings.autoOpen, settings.maximized);
+          saveWidth(ctx, settings.autoOpen, settings.maximized, settings.wrapLines);
         }
         if (!settings.rememberWidth && !dock) settings = { ...settings, dockWidth: DEFAULT_SETTINGS.dockWidth };
       }
@@ -229,6 +235,7 @@ export default function iterationDiff(pi: ExtensionAPI): void {
       settings = { ...settings, rememberWidth: loaded.value.rememberWidth,
         autoOpen: loaded.value.autoOpen ?? settings.autoOpen,
         maximized: loaded.value.maximized ?? settings.maximized,
+        wrapLines: loaded.value.wrapLines ?? settings.wrapLines,
         dockWidth: loaded.value.rememberWidth ? loaded.value.dockWidth : DEFAULT_SETTINGS.dockWidth };
     } else {
       savedWidth = undefined;

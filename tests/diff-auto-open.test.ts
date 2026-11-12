@@ -541,3 +541,59 @@ test("layout updates dock width on hot settings change without altering editor d
     await f.close();
   }
 });
+
+test("submitting a new editor message auto-closes the open dock and frees the full conversation width", async () => {
+  const f = await fixture(true);
+  try {
+    // Iteration 1: with file change -> auto-opens
+    await f.begin(false, true);
+    await f.finish();
+    assert.equal(f.widgetOpen(), true, "Dock should auto-open after iteration with changes");
+
+    // User submits next message (input event)
+    await f.dispatch("input", { text: "next question", source: "interactive" });
+
+    // Dock should now be closed immediately
+    assert.equal(f.widgetOpen(), false, "Dock should close on user input");
+
+    // Iteration 2: conversation only (no file changes)
+    await f.dispatch("before_agent_start", { messageType: "user", prompt: "next question" });
+    await f.dispatch("message_start", { message: { role: "user", content: "next question" } });
+    await f.finish();
+
+    // Dock remains closed because there were no net changes
+    assert.equal(f.widgetOpen(), false, "Dock remains closed on changeless iteration");
+  } finally {
+    await f.close();
+  }
+});
+
+test("wrapLines setting persists globally in iteration-diff.json across sessions", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "diff-wrap-agent-"));
+  try {
+    let f = await fixture(false, agentDir);
+    try {
+      // SETTING_ITEMS: 0 dockWidth, 1 lineNumbers, 2 filePaths, 3 collapseFiles,
+      // 4 rememberWidth, 5 autoOpen, 6 maximized, 7 wrapLines
+      await f.settings(["\x1b[B", "\x1b[B", "\x1b[B", "\x1b[B", "\x1b[B", "\x1b[B", "\x1b[B", " "]);
+    } finally {
+      await f.close();
+    }
+
+    const saved = JSON.parse(await readFile(join(agentDir, DOCK_WIDTH_FILE), "utf8"));
+    assert.equal(saved.wrapLines, true);
+
+    f = await fixture(false, agentDir);
+    try {
+      await f.begin();
+      await f.finish();
+      await f.shortcuts.get("f6")!(f.ctx);
+      const panel = f.tui.getFocusedComponent() as unknown as { getPreferences(): { wrapLines: boolean } };
+      assert.equal(panel.getPreferences().wrapLines, true, "New session should inherit wrapLines: true");
+    } finally {
+      await f.close();
+    }
+  } finally {
+    await rm(agentDir, { recursive: true, force: true });
+  }
+});

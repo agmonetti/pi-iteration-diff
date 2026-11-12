@@ -187,17 +187,22 @@ test("global preferences persist maximized, accept legacy files and reject inval
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = dir;
   try {
-    saveDockWidth({ dockWidth: 50, rememberWidth: true, autoOpen: true, maximized: true });
+    saveDockWidth({ dockWidth: 50, rememberWidth: true, autoOpen: true, maximized: true, wrapLines: true });
     const loaded = loadDockWidth();
     assert.deepEqual(loaded.status === "ok" && loaded.value,
-      { dockWidth: 50, rememberWidth: true, autoOpen: true, maximized: true });
+      { dockWidth: 50, rememberWidth: true, autoOpen: true, maximized: true, wrapLines: true });
     await writeFile(join(dir, DOCK_WIDTH_FILE),
       JSON.stringify({ version: 1, dockWidth: 40, rememberWidth: false }) + "\n", { encoding: "utf8" });
     const legacy = loadDockWidth();
     assert.equal(legacy.status, "ok");
     assert.equal(legacy.status === "ok" && legacy.value.maximized, undefined);
+    assert.equal(legacy.status === "ok" && legacy.value.wrapLines, undefined);
     await writeFile(join(dir, DOCK_WIDTH_FILE),
       JSON.stringify({ version: 1, dockWidth: 40, rememberWidth: false, maximized: "yes" }) + "\n",
+      { encoding: "utf8" });
+    assert.equal(loadDockWidth().status, "invalid");
+    await writeFile(join(dir, DOCK_WIDTH_FILE),
+      JSON.stringify({ version: 1, dockWidth: 40, rememberWidth: false, wrapLines: "yes" }) + "\n",
       { encoding: "utf8" });
     assert.equal(loadDockWidth().status, "invalid");
   } finally {
