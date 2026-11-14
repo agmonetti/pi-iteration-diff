@@ -1,5 +1,31 @@
 # PROGRESS.md — Project Living Log
 
+### 2026-11-14 — Clipboard copy for selections and the whole iteration diff (Issue #4, FR-27)
+
+**Changed**
+- `src/ui/diff-panel.ts`: added `c` (copy the current selection, or the cursor row/hunk header when there is no selection) and `C` (copy every file, hunk, and row of the reviewed iteration in panel order, independent of scroll and collapsed state). `formatSelectedContext()` now delegates to a shared `formatEntries()` that preserves every hunk header in display order instead of keeping only the last one; `formatWholeDiff()` reuses the same plain-text shape. `Actions` gained optional `copyText` and `notify`. Copying never creates or clears a selection, moves the cursor or focus, appends to the draft, or closes the dock. Footer hints are appended only when they fit the current width, so existing hints are not lengthened into truncation.
+- `src/ui/clipboard.ts` (new): isolated, version-pinned adapter for Pi 1.4.0's fullscreen `copySelection` runtime option (private in the installed pi-tui .d.ts), with capability detection and fallbacks to the native helper `setText` and an OSC 52 write. `true` is the only success result; host failures keep their message, native failures fall through, an unconfirmed OSC 52 write returns "sent, unverified", and payloads over 100,000 encoded characters are refused. Copied text is never logged or persisted.
+- `src/index.ts`: wires `copyText: createClipboardWriter(tui)` and a guarded `notify` through `owner?.ui.notify`.
+- `tests/diff-copy.test.ts` (new): exact payload parity between `a` and `c`, no ANSI, selection/draft/focus/dock preservation, cursor-row and hunk-header copies, whole-diff inclusion of collapsed files and multiple hunks, meta-notice exclusion, multi-hunk and cross-file selection headers, selection preservation after `C`, oversized whole-diff refusal, synchronous throws, rejections, `false`, missing clipboard, unavailable notice-only files, and width-gated footer hints. `tests/clipboard.test.ts` (new): capability order, false/string/throw results, native success and fallback, OSC 52 encoding, size refusal, failed writes, and empty text.
+- `README.md`, `CHANGELOG.md`, `docs/REQUIREMENTS.md` (FR-27): document `c`/`C`, the payload, platform delivery paths, unverified OSC 52 behavior, and OS limits.
+- `package.json`, `tests/package-install.test.ts`: version 0.1.3.
+
+**Executed Tests**
+| Command / case | Environment | Result | Evidence |
+|---|---|---|---|
+| `node --import tsx --test tests/diff-copy.test.ts tests/clipboard.test.ts` | Arch Linux, Node v26.13.0 | PASS | 16 tests, 0 failures |
+| `npm run check` | Arch Linux, Node v26.13.0 | PASS | Typecheck clean; full suite 202 tests, 0 failures |
+
+**Failures / limits / decisions**
+- Design decisions: `c` without a selection copies the cursor row (or hunk header) as proposed in Issue #4; `C` covers all files of the iteration, not just the current file; copy always emits logical lines, ignoring wrap and collapse; no new setting was added. A dock too narrow for the optional footer hints hides them rather than truncating existing hints; the keys still work.
+- The `formatEntries()` refactor also fixes multi-hunk selections losing earlier hunk headers from the `a` payload; `a` and `c` remain byte-identical for the same entries. A hunk-header-only entry now formats a header-only block instead of being dropped, so `a`/`c` on a hunk header have a defined payload.
+- Whole-diff copy excludes meta notice rows (such as the no-final-newline marker) and refuses more than 100,000 rows or OSC 52 payloads over 100,000 encoded characters, reporting a warning instead of truncating or overclaiming.
+- Real Pi/Herdr interactive copy, macOS `pbcopy`/native helper, native Windows clipboard, and Herdr terminal clipboard passthrough are NOT RUN. Automated evidence covers payload construction and adapter branches only; OSC 52 delivery cannot be verified from Node.
+- A pre-existing uncommitted README heading edit (removal of the leading `#`) is preserved in the worktree and excluded from this change's commit.
+
+**Next Step**
+- Commit the feature, cut release 0.1.3, publish the tag/release, and close Issue #4. Manual Pi/Herdr clipboard validation remains pending.
+
 ### 2026-11-12 — Release 0.1.2: Resolve Issues #1, #2, and #3
 
 **Changed**

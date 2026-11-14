@@ -5,6 +5,12 @@ All notable changes to `pi-iteration-diff` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-11-14
+
+### Added
+
+- **Clipboard copy**: `c` copies the current selection to the system clipboard as plain text, using the same payload as `a` (file header, hunk header, and `+`/`-`/` ` rows, with no colors, styles, or line numbers); without a selection it copies the row or hunk header under the cursor. `C` copies the complete net diff of the reviewed iteration, including every file, hunk, and row regardless of scroll position or collapsed state. Both actions keep the selection, cursor, focus, editor draft, and dock state unchanged and never append or send anything. Success and failure are reported through Pi notifications. Clipboard delivery uses Pi's fullscreen path when the host provides it; otherwise the extension tries the native helper and then a direct OSC 52 write. A direct OSC 52 write is reported as sent-but-unverified, and oversized payloads or whole diffs over the export row bound are refused with a warning. Copied text is never logged or persisted.
+
 ## [0.1.2] - 2026-11-12
 
 ### Added

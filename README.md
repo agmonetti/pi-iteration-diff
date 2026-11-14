@@ -21,6 +21,7 @@ For project-local installation, add `-l`.
 - **Side-by-side dock** — explore changes alongside Pi's conversation and editor, with adjustable width and auto-close when sending your next message.
 - **Keyboard & mouse** — navigate files, expand hunks, select line ranges, and pan horizontally.
 - **Selective feedback** — append selected changes as formatted diff excerpts to your existing prompt, without auto-sending.
+- **Clipboard export** — copy the current selection or the whole iteration diff as plain text, without touching the draft or leaving Pi.
 - **Persistent width** — keep your preferred dock size across sessions and projects.
 
 ## Usage
@@ -35,6 +36,8 @@ For project-local installation, add `-l`.
 | Jump between files | `[` / `]` |
 | Expand / collapse | `Enter` or click |
 | Append selection to prompt | `a` |
+| Copy selection / cursor line | `c` |
+| Copy whole iteration diff | `C` |
 | Horizontal pan | `←` / `→` or `h` / `l` |
 | Resize dock | `Ctrl+←` / `Ctrl+→` |
 | Return to editor / close maximized dock | `Esc` |
@@ -61,6 +64,12 @@ Configure the dock using `/diff-settings`.
 
 **Wrap long lines** is saved in `<agent-dir>/iteration-diff.json` across sessions and workspaces. It shows the full content of long diff rows instead of truncating them: a row longer than the available width continues on the following display row, breaking between words at whitespace — never mid-word. A single token longer than the whole line (a long URL or identifier) still splits by columns so nothing is lost. Continuation rows keep the line-number gutter blank and mark themselves with `│` under the `+`/`-` sign column. Cursor, selection, and mouse targeting stay per logical line, so a click on any continuation selects that whole row. While wrapping is On, horizontal pan (`←`/`→`/`h`/`l`) is inert because every column is already reachable; turning it Off restores the previous truncation and pan behavior. Hunk and file headers are always kept to a single row.
 
+### Clipboard
+
+`c` copies the current selection as plain text, using the same payload as `a` (file header, hunk header, and `+`/`-`/` ` rows, without colors, styles, or line numbers). Without a selection it copies the row or hunk header under the cursor. `C` copies the complete net diff of the reviewed iteration: every file, hunk, and row in panel order, regardless of scroll position or collapsed state. Both actions leave the selection, cursor, focus, editor draft, and open/closed dock unchanged, and neither appends nor sends anything. Copying is repeatable, and `a` can still append the same selection afterwards.
+
+Clipboard delivery uses Pi's own fullscreen clipboard path first, which selects the native helper or platform tools (for example `pbcopy`, `clip`, `wl-copy`, `xclip`, or `xsel`) and reports its own success or failure. If the host does not provide that path, the extension tries the native helper directly and, as a last resort, writes OSC 52 to the terminal. A direct OSC 52 write cannot be confirmed, so the extension reports it as "sent, unverified" with a warning instead of a false success. Payloads over the OSC 52 size limit and whole diffs over the export row bound are refused with a warning. Other local applications can read clipboard contents; the extension never logs or persists copied text.
+
 ## Compatibility
 
 - **Pi Coding Agent** 1.4.0+
@@ -71,6 +80,7 @@ Configure the dock using `/diff-settings`.
 ## Limitations
 
 - Drag-to-editor behavior depends on terminal capabilities. Use `a` to append selected changes reliably.
+- Clipboard delivery depends on the host: Pi's native tools on macOS and Windows, `wl-copy`/`xclip`/`xsel` on Linux, and OSC 52 as a terminal fallback. Terminals that drop OSC 52 (for example tmux without `set-clipboard on`, or some SSH and Windows terminal paths) show the unverified-copy warning. Linux automated tests are the only clipboard execution recorded so far; macOS and native Windows clipboard paths are not yet manually validated.
 - Changes made by external processes may appear in the iteration diff and are not guaranteed to originate from the agent.
 - Binary and non-UTF-8 files are omitted from text review. Oversized files with a verified PNG signature are also omitted after bounded, identity-checked reads; oversized text and unknown formats still produce partial captures. Binary/text transitions remain partial.
 - Internal symlinks to text files captured separately in the same snapshot are omitted from content review; changes to their targets appear under the target path. Retargeting, creation, deletion, external/unreadable links, hardlinks, and special files remain partial rather than claiming a complete delta. Link metadata changes without retargeting are not reviewed.
