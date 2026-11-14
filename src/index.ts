@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { mountDock, type DockHandle } from "./ui/layout-adapter.js";
 import { DiffPanel } from "./ui/diff-panel.js";
+import { createClipboardWriter } from "./ui/clipboard.js";
 import { createIterationView } from "./diffs/iteration-diff.js";
 import { registerCaptureLifecycle } from "./lifecycle/pi-lifecycle.js";
 import { workspaceRoot } from "./snapshots/capture.js";
@@ -137,6 +138,10 @@ export default function iterationDiff(pi: ExtensionAPI): void {
               const next = prev ? `${prev}\n\n${snippet}` : snippet;
               owner.ui.setEditorText(next);
             },
+            copyText: createClipboardWriter(tui),
+            // Capture this dock's context: an async copy must still report its
+            // result if the dock is dismissed before the clipboard resolves.
+            notify: (message, type) => ctx.ui.notify(message, type),
             style: (role, text) => {
               if (role === "bold") return ctx.ui.theme.bold(text);
               if (role === "dim") return ctx.ui.theme.fg("dim", text);

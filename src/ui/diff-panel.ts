@@ -9,6 +9,8 @@ const MAX_FILE_ROWS = 2_000;
 const MAX_CONTENT_ROWS = 12_000;
 const MAX_NOTICES = 32;
 const MAX_TEXT_LENGTH = 16_384;
+/** Bound for whole-diff clipboard export; real iterations cap well below this. */
+const MAX_COPY_ROWS = 100_000;
 
 /** Column range of one wrapped segment within a row's original text. */
 interface WrapSegment {
@@ -100,6 +102,9 @@ export type Actions = {
   setDockWidth?(cols: number): void;
   resizeEnd?(): void;
   appendContext?(snippet: string): void;
+  /** Copy plain text to the system clipboard; true means delivery was verified. */
+  copyText?(text: string): boolean | string | void | Promise<boolean | string | void>;
+  notify?(message: string, type: "info" | "warning"): void;
 };
 
 export type Entry =
@@ -609,27 +614,70 @@ export class DiffPanel extends VStack implements Component, Focusable {
 
   /** Format the selected context according to approved plain text diff format. */
   formatSelectedContext(): string | undefined {
-    const entries = this.getSelectedEntries();
-    // Group rows by file
-    const fileMap = new Map<string, { file: DiffFile; hunkHeader?: string; rows: DiffRow[] }>();
-    for (const entry of entries) {
-      if (entry.kind === "hunk") {
-        if (!fileMap.has(entry.file.path)) {
-          fileMap.set(entry.file.path, { file: entry.file, rows: [] });
+    return this.formatEntries(this.getSelectedEntries());
+  }
+
+  /**
+   * Format every file of the reviewed iteration in panel order, regardless of
+   * scroll position, current file, or collapsed state. Logical rows are copied
+   * (wrapping and horizontal pan do not change the payload).
+   */
+  formatWholeDiff(): string | undefined {
+    const entries = this.wholeDiffEntries();
+    return entries ? this.formatEntries(entries) : undefined;
+  }
+
+  /** Undefined when the whole diff exceeds the clipboard export bound. */
+  private wholeDiffEntries(): Entry[] | undefined {
+    const entries: Entry[] = [];
+    for (const file of this.view.files) {
+      const rows = file.getRows();
+      // Unavailable files expose only a notice row: there is no diff text to copy.
+      if (!rows.some(row => row.kind !== "notice")) continue;
+      let hunkIndex = 0;
+      for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+        const row = rows[rowIndex]!;
+        // Meta notices (for example "no final newline") are not diff lines.
+        if (row.kind === "notice") continue;
+        if (entries.length >= MAX_COPY_ROWS) return undefined;
+        if (row.kind === "hunk") {
+          hunkIndex++;
+          entries.push({ kind: "hunk", file, row, hunkIndex });
+        } else {
+          entries.push({ kind: "row", file, row, hunkIndex, rowIndex });
         }
-        fileMap.get(entry.file.path)!.hunkHeader = entry.row.text;
-      } else if (entry.kind === "row") {
-        if (!fileMap.has(entry.file.path)) {
-          fileMap.set(entry.file.path, { file: entry.file, rows: [] });
-        }
-        fileMap.get(entry.file.path)!.rows.push(entry.row);
       }
     }
-    if (fileMap.size === 0) return undefined;
+    return entries;
+  }
+
+  /**
+   * Plain-text blocks for entries in display order: one header per file, every
+   * encountered hunk header in place, and `+`/`-`/` ` code rows. No styles or
+   * line numbers are introduced, so `a` and `c` carry the same payload shape.
+   */
+  private formatEntries(entries: readonly Entry[]): string | undefined {
+    interface Group { file: DiffFile; lines: string[]; rows: DiffRow[] }
+    const groups = new Map<string, Group>();
+    for (const entry of entries) {
+      if (entry.kind !== "hunk" && entry.kind !== "row") continue;
+      let group = groups.get(entry.file.path);
+      if (!group) {
+        group = { file: entry.file, lines: [], rows: [] };
+        groups.set(entry.file.path, group);
+      }
+      if (entry.kind === "hunk") {
+        group.lines.push(entry.row.text);
+      } else {
+        group.rows.push(entry.row);
+        const prefix = entry.row.kind === "added" ? "+" : entry.row.kind === "removed" ? "-" : " ";
+        group.lines.push(`${prefix}${entry.row.text}`);
+      }
+    }
 
     const blocks: string[] = [];
-    for (const { file, hunkHeader, rows } of fileMap.values()) {
-      if (!rows.length) continue;
+    for (const { file, lines, rows } of groups.values()) {
+      if (!lines.length) continue;
       const oldNums = rows.map(r => r.oldLine).filter((n): n is number => n !== undefined);
       const newNums = rows.map(r => r.newLine).filter((n): n is number => n !== undefined);
       const parts: string[] = [];
@@ -644,14 +692,7 @@ export class DiffPanel extends VStack implements Component, Focusable {
         parts.push(min === max ? `new:${min}` : `new:${min}-${max}`);
       }
       const rangeStr = parts.length > 0 ? ` | ${parts.join(" | ")}` : "";
-      const headerLine = `[${file.path} | diff${rangeStr}]`;
-      const codeLines: string[] = [];
-      if (hunkHeader) codeLines.push(hunkHeader);
-      for (const r of rows) {
-        const prefix = r.kind === "added" ? "+" : r.kind === "removed" ? "-" : " ";
-        codeLines.push(`${prefix}${r.text}`);
-      }
-      blocks.push(`${headerLine}\n${codeLines.join("\n")}`);
+      blocks.push(`[${file.path} | diff${rangeStr}]\n${lines.join("\n")}`);
     }
     return blocks.length > 0 ? blocks.join("\n\n") : undefined;
   }
@@ -661,6 +702,61 @@ export class DiffPanel extends VStack implements Component, Focusable {
     if (!formatted) return;
     this.actions.appendContext?.(formatted);
     this.actions.editor();
+  }
+
+  private copySelection(): void {
+    this.copyEntries(this.getSelectedEntries(), false);
+  }
+
+  private copyWholeDiff(): void {
+    const entries = this.wholeDiffEntries();
+    if (!entries) {
+      this.actions.notify?.("Whole diff is too large to copy", "warning");
+      return;
+    }
+    this.copyEntries(entries, true);
+  }
+
+  private copyEntries(entries: readonly Entry[], whole: boolean): void {
+    const text = this.formatEntries(entries);
+    if (!text) {
+      const message = whole ? "No diff content to copy"
+        : this.hasSelection() ? "Selection has no diff lines to copy" : "Select a diff line or range first";
+      this.actions.notify?.(message, "warning");
+      return;
+    }
+    const rows = entries.filter((entry): entry is Entry & { kind: "row" } => entry.kind === "row").length;
+    const paths = new Set(entries.flatMap(entry =>
+      entry.kind === "row" || entry.kind === "hunk" ? [entry.file.path] : []));
+    const where = paths.size === 1 ? ` from ${[...paths][0]}` : ` from ${paths.size} files`;
+    const description = rows > 0 ? `${rows} ${rows === 1 ? "line" : "lines"}` : "hunk header";
+    this.copyToClipboard(text, `${whole ? "Copied whole diff: " : "Copied "}${description}${where}`);
+  }
+
+  private copyToClipboard(text: string, success: string): void {
+    const copy = this.actions.copyText;
+    if (!copy) {
+      this.actions.notify?.("Clipboard unavailable in this environment", "warning");
+      return;
+    }
+    const report = (result: boolean | string | void): void => {
+      if (result === true) {
+        this.actions.notify?.(success, "info");
+        return;
+      }
+      this.actions.notify?.(typeof result === "string" && result.trim() ? result : "Clipboard unavailable", "warning");
+    };
+    try {
+      const result = copy(text);
+      if (result !== null && typeof result === "object" && typeof (result as Promise<unknown>).then === "function") {
+        void (result as Promise<boolean | string | void>).then(report,
+          error => report(error instanceof Error ? error.message : "Clipboard unavailable"));
+        return;
+      }
+      report(result as boolean | string | void);
+    } catch (error) {
+      report(error instanceof Error ? error.message : "Clipboard unavailable");
+    }
   }
 
   private getScope(): string {
@@ -805,10 +901,12 @@ export class DiffPanel extends VStack implements Component, Focusable {
       const count = rows.length || entries.length;
       const lineWord = count === 1 ? "line" : "lines";
       const short = width < 55;
-      const text = short
+      const base = short
         ? `▏ ${count} ${lineWord} selected · a: append`
         : `▏ Sel: ${summary} · a: append to editor`;
-      return this.actions.style("accent", truncateToWidth(text, width, "…"));
+      const withCopy = this.appendFooterHint(this.appendFooterHint(base, " · c: copy", width),
+        " · C: copy diff", width);
+      return this.actions.style("accent", truncateToWidth(withCopy, width, "…"));
     }
 
     const path = active && "file" in active ? active.file?.path : undefined;
@@ -823,7 +921,14 @@ export class DiffPanel extends VStack implements Component, Focusable {
     } else {
       text = `▏ Enter: expand${panStr} · a: append · ↑↓: navigate · ${escHint} · d: details`;
     }
+    // Copy hints are appended only when they fit, so an existing hint is never
+    // lengthened into truncation on a narrow dock. Both keys still work there.
+    text = this.appendFooterHint(this.appendFooterHint(text, " · c: copy", width), " · C: copy diff", width);
     return this.actions.style("muted", truncateToWidth(text, width, "…"));
+  }
+
+  private appendFooterHint(text: string, hint: string, width: number): string {
+    return visibleWidth(text) + visibleWidth(hint) <= width ? `${text}${hint}` : text;
   }
 
   /** Map a display row to its logical entry and render the right segment. */
@@ -1111,6 +1216,8 @@ export class DiffPanel extends VStack implements Component, Focusable {
     if (data === "d") { this.showDetails = !this.showDetails; this.rebuild(); this.actions.render(); return; }
     if (data === "i") { this.inspecting = !this.inspecting; this.actions.render(); return; }
     if (data === "a") { this.transferContext(); return; }
+    if (data === "c") { this.copySelection(); return; }
+    if (data === "C") { this.copyWholeDiff(); return; }
 
     // Resize dock shortcuts: < / > or Ctrl+Left / Ctrl+Right
     if (data === "<" || data === "," || data === "\x1b[1;5D") {
